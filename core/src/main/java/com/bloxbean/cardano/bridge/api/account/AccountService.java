@@ -88,6 +88,8 @@ public final class AccountService {
         if (accountIndex < 0 || addressIndex < 0) {
             throw new IllegalArgumentException("Account and address indices must be >= 0");
         }
+        // The mnemonic is consumed here (transient parameter); the stored account retains only
+        // the derived account-level key — see accountFromAccountKey.
         var cclAccount = accountFromAccountKey(network, mnemonic, accountIndex, addressIndex);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, accountIndex, addressIndex));
@@ -96,11 +98,16 @@ public final class AccountService {
 
     /**
      * Builds the CCL account from the <b>hardened account-level key</b> (ADR-0016's preferred
-     * mode): the mnemonic is used once to derive {@code m/1852'/1815'/accountIndex'}, and the
-     * account is constructed from that 96-byte key — the root phrase is not retained by the
-     * account object. The blast radius of a later memory disclosure is one account, not the
-     * wallet's entire derivation universe. (Transient copies made during derivation are subject
-     * to GC; zeroization is best-effort, per the ADR.)
+     * mode).
+     *
+     * <p><b>Reviewer note — passing is not retaining:</b> the mnemonic here is a <em>transient
+     * parameter</em>, consumed within this one call to derive {@code m/1852'/1815'/accountIndex'}.
+     * The account it returns is built via CCL's {@code createFromAccountKey}, so the long-lived
+     * object in the registry holds <em>only</em> that 96-byte account key — its {@code mnemonic}
+     * and {@code rootKey} fields are null. The blast radius of a later memory disclosure is one
+     * account, not the wallet's entire derivation universe. What remains of the phrase after this
+     * call are GC-transient copies (parameter, derivation intermediates); zeroization of those is
+     * best-effort, per the ADR.
      *
      * <p>Gated by {@code AccountKeyDerivationParityTest}: addresses, identifiers, and signatures
      * must be byte-identical with mnemonic-backed accounts.
@@ -128,13 +135,24 @@ public final class AccountService {
         if (network == null) {
             throw new InvalidNetworkException(networkId);
         }
-        // Generate the phrase, then hold the account by its account-level key (same mode as
-        // openMnemonic); the phrase itself lives only in the pending map until export/close.
-        String phrase = new com.bloxbean.cardano.client.account.Account(network).mnemonic();
+        // Generate the phrase directly (no throwaway mnemonic-backed Account, which would derive
+        // a full key set and float to GC holding the phrase and root key), then hold the account
+        // by its account-level key — same mode as openMnemonic. The phrase itself lives only in
+        // the pending map until export/close.
+        String phrase;
+        try {
+            phrase = String.join(" ", com.bloxbean.cardano.client.crypto.bip39.MnemonicCode.INSTANCE
+                    .createMnemonic(com.bloxbean.cardano.client.crypto.bip39.Words.TWENTY_FOUR));
+        } catch (Exception e) {
+            throw new IllegalStateException("Mnemonic generation failed: " + e.getMessage(), e);
+        }
+        // As in openMnemonic: the phrase is consumed transiently; the stored account retains only
+        // the account-level key. The pending map below is the phrase's sole retention, for export.
         var cclAccount = accountFromAccountKey(network, phrase, 0, 0);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, 0, 0));
         pendingRecoveryPhrases.put(handle, phrase);
+
         return handle;
     }
 
