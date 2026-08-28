@@ -68,7 +68,8 @@ Predicate methods (`validate`, `validate_mnemonic`, `verify`) return `bool` and 
 ## bridge.accounts() — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
-account API.
+account API. The account object retains only the hardened account-level key
+(`m/1852'/1815'/account'`) — never your recovery phrase.
 
 ```rust
 use ccl::accounts::SigningRole;

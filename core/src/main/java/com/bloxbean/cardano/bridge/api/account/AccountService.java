@@ -3,6 +3,7 @@ package com.bloxbean.cardano.bridge.api.account;
 import com.bloxbean.cardano.bridge.util.NetworkMapper;
 import com.bloxbean.cardano.client.common.model.Network;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -105,9 +106,14 @@ public final class AccountService {
      * The account it returns is built via CCL's {@code createFromAccountKey}, so the long-lived
      * object in the registry holds <em>only</em> that 96-byte account key — its {@code mnemonic}
      * and {@code rootKey} fields are null. The blast radius of a later memory disclosure is one
-     * account, not the wallet's entire derivation universe. What remains of the phrase after this
-     * call are GC-transient copies (parameter, derivation intermediates); zeroization of those is
-     * best-effort, per the ADR.
+     * account, not the wallet's entire derivation universe.
+     *
+     * <p>The derivation intermediates (root, purpose, coin-type — and the account-level pair,
+     * whose retained form is the independent merged copy handed to CCL) are zeroed in the
+     * {@code finally} block below; CCL's {@code getKeyData()}/{@code getChainCode()} expose the
+     * backing arrays, so the fill genuinely overwrites them. What this cannot reach — the mnemonic
+     * String itself and CCL-internal seed copies — stays GC-transient; zeroization remains
+     * best-effort overall, per the ADR.
      *
      * <p>Gated by {@code AccountKeyDerivationParityTest}: addresses, identifiers, and signatures
      * must be byte-identical with mnemonic-backed accounts.
@@ -115,14 +121,47 @@ public final class AccountService {
     private static com.bloxbean.cardano.client.account.Account accountFromAccountKey(
             Network network, String mnemonic, int accountIndex, int addressIndex) {
         var generator = new com.bloxbean.cardano.client.crypto.bip32.HdKeyGenerator();
-        var root = new com.bloxbean.cardano.client.crypto.cip1852.CIP1852()
-                .getRootKeyPairFromMnemonic(mnemonic);
-        var purpose = generator.getChildKeyPair(root, 1852, true);
-        var coinType = generator.getChildKeyPair(purpose, 1815, true);
-        var accountLevel = generator.getChildKeyPair(coinType, accountIndex, true);
-        byte[] accountKey = accountLevel.getPrivateKey().getBytes();
-        return com.bloxbean.cardano.client.account.Account
-                .createFromAccountKey(network, accountKey, accountIndex, addressIndex);
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair root = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair purpose = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair coinType = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair accountLevel = null;
+        try {
+            root = new com.bloxbean.cardano.client.crypto.cip1852.CIP1852()
+                    .getRootKeyPairFromMnemonic(mnemonic);
+            purpose = generator.getChildKeyPair(root, 1852, true);
+            coinType = generator.getChildKeyPair(purpose, 1815, true);
+            accountLevel = generator.getChildKeyPair(coinType, accountIndex, true);
+            // getBytes() merges keyData + chainCode into a NEW array — the one thing that
+            // legitimately survives this method, inside the CCL account.
+            byte[] accountKey = accountLevel.getPrivateKey().getBytes();
+            return com.bloxbean.cardano.client.account.Account
+                    .createFromAccountKey(network, accountKey, accountIndex, addressIndex);
+        } finally {
+            wipe(root);
+            wipe(purpose);
+            wipe(coinType);
+            wipe(accountLevel);
+        }
+    }
+
+    /**
+     * Zeroes a derivation intermediate's private key material in place. Child derivation copies
+     * out of fresh HMAC output ({@code Arrays.copyOfRange}), so no wiped array is shared with a
+     * pair that must stay live; the private and public halves of one pair share their chain-code
+     * array, which is fine — both halves are being discarded together.
+     */
+    private static void wipe(com.bloxbean.cardano.client.crypto.bip32.HdKeyPair pair) {
+        if (pair == null) {
+            return;
+        }
+        byte[] keyData = pair.getPrivateKey().getKeyData();
+        if (keyData != null) {
+            Arrays.fill(keyData, (byte) 0);
+        }
+        byte[] chainCode = pair.getPrivateKey().getChainCode();
+        if (chainCode != null) {
+            Arrays.fill(chainCode, (byte) 0);
+        }
     }
 
     /**
