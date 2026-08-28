@@ -88,11 +88,34 @@ public final class AccountService {
         if (accountIndex < 0 || addressIndex < 0) {
             throw new IllegalArgumentException("Account and address indices must be >= 0");
         }
-        var cclAccount = com.bloxbean.cardano.client.account.Account
-                .createFromMnemonic(network, mnemonic, accountIndex, addressIndex);
+        var cclAccount = accountFromAccountKey(network, mnemonic, accountIndex, addressIndex);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, accountIndex, addressIndex));
         return handle;
+    }
+
+    /**
+     * Builds the CCL account from the <b>hardened account-level key</b> (ADR-0016's preferred
+     * mode): the mnemonic is used once to derive {@code m/1852'/1815'/accountIndex'}, and the
+     * account is constructed from that 96-byte key — the root phrase is not retained by the
+     * account object. The blast radius of a later memory disclosure is one account, not the
+     * wallet's entire derivation universe. (Transient copies made during derivation are subject
+     * to GC; zeroization is best-effort, per the ADR.)
+     *
+     * <p>Gated by {@code AccountKeyDerivationParityTest}: addresses, identifiers, and signatures
+     * must be byte-identical with mnemonic-backed accounts.
+     */
+    private static com.bloxbean.cardano.client.account.Account accountFromAccountKey(
+            Network network, String mnemonic, int accountIndex, int addressIndex) {
+        var generator = new com.bloxbean.cardano.client.crypto.bip32.HdKeyGenerator();
+        var root = new com.bloxbean.cardano.client.crypto.cip1852.CIP1852()
+                .getRootKeyPairFromMnemonic(mnemonic);
+        var purpose = generator.getChildKeyPair(root, 1852, true);
+        var coinType = generator.getChildKeyPair(purpose, 1815, true);
+        var accountLevel = generator.getChildKeyPair(coinType, accountIndex, true);
+        byte[] accountKey = accountLevel.getPrivateKey().getBytes();
+        return com.bloxbean.cardano.client.account.Account
+                .createFromAccountKey(network, accountKey, accountIndex, addressIndex);
     }
 
     /**
@@ -105,10 +128,13 @@ public final class AccountService {
         if (network == null) {
             throw new InvalidNetworkException(networkId);
         }
-        var cclAccount = new com.bloxbean.cardano.client.account.Account(network);
+        // Generate the phrase, then hold the account by its account-level key (same mode as
+        // openMnemonic); the phrase itself lives only in the pending map until export/close.
+        String phrase = new com.bloxbean.cardano.client.account.Account(network).mnemonic();
+        var cclAccount = accountFromAccountKey(network, phrase, 0, 0);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, 0, 0));
-        pendingRecoveryPhrases.put(handle, cclAccount.mnemonic());
+        pendingRecoveryPhrases.put(handle, phrase);
         return handle;
     }
 
