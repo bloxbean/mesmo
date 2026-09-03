@@ -21,8 +21,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * and idempotent.
  *
  * <p>The Account's ordinary representation ({@link #info}) contains public data only — it never
- * echoes the mnemonic. (Deriving from the hardened account-level key and dropping the phrase — the
- * ADR's preferred mode — is gated on signing-parity verification and lands with the signing slice.)
+ * echoes the mnemonic. Accounts are held by their <b>hardened account-level key</b> (the ADR's
+ * preferred mode; see {@link #accountFromAccountKey}): the phrase is consumed at open and never
+ * retained, gated by {@code AccountKeyDerivationParityTest}.
  */
 public final class AccountService {
 
