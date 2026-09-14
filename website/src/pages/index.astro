@@ -1,0 +1,329 @@
+---
+import '../styles/landing.css';
+import ParticleBackground from '../components/landing/ParticleBackground.astro';
+import HeroIllustration from '../components/landing/HeroIllustration.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const docs = (p: string) => `${base}${p}`;
+
+const K = (s: string) => `<span style="color:#8ab6ff">${s}</span>`;   // keyword
+const S = (s: string) => `<span style="color:#e5c07b">${s}</span>`;   // string
+const C = (s: string) => `<span style="color:#5c6b85">${s}</span>`;   // comment
+const F = (s: string) => `<span style="color:#5eead4">${s}</span>`;   // call
+
+const languages = [
+  {
+    id: 'js', name: 'JavaScript', dot: '#f7df1e', sub: 'Bun FFI', href: docs('/js/'),
+    install: 'bun add @bloxbean/mesmo',
+    code: [
+      `${K('import')} { CclBridge, TESTNET } ${K('from')} ${S(`'@bloxbean/mesmo'`)};`,
+      ``,
+      `${K('const')} bridge = ${K('new')} ${F('CclBridge')}();`,
+      `${K('using')} account = bridge.accounts.${F('create')}(TESTNET);`,
+      `${K('const')} result = bridge.quicktx.${F('build')}(yaml, utxos, params);`,
+      `${K('const')} signed = account.${F('signTx')}(result.tx_cbor);`,
+      `${C('// fully offline — submit signed cbor with any HTTP client')}`,
+    ].join('\n'),
+  },
+  {
+    id: 'go', name: 'Go', dot: '#00add8', sub: 'purego · no cgo', href: docs('/go/'),
+    install: 'go get github.com/bloxbean/mesmo/wrappers/go',
+    code: [
+      `bridge, _ := ccl.${F('New')}()`,
+      `${K('defer')} bridge.${F('Close')}()`,
+      ``,
+      `account, _ := bridge.Accounts.${F('Create')}(ccl.Testnet)`,
+      `${K('defer')} account.${F('Close')}()`,
+      `result, _ := bridge.QuickTx.${F('Build')}(yaml, utxos, params)`,
+      `signed, _ := account.${F('SignTx')}(result.TxCbor, ccl.RolePayment)`,
+      `${C('// cross-compiles: pure Go, no C toolchain')}`,
+    ].join('\n'),
+  },
+  {
+    id: 'rust', name: 'Rust', dot: '#f74c00', sub: 'mesmo crate', href: docs('/rust/'),
+    install: 'cargo add mesmo',
+    code: [
+      `${K('let')} bridge = ccl::Bridge::${F('new')}()?;`,
+      ``,
+      `${K('let')} account = bridge.${F('account')}().${F('create')}(ccl::network::TESTNET)?;`,
+      `${K('let')} result = bridge.${F('quicktx')}().${F('build')}(&yaml, &utxos, &params)?;`,
+      `${K('let')} signed = bridge.${F('account')}()`,
+      `    .${F('sign_tx')}(&mnemonic, ccl::network::TESTNET, 0, 0, &result.tx_cbor)?;`,
+      `${C('// native lib fetched once at first build, then cached')}`,
+    ].join('\n'),
+  },
+  {
+    id: 'python', name: 'Python', dot: '#4d9fdb', sub: 'ctypes', href: docs('/python/'),
+    install: 'pip install mesmo',
+    code: [
+      `${K('from')} ccl ${K('import')} CclLib, Network`,
+      ``,
+      `${K('with')} ${F('CclLib')}() ${K('as')} lib, lib.accounts.${F('create')}(Network.TESTNET) ${K('as')} account:`,
+      `    result = lib.quicktx.${F('build')}(yaml, utxos, params)`,
+      `    signed = account.${F('sign_tx')}(result[${S('"tx_cbor"')}])`,
+      `${C('# wheels bundle the native library — pip install and go')}`,
+    ].join('\n'),
+  },
+];
+
+const stats = [
+  { n: '4', label: 'first-class languages' },
+  { n: '7', label: 'API groups, identical everywhere' },
+  { n: '20+', label: 'devnet-verified tx intents' },
+  { n: '0', label: 'JVMs at runtime' },
+];
+
+const features = [
+  { icon: '⚙️', title: 'Nothing extra to install', body: 'Ships as a plain native library with a C ABI, compiled ahead of time — native startup, small footprint, and no JVM anywhere in your stack.' },
+  { icon: '🔌', title: 'Fully offline by design', body: 'Key derivation, transaction building, signing, Plutus data — no network calls, no submission, no secrets in the library. You bring chain data; optional providers fetch it for you.' },
+  { icon: '📄', title: 'One YAML transaction format', body: 'Describe payments, staking, governance, minting, and Plutus operations as TxPlan YAML — identical across all four languages, with a verified intent catalog.' },
+  { icon: '🧮', title: 'Offline Plutus costing', body: 'The embedded Scalus UPLC evaluator computes execution units in-process. Override with explicit units or a remote evaluator when you want node-backed costing.' },
+  { icon: '🤝', title: 'Four first-class wrappers', body: 'Python, Go, Rust, and JavaScript (Bun) are kept at strict parity — same API groups, same error codes, enforced by CI. No second-class language.' },
+  { icon: '🤖', title: 'AI-friendly from day one', body: 'llms.txt, a full-docs dump, and an AI Starter Pack distilled for agents: point Claude Code or Cursor at one URL and generate correct code immediately.' },
+];
+---
+
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mesmo — Cardano's mature Java SDK as a native library for Python, Go, Rust & JavaScript</title>
+  <meta name="description" content="One mature Cardano codebase, exported to four language ecosystems. Offline key derivation, transaction building, signing, Plutus and governance from Python, Go, Rust, and JavaScript — with nothing extra to install." />
+  <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body class="bg-surface text-text font-sans antialiased">
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 border-b border-white/5 bg-surface/80 backdrop-blur-md">
+    <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
+      <a href={base + '/'} class="flex items-center gap-2.5 font-semibold text-white">
+        <img src={`${base}/favicon.svg`} alt="" class="h-7 w-7" />
+        <span>Mesmo</span>
+      </a>
+      <div class="flex items-center gap-6 text-sm text-text-muted">
+        <a href={docs('/overview/')} class="transition hover:text-white">Docs</a>
+        <a href={docs('/reference/txplan/')} class="hidden transition hover:text-white sm:block">TxPlan</a>
+        <a href={docs('/ai/')} class="transition hover:text-white">AI</a>
+        <a href="https://github.com/bloxbean/mesmo"
+           class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white transition hover:border-white/25 hover:bg-white/10">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="relative overflow-hidden">
+      <ParticleBackground />
+      <div class="glow-blob left-1/2 top-0 h-80 w-[42rem] -translate-x-1/2 bg-brand/20"></div>
+      <div class="relative z-10 mx-auto flex max-w-5xl flex-col items-center gap-12 px-6 pb-20 pt-16 lg:flex-row lg:gap-8 sm:pt-24">
+        <div class="flex-1 text-center lg:text-left">
+          <p class="mb-5 inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-light">
+            <span class="h-1.5 w-1.5 rounded-full bg-teal"></span>
+            Built on Cardano Client Lib · fully offline
+          </p>
+          <h1 class="text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-[3.4rem]">
+            One mature Cardano codebase,<br />
+            <span class="grad-text">exported to four languages.</span>
+          </h1>
+          <p class="mx-auto mt-6 max-w-xl text-lg leading-8 text-text-muted lg:mx-0">
+            Cardano Client Lib — the Java SDK behind production Cardano systems — compiled
+            to a plain native library. Offline key derivation, transaction building, signing,
+            Plutus, and governance from Python, Go, Rust, and JavaScript. Nothing extra to
+            install, no JVM anywhere in your stack.
+          </p>
+          <div class="mt-9 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+            <a href={docs('/getting-started/')}
+               class="rounded-xl bg-brand px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand/30 transition-all duration-200 hover:bg-brand-dark hover:shadow-brand/45">
+              Get started
+            </a>
+            <a href={docs('/ai/starter-pack/')}
+               class="rounded-xl border border-white/10 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:border-white/25 hover:bg-white/10">
+              AI Starter Pack
+            </a>
+          </div>
+        </div>
+        <div class="w-full max-w-lg flex-1"><HeroIllustration /></div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="border-y border-white/5 bg-surface-dark/60">
+      <div class="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-6 py-10 sm:grid-cols-4">
+        {stats.map((s) => (
+          <div class="text-center">
+            <div class="grad-text font-mono text-4xl font-bold">{s.n}</div>
+            <div class="mt-1 text-xs uppercase tracking-wider text-text-muted">{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Honest positioning -->
+    <section class="mx-auto max-w-5xl px-6 py-20 sm:py-24">
+      <h2 class="mb-4 text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">Where this fits</h2>
+      <p class="mx-auto mb-10 max-w-3xl text-center text-text-muted">
+        Cardano already has excellent native libraries —
+        <a href="https://github.com/Python-Cardano/pycardano" class="text-brand-light transition hover:text-white">pycardano</a>,
+        <a href="https://meshjs.dev" class="text-brand-light transition hover:text-white">MeshJS</a> and
+        <a href="https://github.com/Anastasia-Labs/lucid-evolution" class="text-brand-light transition hover:text-white">Lucid Evolution</a>,
+        <a href="https://github.com/txpipe/pallas" class="text-brand-light transition hover:text-white">pallas</a>,
+        <a href="https://github.com/blinklabs-io/gouroboros" class="text-brand-light transition hover:text-white">gOuroboros</a>,
+        <a href="https://github.com/Salvionied/apollo" class="text-brand-light transition hover:text-white">Apollo</a>, and more.
+        If one of them serves you well, use it. These bindings shine when it doesn't quite: when a
+        native library is missing a capability you need, or its API doesn't fit how you work, you get
+        Cardano Client Lib's exact, well-tested semantics — identically in four languages — without
+        leaving your stack. Being offline and stateless, they slot in <em>alongside</em> an existing
+        library for just the missing pieces: no rewrite, no migration. It may feel less idiomatic
+        than your native library — and if a native implementation catches up later, swapping back
+        out is just as easy. The point is that you keep moving in the meantime.
+      </p>
+      <div class="grid gap-5 md:grid-cols-2">
+        <div class="glow-card p-6">
+          <h3 class="mb-3 font-semibold text-white">Choose these bindings when…</h3>
+          <ul class="list-disc space-y-2.5 pl-5 text-sm leading-relaxed text-text-muted">
+            <li>your native library is <strong class="text-text">missing functionality you need</strong> — e.g. Conway governance operations, offline Plutus costing, HD-wallet or DRep key derivation — use these bindings for just those pieces, alongside it</li>
+            <li>you're <strong class="text-text">not happy with an API</strong> and prefer CCL's model — declarative TxPlan YAML instead of imperative builders</li>
+            <li>you want <strong class="text-text">identical transaction-building behavior</strong> across several languages or services, or already use CCL on the JVM</li>
+            <li>you want offline building backed by CCL's test suite and devnet-verified intent shapes, and insurance against a library going unmaintained</li>
+          </ul>
+        </div>
+        <div class="glow-card p-6">
+          <h3 class="mb-3 font-semibold text-white">Choose a native library when…</h3>
+          <ul class="list-disc space-y-2.5 pl-5 text-sm leading-relaxed text-text-muted">
+            <li>you prefer a <strong class="text-text">pure-language dependency</strong> — these bindings ship a ~50 MB native binary</li>
+            <li>you need node protocols / chain sync — deliberately out of scope here</li>
+            <li>your platform isn't covered (e.g. macOS Intel)</li>
+            <li>an idiomatic library already fits your stack — no need to switch</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- Terminal: same semantics in every language -->
+    <section class="relative mx-auto max-w-4xl px-6 py-20 sm:py-24">
+      <div class="glow-blob -left-40 top-24 h-72 w-72 bg-teal/10"></div>
+      <h2 class="mb-3 text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">Same semantics in every language</h2>
+      <p class="mx-auto mb-10 max-w-2xl text-center text-text-muted">
+        Same API groups, same error codes, same TxPlan YAML — kept at parity and enforced by CI.
+      </p>
+
+      <div class="term relative z-10">
+        <div class="flex items-center gap-4 border-b border-white/5 px-4 pt-3">
+          <div class="mb-3 flex gap-1.5">
+            <span class="h-3 w-3 rounded-full bg-[#ff5f57]"></span>
+            <span class="h-3 w-3 rounded-full bg-[#febc2e]"></span>
+            <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
+          </div>
+          <div role="tablist" class="flex gap-1 overflow-x-auto">
+            {languages.map((lang, i) => (
+              <button role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-tab={lang.id}
+                      class="term-tab flex items-center gap-2 whitespace-nowrap px-4 pb-3 pt-1 font-mono text-sm">
+                <span class="h-2 w-2 rounded-full" style={`background:${lang.dot}`}></span>{lang.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        {languages.map((lang, i) => (
+          <div role="tabpanel" data-panel={lang.id} class:list={[{ hidden: i !== 0 }]}>
+            <div class="border-b border-white/5 px-5 py-3 font-mono text-sm text-[#8fd18f]">
+              <span class="select-none text-text-muted">$ </span>{lang.install}
+            </div>
+            <pre class="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed text-[#d4d4d8]"><code set:html={lang.code} /></pre>
+            <div class="flex items-center justify-between border-t border-white/5 px-5 py-3 text-xs text-text-muted">
+              <span class="font-mono">{lang.sub}</span>
+              <a href={lang.href} class="font-semibold text-brand-light transition hover:text-white">{lang.name} guide →</a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="relative border-t border-white/5 bg-surface-dark/40 py-20 sm:py-24">
+      <div class="glow-blob -right-32 top-10 h-80 w-80 bg-brand/10"></div>
+      <div class="relative z-10 mx-auto max-w-5xl px-6">
+        <h2 class="mb-12 text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">Why these bindings</h2>
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div class="glow-card p-6">
+              <div class="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-lg">{f.icon}</div>
+              <h3 class="mb-2 font-semibold text-white">{f.title}</h3>
+              <p class="text-sm leading-relaxed text-text-muted">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+
+    <!-- The stack underneath -->
+    <section class="mx-auto max-w-5xl px-6 py-20 sm:py-24">
+      <h2 class="mb-4 text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">Proven engine, new bindings</h2>
+      <p class="mx-auto max-w-3xl text-center text-text-muted">
+        Most ecosystem libraries are maintained by small teams in their spare time, so after a hard
+        fork some features can lag. The Java Cardano stack is maintained full-time and has a track
+        record of picking up new protocol features quickly. These bindings are brand new — nobody
+        runs them in production yet. What is proven is the engine inside them:
+        <a href="https://github.com/bloxbean/cardano-client-lib" class="text-brand-light transition hover:text-white">Cardano Client Lib</a>
+        has powered production Cardano systems — exchange integrations, governance platforms,
+        indexers — for years. The bindings compile and export that same library, with the same
+        code, tests, and maintainers. Only the calling language changes.
+      </p>
+    </section>
+
+    <!-- AI section -->
+    <section class="relative overflow-hidden border-t border-white/5 bg-surface-dark/60">
+      <div class="glow-blob left-1/2 top-1/2 h-64 w-[36rem] -translate-x-1/2 -translate-y-1/2 bg-teal/10"></div>
+      <div class="relative z-10 mx-auto max-w-4xl px-6 py-20 text-center sm:py-24">
+        <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Bring your AI agent</h2>
+        <p class="mx-auto mt-4 max-w-2xl text-text-muted">
+          The docsite ships <code class="font-mono text-brand-light">llms.txt</code>, a full-docs dump, and a distilled
+          Starter Pack. One <code class="font-mono text-brand-light">curl</code> and Claude Code, Cursor, or any agent
+          writes correct code against the bindings.
+        </p>
+        <div class="term mx-auto mt-8 max-w-2xl text-left">
+          <div class="flex gap-1.5 border-b border-white/5 px-4 py-3">
+            <span class="h-3 w-3 rounded-full bg-[#ff5f57]"></span>
+            <span class="h-3 w-3 rounded-full bg-[#febc2e]"></span>
+            <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
+          </div>
+          <pre class="overflow-x-auto px-5 py-4 font-mono text-sm text-[#d4d4d8]"><code><span class="select-none text-text-muted">$ </span>curl -o CLAUDE.md https://pages.bloxbean.com/mesmo/ai/starter-pack.md</code></pre>
+        </div>
+        <a href={docs('/ai/')} class="mt-8 inline-block font-semibold text-brand-light transition hover:text-white">Set up your tool →</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-white/5 py-10">
+    <div class="mx-auto mb-8 flex max-w-5xl flex-col items-center gap-3 px-6 text-center">
+      <span class="text-xs font-semibold uppercase tracking-wider text-text-muted">Supported by</span>
+      <img src={`${base}/images/cf-logo-text.svg`} alt="Cardano Foundation" width="160" class="invert opacity-80" />
+      <p class="text-sm text-text-muted">The Cardano Foundation supports this project through engineering resources.</p>
+    </div>
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 text-sm text-text-muted">
+      <span>© {new Date().getFullYear()} BloxBean — MIT License</span>
+      <div class="flex gap-6">
+        <a href={docs('/overview/')} class="transition hover:text-white">Documentation</a>
+        <a href={docs('/reference/txplan/')} class="transition hover:text-white">TxPlan</a>
+        <a href="https://github.com/bloxbean/cardano-client-lib" class="transition hover:text-white">Cardano Client Lib</a>
+        <a href="https://github.com/bloxbean/mesmo" class="transition hover:text-white">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((b) =>
+          b.setAttribute('aria-selected', String(b === btn)));
+        document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) =>
+          p.classList.toggle('hidden', p.dataset.panel !== btn.dataset.tab));
+      });
+    });
+  </script>
+</body>
+</html>

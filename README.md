@@ -411,3 +411,11 @@ bridge.close();
 ## License
 
 [MIT License](LICENSE)
+
+## Supported by
+
+<p align="left">
+  <img src="website/public/images/cf-logo-text.svg" alt="Cardano Foundation" width="180"/>
+</p>
+
+The Cardano Foundation supports this project through engineering resources.

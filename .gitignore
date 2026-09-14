@@ -50,3 +50,14 @@ wrappers/js/node_modules/
 # Yaci DevKit CLI local artifacts
 yaci-cli.history
 logs/yaci-cli.log
+
+# Docsite generated output (duplicated from website/.gitignore so a website/
+# build left behind on a branch that predates the docsite can't be committed)
+website/dist/
+website/.astro/
+website/node_modules/
+website/src/content/docs/js/
+website/src/content/docs/go/
+website/src/content/docs/rust/
+website/src/content/docs/python/
+website/src/content/docs/reference/txplan.md
