@@ -23,7 +23,7 @@ new YaciProvider(baseUrl?: string)   // default: "http://localhost:10000/local-c
 
 ```js
 const provider = new YaciProvider();
-const result = await bridge.quicktx.buildWith(yaml, provider, senderAddress);
+const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 ### BlockfrostProvider
@@ -38,7 +38,7 @@ new BlockfrostProvider(projectId: string, options?: { network?: "mainnet" | "pre
 
 ```js
 const provider = new BlockfrostProvider(process.env.BF_PROJECT_ID, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, senderAddress);
+const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 ## Evaluators
@@ -61,7 +61,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```js
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, sender, evaluator);
+const result = await bridge.quicktx.buildWith(yaml, provider, [sender], evaluator);
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 

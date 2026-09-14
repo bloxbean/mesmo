@@ -10,7 +10,7 @@ import (
 const intentMnemonic = "test walk nut penalty hip pave soap entry language right filter choice"
 
 // A stake registration must be witnessed by the stake key in addition to the payment key, or the
-// node rejects it with MissingVKeyWitnessesUTXOW. This verifies SignTxWithKeys adds that second
+// node rejects it with MissingVKeyWitnessesUTXOW. This verifies the stake role adds that second
 // witness (the signed CBOR is longer by one vkey witness) where SignTx (payment only) does not.
 func TestSignTxWithStakeKey(t *testing.T) {
 	yamlBytes, err := os.ReadFile("../../../test-fixtures/quicktx-intents/stake_registration.yaml")
@@ -29,14 +29,8 @@ func TestSignTxWithStakeKey(t *testing.T) {
 		t.Fatalf("build stake registration: %v", err)
 	}
 
-	signedPayment, err := bridge.Account.SignTx(intentMnemonic, Testnet, 0, 0, built.TxCbor)
-	if err != nil {
-		t.Fatalf("sign (payment): %v", err)
-	}
-	signedStake, err := bridge.Account.SignTxWithKeys(intentMnemonic, Testnet, 0, 0, built.TxCbor, "payment", "stake")
-	if err != nil {
-		t.Fatalf("sign (payment,stake): %v", err)
-	}
+	signedPayment := intentSign(t, built.TxCbor, "payment")
+	signedStake := intentSign(t, built.TxCbor, "payment", "stake")
 
 	if len(signedStake) <= len(signedPayment) {
 		t.Errorf("payment+stake signing should add a witness: payment=%d, payment+stake=%d",
@@ -44,10 +38,52 @@ func TestSignTxWithStakeKey(t *testing.T) {
 	}
 }
 
-// An unknown key role is rejected.
-func TestSignTxWithKeysRejectsUnknownRole(t *testing.T) {
-	if _, err := bridge.Account.SignTxWithKeys(intentMnemonic, Testnet, 0, 0,
-		"84a300d9010281825820"+strings.Repeat("0", 100), "bogus"); err == nil {
+// An unknown role bit is rejected by the typed mask.
+func TestSignTxRejectsUnknownRole(t *testing.T) {
+	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	if err != nil {
+		t.Fatalf("Accounts.FromMnemonic: %v", err)
+	}
+	defer acct.Close()
+	if _, err := acct.SignTx("84a300d9010281825820"+strings.Repeat("0", 100), SigningRole(1<<7)); err == nil {
 		t.Error("expected an error for an unknown signing role")
 	}
+}
+
+// rolesFromKeys maps the fixture role names onto the typed mask.
+func rolesFromKeys(t *testing.T, keys []string) SigningRole {
+	t.Helper()
+	var mask SigningRole
+	for _, k := range keys {
+		switch k {
+		case "payment":
+			mask |= RolePayment
+		case "stake":
+			mask |= RoleStake
+		case "drep":
+			mask |= RoleDRep
+		default:
+			t.Fatalf("unknown signing role %q", k)
+		}
+	}
+	return mask
+}
+
+// intentSignAt signs with the fixture mnemonic through a managed handle at the given address index.
+func intentSignAt(t *testing.T, addressIndex int, txCbor string, keys ...string) string {
+	t.Helper()
+	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, addressIndex)
+	if err != nil {
+		t.Fatalf("Accounts.FromMnemonic: %v", err)
+	}
+	defer acct.Close()
+	signed, err := acct.SignTx(txCbor, rolesFromKeys(t, keys))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return signed
+}
+
+func intentSign(t *testing.T, txCbor string, keys ...string) string {
+	return intentSignAt(t, 0, txCbor, keys...)
 }

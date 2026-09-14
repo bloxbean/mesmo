@@ -45,17 +45,21 @@ func main() {
 	}
 	defer bridge.Close()
 
-	// Create a new account (24-word mnemonic, testnet addresses).
-	account, err := bridge.Account.Create(ccl.Testnet)
+	// Create a new managed account (testnet). Its Info never contains the phrase;
+	// export the recovery phrase once, deliberately.
+	account, err := bridge.Accounts.Create(ccl.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(account.BaseAddress)  // addr_test1...
-	fmt.Println(account.StakeAddress) // stake_test1...
+	defer account.Close()
+	info, _ := account.Info()
+	fmt.Println(info.BaseAddress)  // addr_test1...
+	fmt.Println(info.StakeAddress) // stake_test1...
+	mnemonic, _ := account.ExportRecoveryPhrase()
 
-	// Restore it later from the mnemonic.
-	restored, _ := bridge.Account.FromMnemonic(account.Mnemonic, ccl.Testnet, 0, 0)
-	_ = restored
+	// Restore it later from the phrase.
+	restored, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	defer restored.Close()
 }
 ```
 
@@ -80,7 +84,7 @@ transaction:
 result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams)
 // result.TxCbor, result.TxHash, result.Fee
 
-signed, err := bridge.Account.SignTx(sender.Mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+signed, err := sender.SignTx(result.TxCbor, ccl.RolePayment) // sender = bridge.Accounts.FromMnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
@@ -88,7 +92,7 @@ With a provider, fetching the chain data is one call:
 
 ```go
 provider := ccl.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
-result, err := bridge.QuickTx.BuildWith(yaml, provider, sender.BaseAddress, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 ```
 
 ## Design in one paragraph
@@ -104,8 +108,6 @@ A `*Bridge` is safe to share across goroutines: all native calls are funneled to
 ```go
 ccl.Mainnet // 0
 ccl.Testnet // 1
-ccl.Preprod // 2
-ccl.Preview // 3
 ```
 
 Every key-derivation method takes a typed `ccl.Network` — passing a bare `int` is a compile error. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).

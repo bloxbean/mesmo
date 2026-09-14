@@ -14,12 +14,35 @@ from pathlib import Path
 
 import pytest
 
+from ccl import SigningRole
 from ccl._ffi import CclLib, CclError
 from ccl.network import Network
 from tests.devkit_helper import DevKitHelper
 
 # The fixed test account the quicktx-intents fixtures are derived from (account 0/0).
 INTENT_MNEMONIC = "test walk nut penalty hip pave soap entry language right filter choice"
+
+_ROLE_MASKS = {"payment": SigningRole.PAYMENT, "stake": SigningRole.STAKE, "drep": SigningRole.DREP}
+
+
+def _roles_mask(keys):
+    mask = _ROLE_MASKS[keys[0]]
+    for k in keys[1:]:
+        mask |= _ROLE_MASKS[k]
+    return mask
+
+
+def _intent_sign(ccl_lib, tx_cbor, keys=("payment",), address_index=0):
+    """Sign with the fixture mnemonic through a managed handle (opened per call, closed after)."""
+    with ccl_lib.accounts.from_mnemonic(INTENT_MNEMONIC, Network.TESTNET, 0, address_index) as acct:
+        return acct.sign_tx(tx_cbor, _roles_mask(list(keys)))
+
+
+def _fresh_addr(ccl_lib):
+    """A fresh testnet address (managed handle, closed immediately)."""
+    with ccl_lib.accounts.create(Network.TESTNET) as acct:
+        return acct.info["base_address"]
+
 INTENT_SENDER = "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp"
 FIXTURES = Path(__file__).parent / "../../../test-fixtures/quicktx-intents"
 
@@ -81,8 +104,7 @@ def _sign_submit(ccl_lib, devkit, yaml_str, utxos, pp, keys, exec_units=None,
         additional_signers = max(0, len(keys) - 1)
     result = ccl_lib.quicktx.build(yaml_str, utxos, pp, exec_units=exec_units,
                                    additional_signers=additional_signers)
-    signed = ccl_lib.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, result["tx_cbor"], list(keys), Network.TESTNET, 0, 0)
+    signed = _intent_sign(ccl_lib, result["tx_cbor"], keys)
     tx_hash = devkit.submit_tx(signed)
     assert tx_hash
     return tx_hash
@@ -147,10 +169,10 @@ def ccl_lib():
 
 @pytest.fixture
 def funded_sender(ccl_lib, devkit):
-    account = ccl_lib.account.create(Network.TESTNET)
-    devkit.topup(account["base_address"], 150)
-    devkit.wait_for_block(2)
-    return account
+    with ccl_lib.accounts.create(Network.TESTNET) as acct:
+        devkit.topup(acct.info["base_address"], 150)
+        devkit.wait_for_block(2)
+        yield acct
 
 
 def _payment_yaml(from_addr, to_addr, quantity):
@@ -170,79 +192,78 @@ transaction:
 
 def test_simple_ada_transfer(ccl_lib, devkit, funded_sender):
     """Build a 5 ADA payment from TxPlan YAML, sign, submit, and verify on-chain."""
-    receiver = ccl_lib.account.create(Network.TESTNET)
+    receiver = _fresh_addr(ccl_lib)
 
-    utxos = devkit.get_utxos(funded_sender["base_address"])
+    utxos = devkit.get_utxos(funded_sender.info["base_address"])
     pp = devkit.get_protocol_params()
 
-    yaml_str = _payment_yaml(funded_sender["base_address"], receiver["base_address"], "5000000")
+    yaml_str = _payment_yaml(funded_sender.info["base_address"], receiver, "5000000")
     result = ccl_lib.quicktx.build(yaml_str, utxos, pp)
     assert len(result["tx_cbor"]) > 0
     assert len(result["tx_hash"]) == 64
     assert int(result["fee"]) > 0
 
-    signed_tx = ccl_lib.account.sign_tx(
-        funded_sender["mnemonic"], result["tx_cbor"], Network.TESTNET, 0, 0)
+    signed_tx = funded_sender.sign_tx(result["tx_cbor"])
     tx_hash = devkit.submit_tx(signed_tx)
     assert tx_hash
 
     devkit.wait_for_block(3)
-    receiver_utxos = devkit.get_utxos(receiver["base_address"])
+    receiver_utxos = devkit.get_utxos(receiver)
     total = sum(int(a["quantity"]) for u in receiver_utxos
                 for a in u["amount"] if a["unit"] == "lovelace")
     assert total == 5_000_000
 
 
 def test_multiple_receivers(ccl_lib, devkit, funded_sender):
-    r1 = ccl_lib.account.create(Network.TESTNET)
-    r2 = ccl_lib.account.create(Network.TESTNET)
+    r1 = _fresh_addr(ccl_lib)
+    r2 = _fresh_addr(ccl_lib)
 
-    utxos = devkit.get_utxos(funded_sender["base_address"])
+    sender_address = funded_sender.info["base_address"]
+    utxos = devkit.get_utxos(sender_address)
     pp = devkit.get_protocol_params()
 
     yaml_str = f"""
 version: 1.0
 transaction:
   - tx:
-      from: {funded_sender['base_address']}
+      from: {sender_address}
       intents:
         - type: payment
-          address: {r1['base_address']}
+          address: {r1}
           amounts:
             - unit: lovelace
               quantity: "3000000"
         - type: payment
-          address: {r2['base_address']}
+          address: {r2}
           amounts:
             - unit: lovelace
               quantity: "2000000"
 """
     result = ccl_lib.quicktx.build(yaml_str, utxos, pp)
-    signed_tx = ccl_lib.account.sign_tx(
-        funded_sender["mnemonic"], result["tx_cbor"], Network.TESTNET, 0, 0)
+    signed_tx = funded_sender.sign_tx(result["tx_cbor"])
     assert devkit.submit_tx(signed_tx)
 
     devkit.wait_for_block(3)
-    r1_utxos = devkit.get_utxos(r1["base_address"])
+    r1_utxos = devkit.get_utxos(r1)
     total = sum(int(a["quantity"]) for u in r1_utxos
                 for a in u["amount"] if a["unit"] == "lovelace")
     assert total == 3_000_000
-    r2_utxos = devkit.get_utxos(r2["base_address"])
+    r2_utxos = devkit.get_utxos(r2)
     total2 = sum(int(a["quantity"]) for u in r2_utxos
                  for a in u["amount"] if a["unit"] == "lovelace")
     assert total2 == 2_000_000
 
 
 def test_insufficient_funds(ccl_lib, devkit):
-    sender = ccl_lib.account.create(Network.TESTNET)
-    devkit.topup(sender["base_address"], 2)
+    sender = _fresh_addr(ccl_lib)
+    devkit.topup(sender, 2)
     devkit.wait_for_block(2)
-    receiver = ccl_lib.account.create(Network.TESTNET)
+    receiver = _fresh_addr(ccl_lib)
 
-    utxos = devkit.get_utxos(sender["base_address"])
+    utxos = devkit.get_utxos(sender)
     pp = devkit.get_protocol_params()
 
-    yaml_str = _payment_yaml(sender["base_address"], receiver["base_address"], "100000000")
+    yaml_str = _payment_yaml(sender, receiver, "100000000")
     with pytest.raises(CclError):
         ccl_lib.quicktx.build(yaml_str, utxos, pp)
 
@@ -251,11 +272,11 @@ def test_build_with_yaci_provider(ccl_lib, devkit, funded_sender):
     """The shipped YaciProvider fetches the devnet's real chain data and feeds build()."""
     from ccl.providers import YaciProvider
 
-    receiver = ccl_lib.account.create(Network.TESTNET)
+    receiver = _fresh_addr(ccl_lib)
     provider = YaciProvider()  # defaults to the local DevKit cluster
-    yaml_str = _payment_yaml(funded_sender["base_address"], receiver["base_address"], "5000000")
+    yaml_str = _payment_yaml(funded_sender.info["base_address"], receiver, "5000000")
 
-    result = ccl_lib.quicktx.build_with(yaml_str, provider, funded_sender["base_address"])
+    result = ccl_lib.quicktx.build_with(yaml_str, provider, [funded_sender.info["base_address"]])
 
     assert len(result["tx_cbor"]) > 0
     assert len(result["tx_hash"]) == 64
@@ -295,7 +316,7 @@ def test_donation_treasury(ccl_lib, devkit):
     for _ in range(5):
         yaml_str = base_yaml.replace("current_treasury_value: 0", f"current_treasury_value: {treasury}")
         result = ccl_lib.quicktx.build(yaml_str, utxos, pp)
-        signed = ccl_lib.account.sign_tx(INTENT_MNEMONIC, result["tx_cbor"], Network.TESTNET, 0, 0)
+        signed = _intent_sign(ccl_lib, result["tx_cbor"])
         try:
             tx_hash = devkit.submit_tx(signed)
             assert tx_hash
@@ -373,6 +394,19 @@ def test_plutus_spend(ccl_lib, devkit):
 
 # --- Governance / staking suite (mirrors intents_integration_test.go) ---
 
+def test_managed_account_handle_sign_submit(ccl_lib, devkit):
+    """ADR-0016 end-to-end: build offline, sign with a managed Account handle (typed role mask,
+    no mnemonic in the signing call), and have the node accept the transaction. The handle-based
+    signature must be as node-acceptable as the mnemonic-per-call path it replaces."""
+    pp = _reset_and_fund(devkit)
+    utxos = devkit.get_utxos(INTENT_SENDER)
+    built = ccl_lib.quicktx.build(_read_fixture("stake_registration.yaml"), utxos, pp,
+                                  additional_signers=1)
+    with ccl_lib.accounts.from_mnemonic(INTENT_MNEMONIC, Network.TESTNET) as acct:
+        signed = acct.sign_tx(built["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
+    assert devkit.submit_tx(signed)
+
+
 def test_stake_registration(ccl_lib, devkit):
     """Register a stake address (witnessed by payment + stake keys). Mirrors
     TestIntegrationStakeRegistration."""
@@ -388,7 +422,7 @@ def test_drep_registration(ccl_lib, devkit):
 def test_drep_key_required(ccl_lib, devkit):
     """Negative test: a DRep registration certificate must be witnessed by the DRep key, so signing
     with the payment key alone must be rejected by the node (MissingVKeyWitnessesUTXOW). This proves
-    the extra witness sign_tx_with_keys adds is genuinely required — not cosmetic — and complements
+    the extra witness the stake role adds is genuinely required — not cosmetic — and complements
     the positive test_drep_registration (payment+drep) above. Mirrors TestIntegrationDRepKeyRequired.
     """
     pp = _reset_and_fund(devkit)
@@ -397,8 +431,7 @@ def test_drep_key_required(ccl_lib, devkit):
                                   additional_signers=1)
 
     # Sign with the payment key ONLY (sign_tx), omitting the DRep-key witness.
-    signed_payment_only = ccl_lib.account.sign_tx(
-        INTENT_MNEMONIC, built["tx_cbor"], Network.TESTNET, 0, 0)
+    signed_payment_only = _intent_sign(ccl_lib, built["tx_cbor"])
     with pytest.raises(RuntimeError):
         devkit.submit_tx(signed_payment_only)
 
@@ -492,8 +525,7 @@ def test_aiken_mint_rejects(ccl_lib, devkit):
     utxos = devkit.get_utxos(INTENT_SENDER)
     result = ccl_lib.quicktx.build(_read_fixture("plutus/aiken_mint_fail.yaml"),
                                    utxos, pp, exec_units=EXEC_UNITS)
-    signed = ccl_lib.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, result["tx_cbor"], ["payment"], Network.TESTNET, 0, 0)
+    signed = _intent_sign(ccl_lib, result["tx_cbor"], ["payment"])
     with pytest.raises(RuntimeError):
         devkit.submit_tx(signed)
 
@@ -579,8 +611,7 @@ def test_voting(ccl_lib, devkit):
     u3 = devkit.get_utxos(INTENT_SENDER)
     proposal = ccl_lib.quicktx.build(_read_fixture("governance_proposal.yaml"), u3, pp)
     action_tx_hash = proposal["tx_hash"]
-    signed_proposal = ccl_lib.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, proposal["tx_cbor"], ["payment"], Network.TESTNET, 0, 0)
+    signed_proposal = _intent_sign(ccl_lib, proposal["tx_cbor"], ["payment"])
     assert devkit.submit_tx(signed_proposal)
     devkit.wait_for_block(3)
 
@@ -607,8 +638,7 @@ def _sign_submit_fee(ccl_lib, devkit, yaml_str, utxos, pp, keys, exec_units=None
     balance change (the ledger read-back "submit accepted" alone can't give)."""
     result = ccl_lib.quicktx.build(yaml_str, utxos, pp, exec_units=exec_units,
                                    additional_signers=max(0, len(keys) - 1))
-    signed = ccl_lib.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, result["tx_cbor"], list(keys), Network.TESTNET, 0, 0)
+    signed = _intent_sign(ccl_lib, result["tx_cbor"], keys)
     assert devkit.submit_tx(signed)
     return int(result["fee"])
 
@@ -832,8 +862,8 @@ def test_compose_two_senders(ccl_lib, devkit):
 
     utxos = devkit.get_utxos(INTENT_SENDER) + devkit.get_utxos(INTENT_SENDER2)
     result = ccl_lib.quicktx.build(_read_fixture("compose.yaml"), utxos, pp)
-    once = ccl_lib.account.sign_tx(INTENT_MNEMONIC, result["tx_cbor"], Network.TESTNET, 0, 0)
-    twice = ccl_lib.account.sign_tx(INTENT_MNEMONIC, once, Network.TESTNET, 0, 1)
+    once = _intent_sign(ccl_lib, result["tx_cbor"])
+    twice = _intent_sign(ccl_lib, once, address_index=1)
     assert devkit.submit_tx(twice)
     devkit.wait_for_block(3)
 

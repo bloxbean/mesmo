@@ -39,3 +39,4 @@ stays reserved).
 | [0013](0013-transaction-evaluators.md) | Transaction evaluators — Scalus default in the core, pluggable remote evaluators in the wrappers | Accepted | 2026-07-03 |
 | [0014](0014-go-distribution-purego-runtime-resolution.md) | Go distribution — purego + runtime library resolution (supersedes ADR-0012's Go mechanism) | Accepted | 2026-07-07 |
 | [0015](0015-no-reference-wrapper-parity.md) | No reference wrapper — keep the four wrappers at parity | Accepted | 2026-07-10 |
+| [0016](0016-managed-account-signing-handles.md) | Encapsulate signing secrets in managed Account handles | Accepted | 2026-08-26 |

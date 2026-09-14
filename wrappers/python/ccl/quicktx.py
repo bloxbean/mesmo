@@ -48,11 +48,14 @@ class QuickTx:
         )
         return yaml.safe_load(self._bridge._check(rc))
 
-    def build_with(self, txplan_yaml, provider, sender, evaluator=None, additional_signers=0):
+    def build_with(self, txplan_yaml, provider, senders, evaluator=None, additional_signers=0):
         """Fetch chain data from ``provider`` (and, optionally, execution units from ``evaluator``),
         then build — in one call.
 
-        Composes ``provider.utxos(sender)`` + ``provider.protocol_params()`` with :meth:`build`.
+        Composes ``provider.utxos(sender)`` for every sender + ``provider.protocol_params()``
+        with :meth:`build`. UTXOs are de-duplicated by ``(tx_hash, output_index)``, so overlapping
+        senders can't double-fund the build. For multi-sender transactions, TxPlan's
+        ``context.fee_payer`` decides who pays the fee.
         The bridge stays offline — this only moves the optional HTTP fetch into wrapper code. See
         :mod:`ccl.providers` for available providers (Yaci DevKit, Blockfrost) or implement your own.
 
@@ -66,14 +69,21 @@ class QuickTx:
         Args:
             txplan_yaml: the TxPlan YAML string defining the transaction(s).
             provider: a :class:`ccl.providers.ChainDataProvider` (``utxos(address)`` + ``protocol_params()``).
-            sender: the address whose UTXOs fund the transaction.
+            senders: list of addresses whose UTXOs fund the transaction(s).
             evaluator: optional :class:`ccl.providers.TransactionEvaluator` (``evaluate(tx_cbor, utxos)``)
                 to compute the units remotely; when omitted, the offline Scalus default is used.
 
         Returns:
             dict with ``tx_cbor``, ``tx_hash`` and ``fee``.
         """
-        utxos = provider.utxos(sender)
+        utxos = []
+        seen = set()
+        for sender in senders:
+            for u in provider.utxos(sender):
+                key = (u.get("tx_hash"), u.get("output_index"))
+                if key not in seen:
+                    seen.add(key)
+                    utxos.append(u)
         protocol_params = provider.protocol_params()
         exec_units = None
         if evaluator is not None:

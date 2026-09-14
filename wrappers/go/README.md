@@ -66,22 +66,25 @@ func main() {
 	}
 	defer bridge.Close() // tears down the isolate
 
-	account, err := bridge.Account.Create(ccl.Testnet)
+	account, err := bridge.Accounts.Create(ccl.Testnet) // managed handle (ADR-0016)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(account.BaseAddress) // addr_test1...
-	fmt.Println(account.Mnemonic)    // 24-word phrase
+	defer account.Close()
+	info, _ := account.Info()
+	fmt.Println(info.BaseAddress) // addr_test1...
+	phrase, _ := account.ExportRecoveryPhrase() // one-shot, deliberate
+	fmt.Println(phrase) // 24-word phrase
 }
 ```
 
 ## API namespaces
 
 A `*Bridge` exposes these namespaces (all offline operations):
-`bridge.Account`, `bridge.Address`, `bridge.Crypto`, `bridge.Tx`, `bridge.Plutus`,
-`bridge.Script`, `bridge.Gov`, `bridge.Wallet`, `bridge.QuickTx`.
+`bridge.Accounts`, `bridge.Address`, `bridge.Crypto`, `bridge.Tx`, `bridge.Plutus`,
+`bridge.Script`, `bridge.QuickTx`.
 
-Networks are the `ccl.Network` type: `ccl.Mainnet`, `ccl.Testnet`, `ccl.Preprod`, `ccl.Preview`.
+Networks are the `ccl.Network` type: `ccl.Mainnet` or `ccl.Testnet`.
 
 > **These are CCL's enum ordinals, not Cardano's on-chain network id.** `Mainnet` is 0 and
 > `Testnet` is 1, which is the *inverse* of the on-chain encoding (0 = testnet, 1 = mainnet).
@@ -103,7 +106,7 @@ for you over HTTP (stdlib `net/http`), so the native library stays offline and p
 
 ```go
 provider, _ := ccl.NewBlockfrostProvider(projectID, "preprod") // or ccl.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `ccl.ChainDataProvider` interface
@@ -116,7 +119,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress) // Scalus computes the units
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0) // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -126,7 +129,7 @@ here in the wrapper:
 
 ```go
 evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress, evaluator)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0, evaluator)
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `ccl.TransactionEvaluator` interface

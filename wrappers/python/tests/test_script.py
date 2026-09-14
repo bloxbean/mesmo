@@ -4,8 +4,9 @@ from ccl.network import Network
 
 def test_script_native_from_json(ccl):
     # Create account to get a valid key hash for the native script
-    created = ccl.account.create(Network.MAINNET)
-    addr_info = ccl.address.info(created['base_address'])
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        base_address = acct.info['base_address']
+    addr_info = ccl.address.info(base_address)
     key_hash = addr_info['payment_credential_hash']
 
     # Simple ScriptPubkey native script JSON
@@ -25,8 +26,9 @@ def test_script_native_from_json(ccl):
 
 def test_script_hash(ccl):
     # Create a native script to get some CBOR to hash
-    created = ccl.account.create(Network.MAINNET)
-    addr_info = ccl.address.info(created['base_address'])
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        base_address = acct.info['base_address']
+    addr_info = ccl.address.info(base_address)
     key_hash = addr_info['payment_credential_hash']
 
     script_json = json.dumps({

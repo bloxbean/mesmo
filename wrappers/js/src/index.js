@@ -21,22 +21,33 @@ export const CCL_ERROR_INVALID_ADDRESS = -7;
 export const CCL_ERROR_INSUFFICIENT_FUNDS = -8;
 export const CCL_ERROR_INVALID_TRANSACTION = -9;
 export const CCL_ERROR_TX_BUILD = -10;
+export const CCL_ERROR_INVALID_HANDLE = -11;
 
 // Network selectors.
 //
 // WARNING — these are CCL's `Network` *enum ordinals*, NOT Cardano's on-chain network id. They are
 // inverted with respect to it: on-chain, testnet is 0 and mainnet is 1, whereas here MAINNET is 0
-// and TESTNET is 1. Never pass a raw number: `account.create(0)` derives a **mainnet** key, not a
+// and TESTNET is 1. Never pass a raw number: `accounts.create(0)` derives a **mainnet** key, not a
 // testnet one. Always pass one of these constants.
 //
 // The genuine on-chain id is the `network_id` field returned by `address.info()` — an account made
 // with MAINNET (0) has `address.info().network_id === 1`, and one made with TESTNET (1) has 0.
 export const MAINNET = 0;
 export const TESTNET = 1;
-export const PREPROD = 2;
-export const PREVIEW = 3;
 
-const NETWORKS = new Set([MAINNET, TESTNET, PREPROD, PREVIEW]);
+const NETWORKS = new Set([MAINNET, TESTNET]);
+
+/**
+ * Typed signing roles for managed accounts. Combine with `|`; witnesses are applied in canonical
+ * order (payment, stake, DRep, committee cold, committee hot) regardless of combination order.
+ */
+export const SigningRole = Object.freeze({
+  PAYMENT: 1,
+  STAKE: 1 << 1,
+  DREP: 1 << 2,
+  COMMITTEE_COLD: 1 << 3,
+  COMMITTEE_HOT: 1 << 4,
+});
 
 // Validate a `network` argument at the wrapper boundary. Without this an out-of-range value reaches
 // the native library, which fails with an opaque error (or, for a valid-looking ordinal, silently
@@ -44,14 +55,14 @@ const NETWORKS = new Set([MAINNET, TESTNET, PREPROD, PREVIEW]);
 function checkNetwork(network) {
   if (network === undefined || network === null) {
     throw new TypeError(
-      'network is required: pass MAINNET, TESTNET, PREPROD or PREVIEW. ' +
+      'network is required: pass MAINNET or TESTNET. ' +
       'These are CCL enum ordinals (MAINNET === 0), not Cardano\'s on-chain network id.'
     );
   }
   if (!NETWORKS.has(network)) {
     throw new RangeError(
-      `invalid network ${JSON.stringify(network)}: expected MAINNET (0), TESTNET (1), PREPROD (2) ` +
-      'or PREVIEW (3). These are CCL enum ordinals, not Cardano\'s on-chain network id ' +
+      `invalid network ${JSON.stringify(network)}: expected MAINNET (0) or TESTNET (1). ` +
+      'These are CCL enum ordinals, not Cardano\'s on-chain network id ' +
       '(on-chain: 0 = testnet, 1 = mainnet — the inverse).'
     );
   }
@@ -230,14 +241,13 @@ export class CclBridge {
       ccl_get_last_error: { args: [FFIType.ptr], returns: FFIType.ptr },
       ccl_free_string: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
 
-      // Account
-      ccl_account_create: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_from_mnemonic: { args: [FFIType.ptr, FFIType.i32, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_private_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_public_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_drep_id: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_sign_tx: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32, FFIType.cstring], returns: FFIType.i32 },
-      ccl_account_sign_tx_multi: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      // Managed account handles (ADR-0016)
+      ccl_account_open_mnemonic: { args: [FFIType.ptr, FFIType.i32, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.ptr], returns: FFIType.i32 },
+      ccl_account_get_info: { args: [FFIType.ptr, FFIType.i64], returns: FFIType.i32 },
+      ccl_account_sign_tx_handle: { args: [FFIType.ptr, FFIType.i64, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
+      ccl_account_close: { args: [FFIType.ptr, FFIType.i64], returns: FFIType.i32 },
+      ccl_account_create_handle: { args: [FFIType.ptr, FFIType.i32, FFIType.ptr], returns: FFIType.i32 },
+      ccl_account_export_recovery_phrase: { args: [FFIType.ptr, FFIType.i64, FFIType.ptr], returns: FFIType.i32 },
 
       // Address
       ccl_address_info: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
@@ -252,6 +262,7 @@ export class CclBridge {
       ccl_crypto_validate_mnemonic: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
       ccl_crypto_sign: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
       ccl_crypto_verify: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      ccl_crypto_derive_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.cstring], returns: FFIType.i32 },
 
       // Transaction
       ccl_tx_sign_with_secret_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
@@ -268,16 +279,6 @@ export class CclBridge {
       // Script
       ccl_script_native_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
       ccl_script_hash: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
-
-      // Governance
-      ccl_gov_drep_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_gov_committee_cold_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_gov_committee_hot_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-
-      // Wallet
-      ccl_wallet_create: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-      ccl_wallet_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
-      ccl_wallet_get_address: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
 
       // QuickTx
       ccl_quicktx_build: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
@@ -303,15 +304,13 @@ export class CclBridge {
     this._checkVersion();
 
     // Namespace APIs
-    this.account = new AccountApi(this);
     this.address = new AddressApi(this);
     this.crypto = new CryptoApi(this);
     this.tx = new TxApi(this);
     this.plutus = new PlutusApi(this);
     this.script = new ScriptApi(this);
-    this.gov = new GovApi(this);
-    this.wallet = new WalletApi(this);
     this.quicktx = new QuickTxApi(this);
+    this.accounts = new AccountsApi(this);
   }
 
   /**
@@ -358,6 +357,14 @@ export class CclBridge {
     return this._getResult();
   }
 
+  // Like _check, but never touches the read-once result slot — for calls whose result (if any)
+  // is delivered out-of-band (out-params) or that produce none.
+  _checkRc(rc) {
+    if (rc !== CCL_SUCCESS) {
+      throw new CclError(rc, this._getError());
+    }
+  }
+
   /** Tear down the isolate. Idempotent; any later call throws {@link CclClosedError}. */
   close() {
     if (this._threadPtr !== null) {
@@ -391,71 +398,6 @@ export class CclBridge {
 }
 
 // --- Namespace API classes ---
-
-class AccountApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /**
-   * Create a new account (random 24-word mnemonic) on `network`.
-   *
-   * @param {0|1|2|3} network - MAINNET (0), TESTNET (1), PREPROD (2) or PREVIEW (3). Required, and a
-   *   CCL enum ordinal — **not** Cardano's on-chain network id, which is inverted (on-chain: 0 =
-   *   testnet, 1 = mainnet). An account created with MAINNET (the ordinal 0) has an
-   *   `address.info().network_id` of 1; one created with TESTNET (the ordinal 1) has 0.
-   * @returns {{mnemonic: string, base_address: string, enterprise_address: string, stake_address: string, change_address: string}}
-   */
-  create(network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(this._b._lib.ccl_account_create(this._b._thread, network)));
-  }
-
-  /** Restore an account from a mnemonic. `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_account_from_mnemonic(this._b._thread, network, cstr(mnemonic), accountIndex, addressIndex)));
-  }
-
-  /** Extended private key (hex). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getPrivateKey(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_private_key(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex));
-  }
-
-  /** Public key (hex). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getPublicKey(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_public_key(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex));
-  }
-
-  /** DRep ID (bech32). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getDrepId(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_drep_id(this._b._thread, cstr(mnemonic), network, accountIndex));
-  }
-
-  /** Sign a transaction with the account's payment key. `network` is a CCL ordinal (MAINNET === 0). */
-  signTx(mnemonic, network, accountIndex, addressIndex, txCborHex) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_sign_tx(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex, cstr(txCborHex)));
-  }
-
-  // Sign with one or more of the account's keys, selected by role (any of: payment, stake, drep,
-  // committee_cold, committee_hot, applied in order). Use for transactions whose certificates also
-  // need the stake or DRep key — stake registration/delegation/withdrawal and DRep/vote operations.
-  //
-  // `network` is a CCL enum ordinal (MAINNET === 0), not the on-chain network id.
-  signTxWithKeys(mnemonic, network, accountIndex, addressIndex, txCborHex, keys) {
-    checkNetwork(network);
-    const keysStr = Array.isArray(keys) ? keys.join(",") : keys;
-    return this._b._check(
-      this._b._lib.ccl_account_sign_tx_multi(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex, cstr(txCborHex), cstr(keysStr)));
-  }
-}
 
 class AddressApi {
   constructor(bridge) { this._b = bridge; }
@@ -506,12 +448,30 @@ class CryptoApi {
     return this._b._lib.ccl_crypto_validate_mnemonic(this._b._thread, cstr(mnemonic)) === CCL_SUCCESS;
   }
 
+  /**
+   * Ed25519 sign. `skHex` is a 32-byte seed (64 hex chars) or a 64-byte BIP32-Ed25519
+   * extended key (128 hex chars, e.g. from {@link CryptoApi#deriveKey}) — detected by length.
+   */
   sign(messageHex, skHex) {
     return this._b._check(this._b._lib.ccl_crypto_sign(this._b._thread, cstr(messageHex), cstr(skHex)));
   }
 
   verify(signatureHex, messageHex, pkHex) {
     return this._b._lib.ccl_crypto_verify(this._b._thread, cstr(signatureHex), cstr(messageHex), cstr(pkHex)) === CCL_SUCCESS;
+  }
+
+  /**
+   * Stateless CIP-1852 key derivation — the explicit "raw key material" utility.
+   *
+   * `role` is one of "payment", "change", "stake", "drep", "committee_cold", "committee_hot".
+   * Returns `{path, private_key, public_key, public_key_hash}`; pass `private_key` whole to
+   * {@link CryptoApi#sign}, which detects the 64-byte extended form by length (never slice it —
+   * its first half is a clamped scalar, not a seed). Key derivation is
+   * network-independent. Prefer managed accounts for signing — handles never expose key bytes.
+   */
+  deriveKey(mnemonic, accountIndex = 0, addressIndex = 0, role = "payment") {
+    return JSON.parse(this._b._check(this._b._lib.ccl_crypto_derive_key(
+      this._b._thread, cstr(mnemonic), accountIndex, addressIndex, cstr(role))));
   }
 }
 
@@ -564,57 +524,6 @@ class ScriptApi {
 
   hash(scriptCborHex, scriptType = 0) {
     return this._b._check(this._b._lib.ccl_script_hash(this._b._thread, cstr(scriptCborHex), scriptType));
-  }
-}
-
-// Every `network` below is a CCL enum ordinal (MAINNET === 0, TESTNET === 1, …), *not* Cardano's
-// on-chain network id — those are inverted (on-chain: 0 = testnet, 1 = mainnet).
-class GovApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /** DRep key + id. `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  drepKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_drep_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-
-  /** Constitutional-committee cold key. `network` is a CCL ordinal (MAINNET === 0). */
-  committeeColdKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_committee_cold_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-
-  /** Constitutional-committee hot key. `network` is a CCL ordinal (MAINNET === 0). */
-  committeeHotKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_committee_hot_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-}
-
-class WalletApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /** Create a wallet (random mnemonic). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  create(network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(this._b._lib.ccl_wallet_create(this._b._thread, network)));
-  }
-
-  /** Restore a wallet from a mnemonic. `network` is a CCL ordinal (MAINNET === 0). */
-  fromMnemonic(mnemonic, network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_wallet_from_mnemonic(this._b._thread, cstr(mnemonic), network)));
-  }
-
-  /** The wallet's address at `index`. `network` is a CCL ordinal (MAINNET === 0). */
-  getAddress(mnemonic, network, index = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_wallet_get_address(this._b._thread, cstr(mnemonic), network, index));
   }
 }
 
@@ -674,8 +583,21 @@ export class QuickTxApi {
    * @param {Array<{mem: (number|string), steps: (number|string)}>} [execUnits]
    * @returns {Promise<{tx_cbor: string, tx_hash: string, fee: string}>}
    */
-  async buildWith(txplanYaml, provider, sender, evaluator = null, additionalSigners = 0) {
-    const utxos = await provider.utxos(sender);
+  async buildWith(txplanYaml, provider, senders, evaluator = null, additionalSigners = 0) {
+    // UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so overlapping
+    // senders can't double-fund the build. For multi-sender transactions, TxPlan's
+    // context.fee_payer decides who pays the fee.
+    const utxos = [];
+    const seen = new Set();
+    for (const sender of senders) {
+      for (const u of await provider.utxos(sender)) {
+        const key = `${u.tx_hash}#${u.output_index}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          utxos.push(u);
+        }
+      }
+    }
     const protocolParams = await provider.protocolParams();
     let execUnits = null;
     if (evaluator != null) {
@@ -684,5 +606,141 @@ export class QuickTxApi {
       execUnits = await evaluator.evaluate(draft.tx_cbor, utxos);
     }
     return this.build(txplanYaml, utxos, protocolParams, execUnits, additionalSigners);
+  }
+}
+
+/**
+ * A managed account (ADR-0016) bound to one CIP-1852 payment leaf
+ * (`m/1852'/1815'/account'/0/addressIndex`).
+ *
+ * One handle is one payment address; open further Accounts for further address indices. The
+ * stake/DRep/committee keys sit at their standard role indices independent of `addressIndex`, so
+ * Accounts at different address indices of one account index share a single stake/DRep identity.
+ *
+ * Lifecycle: call {@link Account#close} (idempotent) or use `using` / `Symbol.dispose`; any use
+ * after close throws a {@link CclError} with code `CCL_ERROR_INVALID_HANDLE` (-11). String
+ * representations never contain secret material.
+ */
+// Best-effort GC fallback (ADR-0016 "wrapper finalizers are fallback protection"): a dropped
+// Account's native registry entry pins key material until process exit. Deterministic close()
+// or `using` remains the contract — this only narrows the leak. The callback must not touch
+// the read-once result slot (it ignores the return code) and must skip closed bridges: the raw
+// _threadPtr guard is deliberate, the throwing _thread getter would be wrong in a finalizer.
+const accountFinalizer = new FinalizationRegistry(({ bridge, handle }) => {
+  if (bridge._threadPtr !== null && handle) {
+    try {
+      bridge._lib.ccl_account_close(bridge._threadPtr, handle);
+    } catch {
+      // best-effort only
+    }
+  }
+});
+
+export class Account {
+  constructor(bridge, handle) {
+    this._b = bridge;
+    this._handle = handle;
+    this._info = null;
+    accountFinalizer.register(this, { bridge, handle }, this);
+  }
+
+  /**
+   * Public account data: `{ base_address, enterprise_address, stake_address, change_address, network,
+   * account_index, address_index, drep_id, committee_cold_id, committee_cold_credential,
+   * committee_hot_id, committee_hot_credential }`. Never contains secrets.
+   */
+  get info() {
+    if (this._info === null) {
+      const rc = this._b._lib.ccl_account_get_info(this._b._thread, this._handle);
+      // Immutable for the handle's lifetime: fetch once, memoize frozen.
+      this._info = Object.freeze(JSON.parse(this._b._check(rc)));
+    }
+    return this._info;
+  }
+
+  /**
+   * Sign a transaction with the selected roles; returns the signed CBOR hex.
+   *
+   * `roles` is a {@link SigningRole} combination (bit mask), e.g.
+   * `SigningRole.PAYMENT | SigningRole.STAKE` for a stake-certificate transaction. An empty mask
+   * is rejected — signing never silently uses every key.
+   */
+  signTx(txCborHex, roles = SigningRole.PAYMENT) {
+    const rc = this._b._lib.ccl_account_sign_tx_handle(
+      this._b._thread, this._handle, cstr(txCborHex), roles);
+    return this._b._check(rc);
+  }
+
+  /**
+   * One-shot export of a freshly created account's recovery phrase.
+   *
+   * Only available on accounts from {@link AccountsApi#create}, and only once — the phrase is
+   * removed on retrieval. Accounts opened from a mnemonic throw (the caller already holds the
+   * phrase). Persist the returned value securely; nothing else ever returns it.
+   */
+  exportRecoveryPhrase() {
+    // Delivered via out-param in the SAME call — never through the read-once result slot.
+    // The native side destroys its pending copy only after the string is materialized, so a
+    // failed delivery is retryable instead of orphaning the only copy of the phrase.
+    const out = new BigUint64Array(1);
+    const rc = this._b._lib.ccl_account_export_recovery_phrase(this._b._thread, this._handle, ptr(out));
+    this._b._checkRc(rc);
+    const phrasePtr = Number(out[0]);
+    const phrase = new CString(phrasePtr).toString();
+    this._b._lib.ccl_free_string(this._b._thread, phrasePtr);
+    return phrase;
+  }
+
+  /** Release the native account state. Idempotent; further use throws with code -11. */
+  close() {
+    accountFinalizer.unregister(this); // closed deterministically; nothing left to finalize
+    const handle = this._handle;
+    this._handle = 0n; // 0 is never a valid handle
+    this._info = null;
+    if (handle && this._b._threadPtr !== null) {
+      const rc = this._b._lib.ccl_account_close(this._b._thread, handle);
+      this._b._check(rc);
+    }
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+
+  toString() {
+    return this._handle ? `<ccl.Account handle=${this._handle}>` : '<ccl.Account closed>';
+  }
+}
+
+/** Managed-accounts namespace (`bridge.accounts`, ADR-0016). */
+export class AccountsApi {
+  constructor(bridge) {
+    this._b = bridge;
+  }
+
+  /**
+   * Open an account from a mnemonic at fixed derivation indices; returns an {@link Account}.
+   * The mnemonic crosses the FFI boundary once, here; no later operation needs it.
+   */
+  fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0) {
+    checkNetwork(network);
+    const out = new BigInt64Array(1);
+    const rc = this._b._lib.ccl_account_open_mnemonic(
+      this._b._thread, network, cstr(mnemonic), accountIndex, addressIndex, ptr(out));
+    this._b._check(rc);
+    return new Account(this._b, out[0]);
+  }
+
+  /**
+   * Create a brand-new account (fresh 24-word mnemonic); returns an {@link Account}.
+   * No secret is returned here — retrieve the recovery phrase once, deliberately, with
+   * {@link Account#exportRecoveryPhrase}.
+   */
+  create(network) {
+    checkNetwork(network);
+    const out = new BigInt64Array(1);
+    const rc = this._b._lib.ccl_account_create_handle(this._b._thread, network, ptr(out));
+    this._b._check(rc);
+    return new Account(this._b, out[0]);
   }
 }

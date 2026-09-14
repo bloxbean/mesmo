@@ -50,7 +50,7 @@ def test_build_with_uses_supplied_evaluator(ccl):
     scalus_fee = int(ccl.quicktx.build(yaml, utxos, params)["fee"])
 
     evaluator = _FakeEvaluator()
-    result = ccl.quicktx.build_with(yaml, _FakeProvider(), sender, evaluator=evaluator)
+    result = ccl.quicktx.build_with(yaml, _FakeProvider(), [sender], evaluator=evaluator)
 
     assert evaluator.draft_cbor, "evaluator should be consulted with the draft transaction"
     assert result["tx_cbor"]

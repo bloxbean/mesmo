@@ -18,60 +18,51 @@ from ccl import Network
 
 
 def test_members_are_ccl_ordinals():
-    assert (Network.MAINNET, Network.TESTNET, Network.PREPROD, Network.PREVIEW) == (0, 1, 2, 3)
+    assert (Network.MAINNET, Network.TESTNET) == (0, 1)
 
 
 def test_mainnet_derives_an_address_whose_onchain_network_id_is_one(ccl):
     """Network.MAINNET is 0 — but the address it produces reports on-chain network_id 1."""
-    account = ccl.account.create(Network.MAINNET)
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        base_address = acct.info["base_address"]
 
     assert int(Network.MAINNET) == 0
-    assert account["base_address"].startswith("addr1")
-    assert ccl.address.info(account["base_address"])["network_id"] == 1
+    assert base_address.startswith("addr1")
+    assert ccl.address.info(base_address)["network_id"] == 1
 
 
 def test_testnet_derives_an_address_whose_onchain_network_id_is_zero(ccl):
     """Network.TESTNET is 1 — but the address it produces reports on-chain network_id 0."""
-    account = ccl.account.create(Network.TESTNET)
+    with ccl.accounts.create(Network.TESTNET) as acct:
+        base_address = acct.info["base_address"]
 
     assert int(Network.TESTNET) == 1
-    assert account["base_address"].startswith("addr_test1")
-    assert ccl.address.info(account["base_address"])["network_id"] == 0
-
-
-@pytest.mark.parametrize("network", [Network.PREPROD, Network.PREVIEW])
-def test_preprod_and_preview_are_testnets_on_chain(ccl, network):
-    account = ccl.account.create(network)
-
-    assert ccl.address.info(account["base_address"])["network_id"] == 0
+    assert base_address.startswith("addr_test1")
+    assert ccl.address.info(base_address)["network_id"] == 0
 
 
 def test_plain_ints_still_work(ccl):
-    """IntEnum keeps the native call wire-compatible: an int in 0-3 is still accepted."""
-    from_enum = ccl.account.create(Network.TESTNET)
-    from_int = ccl.account.from_mnemonic(from_enum["mnemonic"], 1)
+    """IntEnum keeps the native call wire-compatible: an int of 0 or 1 is still accepted."""
+    with ccl.accounts.create(Network.TESTNET) as created:
+        base_address = created.info["base_address"]
+        mnemonic = created.export_recovery_phrase()
 
-    assert from_int["base_address"] == from_enum["base_address"]
+    with ccl.accounts.from_mnemonic(mnemonic, 1) as from_int:
+        assert from_int.info["base_address"] == base_address
 
 
-@pytest.mark.parametrize("bad", [4, -1, 99])
+@pytest.mark.parametrize("bad", [2, 3, 4, -1, 99])
 def test_out_of_range_network_raises_valueerror(ccl, bad):
     """Caught at the boundary, not deep inside the native library."""
     with pytest.raises(ValueError, match="Network"):
-        ccl.account.create(bad)
+        ccl.accounts.create(bad)
 
 
 def test_network_is_required_and_never_defaults_to_mainnet(ccl):
-    """No default. `lib.account.create()` used to silently mint a *mainnet* account."""
+    """No default. Account creation used to silently mint a *mainnet* account."""
     with pytest.raises(TypeError):
-        ccl.account.create()
-
-    with pytest.raises(TypeError):
-        ccl.wallet.create()
+        ccl.accounts.create()
 
     mnemonic = ccl.crypto.generate_mnemonic(24)
     with pytest.raises(TypeError):
-        ccl.account.get_private_key(mnemonic)
-
-    with pytest.raises(TypeError):
-        ccl.gov.drep_key_from_mnemonic(mnemonic)
+        ccl.accounts.from_mnemonic(mnemonic)

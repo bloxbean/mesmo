@@ -55,14 +55,15 @@ func TestCryptoSignVerifyVector(t *testing.T) {
 
 // A fabricated signature must be rejected (mirrors Python test_crypto_verify_rejects_wrong_signature).
 func TestCryptoVerifyRejectsWrongSignature(t *testing.T) {
-	created, err := bridge.Account.Create(Mainnet)
+	mnemonic, err := bridge.Crypto.GenerateMnemonic(24)
 	if err != nil {
-		t.Fatalf("Account.Create() failed: %v", err)
+		t.Fatalf("GenerateMnemonic() failed: %v", err)
 	}
-	pubKey, err := bridge.Account.GetPublicKey(created.Mnemonic, Mainnet, 0, 0)
+	key, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
 	if err != nil {
-		t.Fatalf("Account.GetPublicKey() failed: %v", err)
+		t.Fatalf("Crypto.DeriveKey() failed: %v", err)
 	}
+	pubKey := key.PublicKey
 	fakeSig := strings.Repeat("00", 64)
 	if bridge.Crypto.Verify(fakeSig, "68656c6c6f", pubKey) {
 		t.Error("a fake all-zero signature must not verify")

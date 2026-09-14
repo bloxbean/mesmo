@@ -62,11 +62,10 @@ use ccl::{Bridge, Network};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge = Bridge::new()?; // loads libccl, starts a GraalVM isolate
 
-    // API methods return JSON strings; parse with serde_json.
-    let account = bridge.account().create(Network::Testnet)?;
-    let json: serde_json::Value = serde_json::from_str(&account)?;
-    println!("{}", json["base_address"]); // addr_test1...
-    println!("{}", json["mnemonic"]);     // 24-word phrase
+    // Managed account handle (ADR-0016): info is public data only.
+    let account = bridge.accounts().create(Network::Testnet)?;
+    println!("{}", account.info()?["base_address"]); // addr_test1...
+    println!("{}", account.export_recovery_phrase()?); // 24-word phrase — one-shot
     Ok(())
 } // Bridge's Drop tears down the isolate
 ```
@@ -74,8 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## API surface
 
 A `Bridge` exposes namespaced accessors (all offline operations):
-`bridge.account()`, `.address()`, `.crypto()`, `.tx()`, `.plutus()`, `.script()`,
-`.gov()`, `.wallet()`, `.quicktx()`.
+`bridge.accounts()`, `.address()`, `.crypto()`, `.tx()`, `.plutus()`, `.script()`,
+`.quicktx()`.
 
 Most methods return `Result<String>` where the `String` is JSON — parse it with
 `serde_json`.
@@ -88,12 +87,11 @@ Transactions are defined as a [TxPlan](https://github.com/bloxbean/cardano-clien
 let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params)?; // -> TxResult { tx_cbor, tx_hash, fee }
 ```
 
-Methods that need a network take the `Network` enum — `Network::Mainnet`, `Network::Testnet`,
-`Network::Preprod`, `Network::Preview` — so a transposed argument is a compile error rather than a
+Methods that need a network take the `Network` enum — `Network::Mainnet` or `Network::Testnet` — so a transposed argument is a compile error rather than a
 key silently derived on the wrong network. Errors are `ccl::CclError`.
 
 > **`Network` is not Cardano's on-chain network id.** Its discriminants are CCL's own enum ordinals
-> (`Mainnet = 0`, `Testnet = 1`, `Preprod = 2`, `Preview = 3`). Cardano's on-chain network id is the
+> (`Mainnet = 0`, `Testnet = 1`). Cardano's on-chain network id is the
 > other way round — **mainnet = 1, testnet = 0** — so an account created with `Network::Mainnet` has
 > an address whose `network_id` is `1`. The `network_id` field returned by `bridge.address().info()`
 > is that genuine on-chain value, not an ordinal from this enum.
@@ -113,7 +111,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 use ccl::providers::BlockfrostProvider; // or YaciProvider
 
 let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, None)?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `ChainDataProvider` trait (`utxos`,
@@ -126,7 +124,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step (pass `None`):
 
 ```rust
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, None)?; // Scalus computes the units
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?; // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -138,7 +136,7 @@ lives here in the wrapper (also behind the `providers` feature):
 use ccl::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new("proj_id", "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, Some(&evaluator))?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, Some(&evaluator))?;
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `TransactionEvaluator` trait (`evaluate`). To

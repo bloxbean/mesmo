@@ -32,8 +32,13 @@ int main(void) {
     ccl_free_string(thread, version);
 
     /* A real operation (key derivation), not just a load check. */
-    if (ccl_account_create(thread, 1) != 0) {
-        fprintf(stderr, "FAIL: ccl_account_create rc\n");
+    long long handle = 0;
+    if (ccl_account_create_handle(thread, 1, &handle) != 0) {
+        fprintf(stderr, "FAIL: ccl_account_create_handle rc\n");
+        return 1;
+    }
+    if (ccl_account_get_info(thread, handle) != 0) {
+        fprintf(stderr, "FAIL: ccl_account_get_info rc\n");
         return 1;
     }
     char *account = ccl_get_result(thread);
@@ -43,6 +48,7 @@ int main(void) {
     }
     printf("account ok (testnet address derived)\n");
     ccl_free_string(thread, account);
+    ccl_account_close(thread, handle);
 
     printf("SMOKE OK\n");
     return 0;

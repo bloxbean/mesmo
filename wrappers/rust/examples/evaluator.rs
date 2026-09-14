@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     // 1) Offline default: no evaluator -> Scalus runs the validator and stamps the computed units.
     let result = bridge
         .quicktx()
-        .build_with(&yaml, &provider, &sender, 0, None)?;
+        .build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
     println!(
         "offline (Scalus) — fee: {}  tx_hash: {}",
         result.fee, result.tx_hash

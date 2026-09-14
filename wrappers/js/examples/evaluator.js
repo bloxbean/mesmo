@@ -34,14 +34,14 @@ const bridge = new CclBridge();
 try {
   // 1) Offline default: no evaluator -> the bridge runs the validator with Scalus and stamps the
   //    computed units. Just works, no network.
-  const result = await bridge.quicktx.buildWith(yaml, provider, sender);
+  const result = await bridge.quicktx.buildWith(yaml, provider, [sender]);
   console.log('offline (Scalus) — fee:', result.fee, 'tx_hash:', result.tx_hash);
 
   // 2) Remote evaluator (illustrative — needs a Blockfrost project id). The two-pass builds a
   //    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
   //
   //   const evaluator = new BlockfrostEvaluator('preprod_your_project_id', { network: 'preprod' });
-  //   const result = await bridge.quicktx.buildWith(yaml, provider, sender, evaluator);
+  //   const result = await bridge.quicktx.buildWith(yaml, provider, [sender], evaluator);
   //
   // To supply units you computed yourself, skip the evaluator and call build() directly:
   //   bridge.quicktx.build(yaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);

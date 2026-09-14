@@ -25,38 +25,31 @@ type Network int
 const (
 	Mainnet Network = 0
 	Testnet Network = 1
-	Preprod Network = 2
-	Preview Network = 3
 )
 
-// String returns the network's name ("mainnet", "testnet", "preprod", "preview"), so a Network
-// reads as itself in logs and errors instead of as a bare, easily-misread ordinal. An unknown
-// value prints as Network(n).
+// String returns the network's name ("mainnet", "testnet"), so a Network reads as itself in logs
+// and errors instead of as a bare, easily-misread ordinal. An unknown value prints as Network(n).
 func (n Network) String() string {
 	switch n {
 	case Mainnet:
 		return "mainnet"
 	case Testnet:
 		return "testnet"
-	case Preprod:
-		return "preprod"
-	case Preview:
-		return "preview"
 	default:
 		return fmt.Sprintf("Network(%d)", int(n))
 	}
 }
 
-// Valid reports whether n is one of the four known networks.
+// Valid reports whether n is one of the two known networks.
 func (n Network) Valid() bool {
-	return n >= Mainnet && n <= Preview
+	return n == Mainnet || n == Testnet
 }
 
 // validate turns an out-of-range Network into a clear Go error at the call boundary, rather than
 // letting it reach the native library and come back as an opaque enum-ordinal failure.
 func (n Network) validate() error {
 	if !n.Valid() {
-		return fmt.Errorf("ccl: invalid network %s: use one of Mainnet(0), Testnet(1), Preprod(2), Preview(3) "+
+		return fmt.Errorf("ccl: invalid network %s: use Mainnet(0) or Testnet(1) "+
 			"(these are CCL enum ordinals, not Cardano's on-chain network id)", n)
 	}
 	return nil
@@ -76,6 +69,8 @@ const (
 	ErrInvalidTransaction = -9
 	// ErrTxBuild is a malformed TxPlan — the most common failure on the core build path.
 	ErrTxBuild = -10
+	// ErrInvalidHandle is an unknown, closed, or foreign account handle (ADR-0016).
+	ErrInvalidHandle = -11
 )
 
 // CclError represents an error from the CCL native library.
@@ -86,15 +81,6 @@ type CclError struct {
 
 func (e *CclError) Error() string {
 	return fmt.Sprintf("CCL Error %d: %s", e.Code, e.Message)
-}
-
-// AccountInfo contains account creation/restoration result.
-type AccountInfo struct {
-	Mnemonic          string `json:"mnemonic"`
-	BaseAddress       string `json:"base_address"`
-	EnterpriseAddress string `json:"enterprise_address"`
-	StakeAddress      string `json:"stake_address"`
-	ChangeAddress     string `json:"change_address"`
 }
 
 // AddressInfo contains address parsing result.
@@ -108,23 +94,6 @@ type AddressInfo struct {
 	DelegationCredentialHash string `json:"delegation_credential_hash,omitempty"`
 	IsPubkeyPayment          bool   `json:"is_pubkey_payment"`
 	IsScriptPayment          bool   `json:"is_script_payment"`
-}
-
-// WalletInfo contains wallet creation result.
-type WalletInfo struct {
-	Mnemonic     string   `json:"mnemonic"`
-	StakeAddress string   `json:"stake_address"`
-	Addresses    []string `json:"addresses"`
-}
-
-// GovKeyInfo contains governance key derivation result.
-type GovKeyInfo struct {
-	DrepID                    string `json:"drep_id,omitempty"`
-	ID                        string `json:"id,omitempty"`
-	VerificationKey           string `json:"verification_key"`
-	VerificationKeyHash       string `json:"verification_key_hash"`
-	Bech32VerificationKey     string `json:"bech32_verification_key"`
-	Bech32VerificationKeyHash string `json:"bech32_verification_key_hash"`
 }
 
 // Bridge wraps the CCL native library.
@@ -143,15 +112,15 @@ type Bridge struct {
 	mu    sync.Mutex
 	calls chan func()
 
-	Account *AccountApi
-	Address *AddressApi
-	Crypto  *CryptoApi
-	Tx      *TxApi
-	Plutus  *PlutusApi
-	Script  *ScriptApi
-	Gov     *GovApi
-	Wallet  *WalletApi
-	QuickTx *QuickTxApi
+	// Accounts is the managed-accounts namespace (ADR-0016): handle-based accounts that keep the
+	// mnemonic out of per-operation calls.
+	Accounts *AccountsApi
+	Address  *AddressApi
+	Crypto   *CryptoApi
+	Tx       *TxApi
+	Plutus   *PlutusApi
+	Script   *ScriptApi
+	QuickTx  *QuickTxApi
 }
 
 // New creates a new Bridge instance with a GraalVM isolate. The native library is located and loaded
@@ -174,14 +143,12 @@ func New() (*Bridge, error) {
 		return nil, err
 	}
 
-	b.Account = &AccountApi{bridge: b}
+	b.Accounts = &AccountsApi{bridge: b}
 	b.Address = &AddressApi{bridge: b}
 	b.Crypto = &CryptoApi{bridge: b}
 	b.Tx = &TxApi{bridge: b}
 	b.Plutus = &PlutusApi{bridge: b}
 	b.Script = &ScriptApi{bridge: b}
-	b.Gov = &GovApi{bridge: b}
-	b.Wallet = &WalletApi{bridge: b}
 	b.QuickTx = &QuickTxApi{bridge: b}
 
 	return b, nil
@@ -337,93 +304,6 @@ func (b *Bridge) checkVersion() error {
 	return nil
 }
 
-// --- AccountApi ---
-
-type AccountApi struct {
-	bridge *Bridge
-}
-
-func (a *AccountApi) Create(network Network) (*AccountInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := a.bridge.invoke(func() int32 { return cclAccountCreate(a.bridge.thread, int32(network)) })
-	if err != nil {
-		return nil, err
-	}
-	var info AccountInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (a *AccountApi) FromMnemonic(mnemonic string, network Network, accountIndex, addressIndex int) (*AccountInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := a.bridge.invoke(func() int32 {
-		return cclAccountFromMnemonic(a.bridge.thread, int32(network), mnemonic, int32(accountIndex), int32(addressIndex))
-	})
-	if err != nil {
-		return nil, err
-	}
-	var info AccountInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (a *AccountApi) GetPublicKey(mnemonic string, network Network, accountIndex, addressIndex int) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return a.bridge.invoke(func() int32 {
-		return cclAccountGetPublicKey(a.bridge.thread, mnemonic, int32(network), int32(accountIndex), int32(addressIndex))
-	})
-}
-
-func (a *AccountApi) GetPrivateKey(mnemonic string, network Network, accountIndex, addressIndex int) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return a.bridge.invoke(func() int32 {
-		return cclAccountGetPrivKey(a.bridge.thread, mnemonic, int32(network), int32(accountIndex), int32(addressIndex))
-	})
-}
-
-func (a *AccountApi) GetDRepID(mnemonic string, network Network, accountIndex int) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return a.bridge.invoke(func() int32 {
-		return cclAccountGetDRepID(a.bridge.thread, mnemonic, int32(network), int32(accountIndex))
-	})
-}
-
-func (a *AccountApi) SignTx(mnemonic string, network Network, accountIndex, addressIndex int, txCborHex string) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return a.bridge.invoke(func() int32 {
-		return cclAccountSignTx(a.bridge.thread, mnemonic, int32(network), int32(accountIndex), int32(addressIndex), txCborHex)
-	})
-}
-
-// SignTxWithKeys signs a transaction with one or more of the account's keys, selected by role
-// (any of: payment, stake, drep, committee_cold, committee_hot, applied in order). Use this for
-// transactions whose certificates also need the stake or DRep key — stake registration/delegation/
-// withdrawal and DRep/vote operations — which the payment key alone cannot witness.
-func (a *AccountApi) SignTxWithKeys(mnemonic string, network Network, accountIndex, addressIndex int, txCborHex string, keys ...string) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return a.bridge.invoke(func() int32 {
-		return cclAccountSignTxMulti(a.bridge.thread, mnemonic, int32(network), int32(accountIndex), int32(addressIndex), txCborHex, strings.Join(keys, ","))
-	})
-}
-
 // --- AddressApi ---
 
 type AddressApi struct {
@@ -476,8 +356,31 @@ func (c *CryptoApi) ValidateMnemonic(mnemonic string) bool {
 	return c.bridge.invokeRC(func() int32 { return cclCryptoValidateMnemon(c.bridge.thread, mnemonic) }) == Success
 }
 
+// Sign produces an Ed25519 signature. skHex is a 32-byte seed (64 hex chars) or a
+// 64-byte BIP32-Ed25519 extended key (128 hex chars, e.g. DeriveKey's PrivateKey) —
+// the form is detected by length.
 func (c *CryptoApi) Sign(messageHex, skHex string) (string, error) {
 	return c.bridge.invoke(func() int32 { return cclCryptoSign(c.bridge.thread, messageHex, skHex) })
+}
+
+// DeriveKey is the stateless CIP-1852 key-derivation utility — the explicit "raw key
+// material" escape hatch. role is one of "payment", "change", "stake", "drep",
+// "committee_cold", "committee_hot". Pass PrivateKey (the 64-byte extended BIP32-Ed25519
+// key) whole to Crypto.Sign, which detects the extended form by length — never slice it,
+// its first half is a clamped scalar, not a seed. Key derivation is network-independent.
+// Prefer the managed Accounts API for signing; handles never expose key bytes.
+func (c *CryptoApi) DeriveKey(mnemonic string, accountIndex, addressIndex int, role string) (*DerivedKey, error) {
+	result, err := c.bridge.invoke(func() int32 {
+		return cclCryptoDeriveKey(c.bridge.thread, mnemonic, int32(accountIndex), int32(addressIndex), role)
+	})
+	if err != nil {
+		return nil, err
+	}
+	var key DerivedKey
+	if err := json.Unmarshal([]byte(result), &key); err != nil {
+		return nil, err
+	}
+	return &key, nil
 }
 
 func (c *CryptoApi) Verify(signatureHex, messageHex, pkHex string) bool {
@@ -540,106 +443,6 @@ func (s *ScriptApi) NativeFromJson(jsonStr string) (string, error) {
 
 func (s *ScriptApi) Hash(scriptCborHex string, scriptType int) (string, error) {
 	return s.bridge.invoke(func() int32 { return cclScriptHash(s.bridge.thread, scriptCborHex, int32(scriptType)) })
-}
-
-// --- GovApi ---
-
-type GovApi struct {
-	bridge *Bridge
-}
-
-func (g *GovApi) DrepKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := g.bridge.invoke(func() int32 {
-		return cclGovDRepKey(g.bridge.thread, mnemonic, int32(network), int32(accountIndex))
-	})
-	if err != nil {
-		return nil, err
-	}
-	var info GovKeyInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (g *GovApi) CommitteeColdKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := g.bridge.invoke(func() int32 {
-		return cclGovCommitteeColdKey(g.bridge.thread, mnemonic, int32(network), int32(accountIndex))
-	})
-	if err != nil {
-		return nil, err
-	}
-	var info GovKeyInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (g *GovApi) CommitteeHotKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := g.bridge.invoke(func() int32 {
-		return cclGovCommitteeHotKey(g.bridge.thread, mnemonic, int32(network), int32(accountIndex))
-	})
-	if err != nil {
-		return nil, err
-	}
-	var info GovKeyInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-// --- WalletApi ---
-
-type WalletApi struct {
-	bridge *Bridge
-}
-
-func (w *WalletApi) Create(network Network) (*WalletInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := w.bridge.invoke(func() int32 { return cclWalletCreate(w.bridge.thread, int32(network)) })
-	if err != nil {
-		return nil, err
-	}
-	var info WalletInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (w *WalletApi) FromMnemonic(mnemonic string, network Network) (*WalletInfo, error) {
-	if err := network.validate(); err != nil {
-		return nil, err
-	}
-	result, err := w.bridge.invoke(func() int32 { return cclWalletFromMnemonic(w.bridge.thread, mnemonic, int32(network)) })
-	if err != nil {
-		return nil, err
-	}
-	var info WalletInfo
-	if err := json.Unmarshal([]byte(result), &info); err != nil {
-		return nil, err
-	}
-	return &info, nil
-}
-
-func (w *WalletApi) GetAddress(mnemonic string, network Network, index int) (string, error) {
-	if err := network.validate(); err != nil {
-		return "", err
-	}
-	return w.bridge.invoke(func() int32 { return cclWalletGetAddress(w.bridge.thread, mnemonic, int32(network), int32(index)) })
 }
 
 // --- QuickTx API ---
@@ -706,4 +509,16 @@ func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interf
 		return nil, fmt.Errorf("failed to parse tx result: %w", err)
 	}
 	return &txResult, nil
+}
+
+// DerivedKey is the result of stateless CIP-1852 key derivation (Crypto.DeriveKey).
+type DerivedKey struct {
+	Path          string `json:"path"`
+	PrivateKey    string `json:"private_key"`
+	PublicKey     string `json:"public_key"`
+	PublicKeyHash string `json:"public_key_hash"`
+	// CIP-105 bech32 encodings, present only for the governance roles (drep,
+	// committee_cold, committee_hot) — the forms cardano-cli and GovTool accept.
+	Bech32VerificationKey     string `json:"bech32_verification_key,omitempty"`
+	Bech32VerificationKeyHash string `json:"bech32_verification_key_hash,omitempty"`
 }

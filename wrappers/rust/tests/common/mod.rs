@@ -244,15 +244,43 @@ pub fn skip_if_no_devkit() -> bool {
 // --- Account / fixture helpers ---
 
 pub fn get_testnet_account(bridge: &Bridge) -> (String, String, String) {
-    let result = bridge
-        .account()
+    let acct = bridge
+        .accounts()
         .create(ccl::Network::Testnet)
         .expect("create account");
-    let json: Value = serde_json::from_str(&result).expect("parse account");
+    let json = acct.info().expect("account info");
     let addr = json["base_address"].as_str().unwrap().to_string();
-    let mnemonic = json["mnemonic"].as_str().unwrap().to_string();
+    let mnemonic = acct.export_recovery_phrase().expect("export recovery phrase");
     let stake = json["stake_address"].as_str().unwrap_or("").to_string();
     (addr, mnemonic, stake)
+}
+
+/// Map fixture role names onto the typed mask.
+pub fn roles_from_keys(keys: &[&str]) -> ccl::accounts::SigningRole {
+    use ccl::accounts::SigningRole;
+    let mut mask = 0u32;
+    for k in keys {
+        mask |= match *k {
+            "payment" => SigningRole::PAYMENT.0,
+            "stake" => SigningRole::STAKE.0,
+            "drep" => SigningRole::DREP.0,
+            other => panic!("unknown signing role {other}"),
+        };
+    }
+    SigningRole(mask)
+}
+
+/// Sign with the intent mnemonic through a managed handle at the given address index.
+pub fn intent_sign_at(bridge: &Bridge, address_index: u32, tx_cbor: &str, keys: &[&str]) -> String {
+    let acct = bridge
+        .accounts()
+        .from_mnemonic(INTENT_MNEMONIC, ccl::Network::Testnet, 0, address_index)
+        .expect("open intent account");
+    acct.sign_tx(tx_cbor, roles_from_keys(keys)).expect("sign")
+}
+
+pub fn intent_sign(bridge: &Bridge, tx_cbor: &str, keys: &[&str]) -> String {
+    intent_sign_at(bridge, 0, tx_cbor, keys)
 }
 
 pub fn fund_sender(bridge: &Bridge, ada: u64) -> (String, String) {
@@ -330,10 +358,7 @@ pub fn sign_submit_n(
         .quicktx()
         .build(yaml, utxos, pp, exec_units, additional_signers)
         .expect("build");
-    let signed = bridge
-        .account()
-        .sign_tx_with_keys(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor, keys)
-        .expect("sign");
+    let signed = intent_sign(bridge, &result.tx_cbor, keys);
     match devkit_try_submit(&signed) {
         Ok(hash) => hash,
         Err(e) => panic!("submit: {}", e),
@@ -486,10 +511,7 @@ pub fn sign_submit_fee(
         .quicktx()
         .build(yaml, utxos, pp, exec_units, additional_signers)
         .expect("build");
-    let signed = bridge
-        .account()
-        .sign_tx_with_keys(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor, keys)
-        .expect("sign");
+    let signed = intent_sign(bridge, &result.tx_cbor, keys);
     match devkit_try_submit(&signed) {
         Ok(_) => result.fee.parse().expect("parse fee"),
         Err(e) => panic!("submit: {}", e),

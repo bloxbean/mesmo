@@ -288,12 +288,9 @@ func skipIfNoDevKit(t *testing.T) {
 	}
 }
 
-func fundSender(t *testing.T, ada int) *AccountInfo {
+func fundSender(t *testing.T, ada int) testAccount {
 	t.Helper()
-	account, err := bridge.Account.Create(Testnet)
-	if err != nil {
-		t.Fatalf("create account: %v", err)
-	}
+	account := createTestAccount(t, Testnet)
 	if err := devkitTopup(account.BaseAddress, ada); err != nil {
 		t.Fatalf("topup: %v", err)
 	}
@@ -336,7 +333,7 @@ func TestIntegrationSimpleADATransfer(t *testing.T) {
 	waitForBlock()
 
 	sender := fundSender(t, 150)
-	receiver, _ := bridge.Account.Create(Testnet)
+	receiver := createTestAccount(t, Testnet)
 
 	utxos, err := devkitGetUtxos(sender.BaseAddress)
 	if err != nil {
@@ -354,10 +351,7 @@ func TestIntegrationSimpleADATransfer(t *testing.T) {
 	}
 	assertTxResult(t, result)
 
-	signedTx, err := bridge.Account.SignTx(sender.Mnemonic, Testnet, 0, 0, result.TxCbor)
-	if err != nil {
-		t.Fatalf("sign: %v", err)
-	}
+	signedTx := signWithMnemonic(t, sender.Mnemonic, result.TxCbor)
 	txHash, err := devkitSubmitTx(signedTx)
 	if err != nil {
 		t.Fatalf("submit: %v", err)
@@ -382,8 +376,8 @@ func TestIntegrationMultipleReceivers(t *testing.T) {
 	waitForBlock()
 
 	sender := fundSender(t, 150)
-	r1, _ := bridge.Account.Create(Testnet)
-	r2, _ := bridge.Account.Create(Testnet)
+	r1 := createTestAccount(t, Testnet)
+	r2 := createTestAccount(t, Testnet)
 
 	utxos, err := devkitGetUtxos(sender.BaseAddress)
 	if err != nil {
@@ -416,7 +410,7 @@ transaction:
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	signedTx, _ := bridge.Account.SignTx(sender.Mnemonic, Testnet, 0, 0, result.TxCbor)
+	signedTx := signWithMnemonic(t, sender.Mnemonic, result.TxCbor)
 	if _, err := devkitSubmitTx(signedTx); err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -436,7 +430,7 @@ func TestIntegrationInsufficientFunds(t *testing.T) {
 	waitForBlock()
 
 	sender := fundSender(t, 2)
-	receiver, _ := bridge.Account.Create(Testnet)
+	receiver := createTestAccount(t, Testnet)
 
 	utxos, _ := devkitGetUtxos(sender.BaseAddress)
 	pp, _ := devkitGetProtocolParams()
@@ -463,13 +457,28 @@ func TestIntegrationBuildWith(t *testing.T) {
 	waitForBlock()
 
 	sender := fundSender(t, 150)
-	receiver, _ := bridge.Account.Create(Testnet)
+	receiver := createTestAccount(t, Testnet)
 
 	provider := NewYaciProvider("") // local DevKit cluster
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "5000000")
-	result, err := bridge.QuickTx.BuildWith(yaml, provider, sender.BaseAddress, 0)
+	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith: %v", err)
 	}
 	assertTxResult(t, result)
+}
+
+// signWithMnemonic signs with the payment role through a managed handle opened for the call.
+func signWithMnemonic(t *testing.T, mnemonic, txCbor string) string {
+	t.Helper()
+	acct, err := bridge.Accounts.FromMnemonic(mnemonic, Testnet, 0, 0)
+	if err != nil {
+		t.Fatalf("Accounts.FromMnemonic: %v", err)
+	}
+	defer acct.Close()
+	signed, err := acct.SignTx(txCbor, RolePayment)
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return signed
 }

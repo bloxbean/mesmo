@@ -10,14 +10,14 @@ Cardano Client Bindings compiles [Cardano Client Lib (CCL)](https://github.com/b
 
 The bridge exposes CCL's **offline/local** operations:
 
-- **Account** — Create accounts, derive keys, export public/private keys, sign transactions
+- **Accounts** — Managed account handles (ADR-0016): open once, sign with typed roles; secrets never leave the handle
 - **Address** — Parse, validate, convert between bech32 and bytes
 - **Crypto** — Blake2b hashing, mnemonic generation/validation, Ed25519 sign/verify
 - **Transaction** — Serialize, deserialize, hash, sign transactions
 - **Plutus** — PlutusData CBOR/JSON conversion, datum hashing
 - **Script** — Native script parsing, script hashing
-- **Governance** — DRep, committee cold/hot key derivation
-- **HD Wallet** — Create wallets, derive addresses
+- **Governance** — DRep and committee identity on account info; role-based governance signing
+- **Key derivation** — Stateless CIP-1852 derivation for any role when raw key material is needed
 - **QuickTx** — JSON-driven offline transaction builder supporting payments, staking, governance, Plutus scripts, and multi-party compose ([documentation](docs/quicktx.md))
 
 Backend/HTTP modules (Blockfrost, Koios, Ogmios) are intentionally excluded — every language has good HTTP libraries, and CCL's real value is the hard parts listed above.
@@ -225,10 +225,10 @@ All functions follow the same pattern:
 |--------|-----------|
 | **Inputs** | Strings via `char*` (JSON for complex data, hex for binary) |
 | **Return value** | `int` status code (`0` = success, negative = error) |
-| **Get result** | `ccl_get_result(thread)` → result string (JSON or hex) |
+| **Get result** | `ccl_get_result(thread)` → result string (JSON or hex). **Read-once**: a second read returns empty — copy if needed twice |
 | **Get error** | `ccl_get_last_error(thread)` → error message |
 | **Memory** | Free returned strings with `ccl_free_string(thread, ptr)` |
-| **Network ID** | `0` = mainnet, `1` = testnet, `2` = preprod, `3` = preview |
+| **Network ID** | `0` = mainnet, `1` = testnet |
 
 ### Usage Pattern (C)
 
@@ -239,11 +239,13 @@ graal_isolatethread_t *thread = NULL;
 graal_isolate_t *isolate = NULL;
 graal_create_isolate(NULL, &isolate, &thread);
 
-int rc = ccl_account_create(thread, 0); // 0 = mainnet
-if (rc == 0) {
+long long handle = 0;
+int rc = ccl_account_create_handle(thread, 0, &handle); // 0 = mainnet
+if (rc == 0 && ccl_account_get_info(thread, handle) == 0) {
     char *json = ccl_get_result(thread);
-    printf("Account: %s\n", json);
+    printf("Account: %s\n", json);   // public data only — never the mnemonic
     ccl_free_string(thread, json);
+    ccl_account_close(thread, handle);
 } else {
     char *err = ccl_get_last_error(thread);
     printf("Error: %s\n", err);
@@ -260,15 +262,18 @@ from ccl import CclLib
 
 lib = CclLib()  # loads libccl and creates isolate
 
-account = lib.account.create(network_id=0)
-print(account)  # {'mnemonic': '...', 'base_address': 'addr1...', ...}
+from ccl import Network
 
-info = lib.address.info(account['base_address'])
+with lib.accounts.create(Network.MAINNET) as account:   # managed handle (ADR-0016)
+    print(account.info)   # {'base_address': 'addr1...', 'drep_id': 'drep1...', ...} — never the mnemonic
+    base_address = account.info["base_address"]
+    mnemonic = account.export_recovery_phrase()          # one-shot, deliberate
+
+info = lib.address.info(base_address)
 hash = lib.crypto.blake2b_256("48656c6c6f")
 tx_hash = lib.tx.hash(tx_cbor_hex)
 datum_hash = lib.plutus.data_hash("182a")
-drep = lib.gov.drep_key_from_mnemonic(account['mnemonic'])
-wallet = lib.wallet.create()
+drep = lib.crypto.derive_key(mnemonic, role="drep")      # stateless raw-key utility
 
 lib.close()
 ```
@@ -280,9 +285,8 @@ use ccl::Bridge;
 
 let bridge = Bridge::new().unwrap();
 
-let result = bridge.account().create(ccl::network::MAINNET).unwrap();
-let account: serde_json::Value = serde_json::from_str(&result).unwrap();
-println!("Address: {}", account["base_address"]);
+let account = bridge.accounts().create(ccl::Network::Mainnet).unwrap(); // managed handle
+println!("Address: {}", account.info().unwrap()["base_address"]);
 
 let hash = bridge.crypto().blake2b_256("48656c6c6f").unwrap();
 let tx_hash = bridge.tx().hash(tx_cbor).unwrap();
@@ -298,13 +302,14 @@ import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
 bridge, _ := ccl.New()
 defer bridge.Close()
 
-account, _ := bridge.Account.Create(ccl.Mainnet)
-fmt.Println("Address:", account.BaseAddress)
+account, _ := bridge.Accounts.Create(ccl.Mainnet) // managed handle
+defer account.Close()
+info, _ := account.Info()
+fmt.Println("Address:", info.BaseAddress)
 
 hash, _ := bridge.Crypto.Blake2b256("48656c6c6f")
 txHash, _ := bridge.Tx.Hash(txCbor)
 datumHash, _ := bridge.Plutus.DataHash("182a")
-wallet, _ := bridge.Wallet.Create(ccl.Mainnet)
 ```
 
 ### Usage Pattern (JavaScript / Bun)
@@ -314,13 +319,12 @@ import { CclBridge, MAINNET } from '@bloxbean/cardano-client-lib';
 
 const bridge = new CclBridge();
 
-const account = bridge.account.create(MAINNET);
-console.log('Address:', account.base_address);
+using account = bridge.accounts.create(MAINNET); // managed handle
+console.log('Address:', account.info.base_address);
 
 const hash = bridge.crypto.blake2b256('48656c6c6f');
 const txHash = bridge.tx.hash(txCbor);
 const datumHash = bridge.plutus.dataHash('182a');
-const wallet = bridge.wallet.create(MAINNET);
 
 bridge.close();
 ```
@@ -332,7 +336,7 @@ bridge.close();
 | Function | Description |
 |----------|-------------|
 | `ccl_version` | Returns library version |
-| `ccl_get_result` | Returns last successful result string |
+| `ccl_get_result` | Returns last successful result string (read-once: consumed on read) |
 | `ccl_get_last_error` | Returns last error message |
 | `ccl_free_string` | Frees a string returned by the library |
 
@@ -340,12 +344,12 @@ bridge.close();
 
 | Function | Description |
 |----------|-------------|
-| `ccl_account_create` | Create a new random account (returns JSON with mnemonic, addresses) |
-| `ccl_account_from_mnemonic` | Restore account from mnemonic phrase |
-| `ccl_account_get_public_key` | Get public key hex from mnemonic |
-| `ccl_account_get_private_key` | Get private key hex from mnemonic |
-| `ccl_account_sign_tx` | Sign a transaction CBOR hex with mnemonic |
-| `ccl_account_get_drep_id` | Get DRep ID (bech32) from mnemonic |
+| `ccl_account_open_mnemonic` | Open a managed account handle from a mnemonic (ADR-0016) |
+| `ccl_account_create_handle` | Create a fresh managed account; returns an opaque handle |
+| `ccl_account_get_info` | Public account data (addresses, DRep id, committee ids) — never secrets |
+| `ccl_account_sign_tx_handle` | Sign a transaction with typed role selection |
+| `ccl_account_export_recovery_phrase` | One-shot recovery-phrase export for created accounts |
+| `ccl_account_close` | Release the handle (explicit, idempotent) |
 
 ### Address
 
@@ -366,6 +370,7 @@ bridge.close();
 | `ccl_crypto_validate_mnemonic` | Validate a mnemonic phrase |
 | `ccl_crypto_sign` | Ed25519 sign (message hex + secret key hex → signature hex) |
 | `ccl_crypto_verify` | Ed25519 verify (signature + message + public key) |
+| `ccl_crypto_derive_key` | Stateless CIP-1852 key derivation (raw key material, any role) |
 
 ### Transaction
 
@@ -391,22 +396,6 @@ bridge.close();
 |----------|-------------|
 | `ccl_script_native_from_json` | Parse native script from JSON → CBOR hex |
 | `ccl_script_hash` | Compute script hash from CBOR hex |
-
-### Governance
-
-| Function | Description |
-|----------|-------------|
-| `ccl_gov_drep_key_from_mnemonic` | Derive DRep key pair from mnemonic |
-| `ccl_gov_committee_cold_key_from_mnemonic` | Derive committee cold key pair |
-| `ccl_gov_committee_hot_key_from_mnemonic` | Derive committee hot key pair |
-
-### HD Wallet
-
-| Function | Description |
-|----------|-------------|
-| `ccl_wallet_create` | Create new HD wallet (returns mnemonic + addresses) |
-| `ccl_wallet_from_mnemonic` | Restore HD wallet from mnemonic |
-| `ccl_wallet_get_address` | Derive address at given index |
 
 ### QuickTx
 

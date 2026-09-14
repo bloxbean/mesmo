@@ -34,8 +34,9 @@ public final class QuickTxApi {
      * JSON protocol-parameters object (both standard CCL data models). On success the result is a
      * JSON object:
      * <pre>{@code {"tx_cbor","tx_hash","fee"}}</pre>
-     * where {@code tx_cbor} is the unsigned transaction; sign it with {@code ccl_account_sign_tx} /
-     * {@code ccl_tx_sign_with_secret_key} and submit it yourself.
+     * where {@code tx_cbor} is the unsigned transaction; sign it with
+     * {@code ccl_account_sign_tx_handle} / {@code ccl_tx_sign_with_secret_key} and submit it
+     * yourself.
      *
      * <p>For Plutus script transactions, pass the redeemers' execution units in
      * {@code exec_units_json} (a JSON array of {@code {"mem","steps"}}, one per redeemer in

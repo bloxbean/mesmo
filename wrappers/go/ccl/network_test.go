@@ -32,12 +32,9 @@ func TestNetworkOrdinalIsInverseOfOnChainNetworkID(t *testing.T) {
 					tc.network, int(tc.network), tc.wantOrdinalIsNo)
 			}
 
-			acct, err := bridge.Account.Create(tc.network)
-			if err != nil {
-				t.Fatalf("Account.Create(%s) failed: %v", tc.network, err)
-			}
+			acct := createTestAccount(t, tc.network)
 			if !strings.HasPrefix(acct.BaseAddress, tc.wantAddrPrefix) {
-				t.Errorf("Account.Create(%s): expected %q address prefix, got %s",
+				t.Errorf("Accounts.Create(%s): expected %q address prefix, got %s",
 					tc.network, tc.wantAddrPrefix, acct.BaseAddress)
 			}
 
@@ -60,8 +57,6 @@ func TestNetworkString(t *testing.T) {
 	}{
 		{Mainnet, "mainnet"},
 		{Testnet, "testnet"},
-		{Preprod, "preprod"},
-		{Preview, "preview"},
 		{Network(42), "Network(42)"},
 		{Network(-1), "Network(-1)"},
 	}
@@ -73,12 +68,12 @@ func TestNetworkString(t *testing.T) {
 }
 
 func TestNetworkValid(t *testing.T) {
-	for _, n := range []Network{Mainnet, Testnet, Preprod, Preview} {
+	for _, n := range []Network{Mainnet, Testnet} {
 		if !n.Valid() {
 			t.Errorf("%s should be Valid()", n)
 		}
 	}
-	for _, n := range []Network{Network(-1), Network(4), Network(99)} {
+	for _, n := range []Network{Network(-1), Network(2), Network(3), Network(99)} {
 		if n.Valid() {
 			t.Errorf("Network(%d) should not be Valid()", int(n))
 		}
@@ -104,47 +99,14 @@ func TestInvalidNetworkReturnsGoError(t *testing.T) {
 		}
 	}
 
-	_, err := bridge.Account.Create(bogus)
-	assertInvalid("Account.Create", err)
-
-	_, err = bridge.Wallet.Create(bogus)
-	assertInvalid("Wallet.Create", err)
+	_, err := bridge.Accounts.Create(bogus)
+	assertInvalid("Accounts.Create", err)
 
 	mnemonic, err := bridge.Crypto.GenerateMnemonic(24)
 	if err != nil {
 		t.Fatalf("GenerateMnemonic failed: %v", err)
 	}
 
-	_, err = bridge.Account.FromMnemonic(mnemonic, bogus, 0, 0)
-	assertInvalid("Account.FromMnemonic", err)
-
-	_, err = bridge.Account.GetPublicKey(mnemonic, bogus, 0, 0)
-	assertInvalid("Account.GetPublicKey", err)
-
-	_, err = bridge.Account.GetPrivateKey(mnemonic, bogus, 0, 0)
-	assertInvalid("Account.GetPrivateKey", err)
-
-	_, err = bridge.Account.GetDRepID(mnemonic, bogus, 0)
-	assertInvalid("Account.GetDRepID", err)
-
-	_, err = bridge.Account.SignTx(mnemonic, bogus, 0, 0, sampleTxCbor)
-	assertInvalid("Account.SignTx", err)
-
-	_, err = bridge.Account.SignTxWithKeys(mnemonic, bogus, 0, 0, sampleTxCbor, "payment")
-	assertInvalid("Account.SignTxWithKeys", err)
-
-	_, err = bridge.Gov.DrepKeyFromMnemonic(mnemonic, bogus, 0)
-	assertInvalid("Gov.DrepKeyFromMnemonic", err)
-
-	_, err = bridge.Gov.CommitteeColdKeyFromMnemonic(mnemonic, bogus, 0)
-	assertInvalid("Gov.CommitteeColdKeyFromMnemonic", err)
-
-	_, err = bridge.Gov.CommitteeHotKeyFromMnemonic(mnemonic, bogus, 0)
-	assertInvalid("Gov.CommitteeHotKeyFromMnemonic", err)
-
-	_, err = bridge.Wallet.FromMnemonic(mnemonic, bogus)
-	assertInvalid("Wallet.FromMnemonic", err)
-
-	_, err = bridge.Wallet.GetAddress(mnemonic, bogus, 0)
-	assertInvalid("Wallet.GetAddress", err)
+	_, err = bridge.Accounts.FromMnemonic(mnemonic, bogus, 0, 0)
+	assertInvalid("Accounts.FromMnemonic", err)
 }

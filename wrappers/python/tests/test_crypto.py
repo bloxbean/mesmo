@@ -29,22 +29,26 @@ def test_crypto_invalid_mnemonic(ccl):
 
 
 def test_crypto_sign(ccl):
-    # account_get_private_key returns 64-byte extended BIP32-ED25519 key (128 hex chars)
-    # ccl_crypto_sign expects standard 32-byte Ed25519 key (64 hex chars)
-    created = ccl.account.create(Network.MAINNET)
-    mnemonic = created['mnemonic']
-
-    private_key_extended = ccl.account.get_private_key(mnemonic, Network.MAINNET)
-    private_key = private_key_extended[:64]  # first 32 bytes
+    # derive_key returns a 64-byte extended BIP32-Ed25519 key (128 hex chars); sign
+    # detects the extended form by length. The signature MUST verify against the key's
+    # own public_key — this round-trip is the regression pin for the seed/extended
+    # confusion (slicing the extended key to 64 hex chars signs under a different keypair).
+    mnemonic = ccl.crypto.generate_mnemonic(24)
+    key = ccl.crypto.derive_key(mnemonic)
 
     message_hex = "68656c6c6f"
-    signature = ccl.crypto.sign(message_hex, private_key)
+    signature = ccl.crypto.sign(message_hex, key['private_key'])
     assert len(signature) == 128  # 64 bytes = 128 hex chars
+    assert ccl.crypto.verify(signature, message_hex, key['public_key']) is True
+
+    # The bug shape: half the extended key treated as a seed must NOT verify.
+    wrong = ccl.crypto.sign(message_hex, key['private_key'][:64])
+    assert ccl.crypto.verify(wrong, message_hex, key['public_key']) is False
 
 
 def test_crypto_verify_rejects_wrong_signature(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    public_key = ccl.account.get_public_key(created['mnemonic'], Network.MAINNET)
+    mnemonic = ccl.crypto.generate_mnemonic(24)
+    public_key = ccl.crypto.derive_key(mnemonic)['public_key']
 
     # A fake signature should fail verification
     fake_sig = "00" * 64

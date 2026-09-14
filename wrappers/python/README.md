@@ -81,9 +81,9 @@ from ccl import CclLib, Network
 
 lib = CclLib()                      # loads libccl, starts a GraalVM isolate
 try:
-    account = lib.account.create(Network.TESTNET)
-    print(account["base_address"])  # addr_test1...
-    print(account["mnemonic"])      # 24-word phrase
+    with lib.accounts.create(Network.TESTNET) as account:  # managed handle (ADR-0016)
+        print(account.info["base_address"])       # addr_test1...
+        print(account.export_recovery_phrase())   # 24-word phrase — one-shot, deliberate
 finally:
     lib.close()                     # tears down the isolate
 ```
@@ -94,20 +94,18 @@ A `CclLib` instance exposes these namespaces (all offline operations):
 
 | Namespace | Examples |
 |-----------|----------|
-| `lib.account` | `create`, `from_mnemonic`, `get_private_key`, `get_public_key`, `get_drep_id`, `sign_tx` |
+| `lib.accounts` | managed accounts: `create`, `from_mnemonic` → `Account` (`info`, `sign_tx`, `export_recovery_phrase`, `close`) |
 | `lib.address` | `info`, `validate`, `to_bytes`, `from_bytes` |
-| `lib.crypto` | `blake2b_256`, `blake2b_224`, `generate_mnemonic`, `validate_mnemonic`, `sign`, `verify` |
+| `lib.crypto` | `blake2b_256`, `blake2b_224`, `generate_mnemonic`, `validate_mnemonic`, `sign`, `verify`, `derive_key` |
 | `lib.tx` | `hash`, `sign_with_secret_key`, `to_json`, `from_json`, `deserialize` |
 | `lib.plutus` | `data_hash`, `data_to_json`, `data_from_json` |
 | `lib.script` | `native_from_json`, `hash` |
-| `lib.gov` | `drep_key_from_mnemonic`, `committee_cold_key_from_mnemonic`, `committee_hot_key_from_mnemonic` |
-| `lib.wallet` | `create`, `from_mnemonic`, `get_address` |
 | `lib.quicktx` | `build(yaml, utxos, protocol_params)` — build an unsigned tx from a TxPlan YAML document |
 
 ### Networks
 
-Every key-derivation and signing call takes a **required** `network` — `Network.MAINNET`,
-`Network.TESTNET`, `Network.PREPROD` or `Network.PREVIEW`. There is no default: a library that
+Every key-derivation and signing call takes a **required** `network` — `Network.MAINNET` or
+`Network.TESTNET`. There is no default: a library that
 derives keys must not guess, least of all guess mainnet.
 
 > **`Network` is CCL's enum ordinal, not Cardano's on-chain network id.** The two differ, and for
@@ -117,14 +115,12 @@ derives keys must not guess, least of all guess mainnet.
 > |---|---|---|
 > | `Network.MAINNET` | 0 | **1** |
 > | `Network.TESTNET` | 1 | **0** |
-> | `Network.PREPROD` | 2 | 0 |
-> | `Network.PREVIEW` | 3 | 0 |
 >
 > So do **not** pass a `network_id` you read off an address back into these APIs — you would flip
 > mainnet and testnet. `lib.address.info(addr)["network_id"]` is the real on-chain id and is a
 > different thing from the `Network` you passed in.
 
-`Network` is an `IntEnum`, so a plain int 0-3 still works, and an out-of-range value raises
+`Network` is an `IntEnum`, so a plain int 0 or 1 still works, and an out-of-range value raises
 `ValueError` at the call rather than failing obscurely inside the native library.
 
 Errors raise `ccl.CclError`.
@@ -148,7 +144,7 @@ from ccl import CclLib, YaciProvider, BlockfrostProvider
 
 lib = CclLib()
 provider = BlockfrostProvider(project_id, network="preprod")  # or YaciProvider()
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address)
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])
 ```
 
 Plug in any backend (Koios, Ogmios, …) by supplying an object with `utxos(address)` and
@@ -161,7 +157,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```python
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address)  # Scalus computes the units
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])  # Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -173,7 +169,7 @@ lives here in the wrapper:
 from ccl import BlockfrostEvaluator
 
 evaluator = BlockfrostEvaluator(project_id, network="preprod")
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address, evaluator=evaluator)
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address], evaluator=evaluator)
 ```
 
 Plug in any evaluator (Ogmios, …) by supplying an object with `evaluate(tx_cbor, utxos)`. To supply

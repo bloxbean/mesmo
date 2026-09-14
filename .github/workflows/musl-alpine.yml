@@ -163,7 +163,7 @@ jobs:
               # single-quoted docker sh -c.
               python3 -m venv /tmp/wheelvenv
               /tmp/wheelvenv/bin/pip install --quiet "$WHEEL"
-              cd /tmp && env -u CCL_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import ccl; lib = ccl.CclLib(); assert lib.version(); lib.account.create(ccl.CclLib.TESTNET); print(\"OK: wheel bundling the musl lib works on Alpine, no CCL_LIB_PATH\")"
+              cd /tmp && env -u CCL_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import ccl; lib = ccl.CclLib(); assert lib.version(); lib.accounts.create(ccl.CclLib.TESTNET).close(); print(\"OK: wheel bundling the musl lib works on Alpine, no CCL_LIB_PATH\")"
             '
 
       - name: Verify the JS wrapper runs on Alpine under Bun
@@ -190,7 +190,7 @@ jobs:
                 const bridge = new CclBridge();
                 try {
                   if (!bridge.version()) throw new Error(\"no version\");
-                  bridge.account.create(TESTNET);
+                  bridge.accounts.create(TESTNET).close();
                   console.log(\`OK: JS wrapper runs on Alpine/musl under Bun (suffix=\${suffix})\`);
                 } finally {
                   bridge.close();

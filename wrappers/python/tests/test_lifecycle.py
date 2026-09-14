@@ -28,8 +28,9 @@ def test_shared_instance_is_usable_from_many_threads():
     with CclLib() as lib:
 
         def work(_):
-            account = lib.account.create(Network.TESTNET)
-            info = lib.address.info(account["base_address"])
+            with lib.accounts.create(Network.TESTNET) as acct:
+                base_address = acct.info["base_address"]
+            info = lib.address.info(base_address)
             return info["network_id"]
 
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -50,7 +51,7 @@ def test_calls_after_close_raise_instead_of_aborting():
     lib.close()
 
     with pytest.raises(CclClosedError):
-        lib.account.create(Network.TESTNET)
+        lib.accounts.create(Network.TESTNET)
 
     with pytest.raises(CclClosedError):
         lib.version()
@@ -111,7 +112,7 @@ def test_use_after_close_does_not_kill_the_interpreter():
         "lib = CclLib()\n"
         "lib.close()\n"
         "try:\n"
-        "    lib.account.create(1)\n"
+        "    lib.accounts.create(1)\n"
         "except CclClosedError:\n"
         "    print('raised')\n"
         "print('survived')\n"

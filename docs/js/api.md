@@ -5,7 +5,7 @@ All functionality hangs off a `CclBridge` instance. Import what you need from th
 ```js
 import {
   CclBridge, CclError, CclClosedError,
-  MAINNET, TESTNET, PREPROD, PREVIEW,
+  MAINNET, TESTNET,
   YaciProvider, BlockfrostProvider, BlockfrostEvaluator,
 } from "@bloxbean/cardano-client-lib";
 ```
@@ -21,7 +21,7 @@ close(): void
 [Symbol.dispose](): void
 ```
 
-Constructing a bridge loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `bridge.account`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`, `bridge.script`, `bridge.gov`, `bridge.wallet`, `bridge.quicktx`.
+Constructing a bridge loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`, `bridge.script`, `bridge.quicktx`.
 
 **Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
 
@@ -34,8 +34,8 @@ using bridge = new CclBridge();   // closed automatically at end of scope
 ## Networks
 
 ```ts
-type Network = 0 | 1 | 2 | 3
-MAINNET = 0, TESTNET = 1, PREPROD = 2, PREVIEW = 3
+type Network = 0 | 1
+MAINNET = 0, TESTNET = 1
 ```
 
 Every method that derives keys (`account.*`, `wallet.*`, `gov.*`) requires a `network` argument. Passing `undefined`/`null` throws `TypeError`; an out-of-range value throws `RangeError`.
@@ -65,36 +65,44 @@ Error codes on `CclError.code`:
 | `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
 | `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
 | `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
 
 Validation-style methods (`address.validate`, `crypto.validateMnemonic`, `crypto.verify`) return `false` instead of throwing.
 
-## bridge.account
+## bridge.accounts — managed accounts
 
-```ts
-create(network: Network): AccountInfo
-fromMnemonic(mnemonic: string, network: Network, accountIndex = 0, addressIndex = 0): AccountInfo
-getPrivateKey(mnemonic: string, network: Network, accountIndex = 0, addressIndex = 0): string
-getPublicKey(mnemonic: string, network: Network, accountIndex = 0, addressIndex = 0): string
-getDrepId(mnemonic: string, network: Network, accountIndex = 0): string
-signTx(mnemonic: string, network: Network, accountIndex: number, addressIndex: number, txCborHex: string): string
-signTxWithKeys(mnemonic: string, network: Network, accountIndex: number, addressIndex: number,
-               txCborHex: string, keys: SigningKeyRole[] | SigningKeyRole): string
+Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
+account API.
+
+```javascript
+import { SigningRole } from '@bloxbean/cardano-client-lib';
+
+const acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);   // or bridge.accounts.create(...)
+try {
+  acct.info;                                     // public data only — never the mnemonic
+  const signed = acct.signTx(txCbor, SigningRole.PAYMENT | SigningRole.STAKE);
+} finally {
+  acct.close();                                  // or: using acct = ... (Symbol.dispose)
+}
+// after close: further use throws CclError with code -11
 ```
 
-`AccountInfo` = `{ mnemonic, base_address, enterprise_address, stake_address, change_address }`.
+- `fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0)` — the mnemonic crosses the
+  FFI boundary once, here.
+- `create(network)` — fresh 24-word account; **no secret in the result**. Retrieve the phrase once,
+  deliberately, with `acct.exportRecoveryPhrase()` — a second call fails, as does export on a
+  mnemonic-opened account.
+- `signTx(txCborHex, roles = SigningRole.PAYMENT)` — typed roles combined with `|`; witnesses apply
+  in canonical order. An empty mask is rejected.
+- `close()` is idempotent; `Symbol.dispose` supports `using`-declarations. A dropped account is
+  additionally reclaimed best-effort by a `FinalizationRegistry` (fallback only — close
+  deterministically). `String(acct)` shows only the handle.
+- `info` returns public data only: the base/enterprise/stake/change addresses, network and
+  derivation indices, `drep_id`, and the committee identifiers (`committee_cold_id`/`committee_hot_id`, bech32,
+  plus `committee_cold_credential`/`committee_hot_credential` — hex blake2b-224 verification-key
+  hashes, as used in committee certificates).
 
-- `create` generates a fresh 24-word mnemonic; treat the returned `mnemonic` as a secret.
-- `getPrivateKey` returns the 64-byte **extended** key as 128 hex chars. For raw Ed25519 signing (`crypto.sign`) use the first 64 hex chars.
-- `signTx` witnesses with the payment key only. When a transaction carries certificates that need other witnesses, use `signTxWithKeys` with the roles in order:
-
-```ts
-type SigningKeyRole = "payment" | "stake" | "drep" | "committee_cold" | "committee_hot"
-```
-
-```js
-// A DRep registration needs the payment key (fee) and the DRep key (certificate):
-const signed = bridge.account.signTxWithKeys(mnemonic, TESTNET, 0, 0, result.tx_cbor, ["payment", "drep"]);
-```
+An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
 ## bridge.address
 
@@ -114,13 +122,21 @@ blake2b256(dataHex: string): string
 blake2b224(dataHex: string): string
 generateMnemonic(wordCount = 24): string
 validateMnemonic(mnemonic: string): boolean
-sign(messageHex: string, skHex: string): string      // Ed25519; 32-byte key (64 hex chars)
+sign(messageHex: string, skHex: string): string      // Ed25519; 32-byte seed or 64-byte extended key (by length)
 verify(signatureHex: string, messageHex: string, pkHex: string): boolean
+deriveKey(mnemonic: string, accountIndex = 0, addressIndex = 0, role: DeriveKeyRole = 'payment'): DerivedKey
 ```
+
+`deriveKey` is the stateless CIP-1852 "raw key material" utility — `role` is one of `'payment'`,
+`'change'`, `'stake'`, `'drep'`, `'committee_cold'`, `'committee_hot'`; it returns `{ path,
+private_key, public_key, public_key_hash }`, plus — for the governance roles — the CIP-105 bech32
+encodings `bech32_verification_key`/`bech32_verification_key_hash` (what cardano-cli and GovTool
+accept for registration). Key derivation is network-independent. Prefer managed
+accounts for signing — handles never expose key bytes.
 
 ```js
 const digest = bridge.crypto.blake2b256("48656c6c6f");          // "Hello"
-const sk = bridge.account.getPrivateKey(mnemonic, TESTNET).slice(0, 64);
+const sk = bridge.crypto.deriveKey(mnemonic).private_key; // pass the extended key whole
 const sig = bridge.crypto.sign("68656c6c6f", sk);
 ```
 
@@ -162,34 +178,20 @@ const script = JSON.parse(bridge.script.nativeFromJson(JSON.stringify({ type: "s
 // script.policy_id, script.script_hash, script.cbor_hex
 ```
 
-## bridge.gov
+## Governance identity and HD-wallet flows
 
-```ts
-drepKeyFromMnemonic(mnemonic: string, network: Network, accountIndex = 0): DrepKeyInfo
-committeeColdKeyFromMnemonic(mnemonic: string, network: Network, accountIndex = 0): CommitteeKeyInfo
-committeeHotKeyFromMnemonic(mnemonic: string, network: Network, accountIndex = 0): CommitteeKeyInfo
-```
-
-`DrepKeyInfo` = `{ drep_id /* drep1... */, verification_key, verification_key_hash, bech32_verification_key, bech32_verification_key_hash }`. Committee results carry `id` (`cc_cold1...` / `cc_hot1...`) instead of `drep_id`.
-
-## bridge.wallet
-
-HD wallet: one mnemonic, many sequential addresses.
-
-```ts
-create(network: Network): WalletInfo
-fromMnemonic(mnemonic: string, network: Network): WalletInfo
-getAddress(mnemonic: string, network: Network, index = 0): string
-```
-
-`WalletInfo` = `{ mnemonic, stake_address, addresses: string[] }`.
+There is no separate gov/wallet API. Governance *identity* (DRep id, committee ids and credentials)
+is public data on `acct.info`; governance *signing* uses `signTx` with the `DREP`/`COMMITTEE_*`
+roles; raw governance key material comes from `bridge.crypto.deriveKey`. An HD wallet is one
+recovery phrase with one managed handle per CIP-1852 payment leaf — pass `addressIndex` to
+`bridge.accounts.fromMnemonic` to enumerate addresses.
 
 ## bridge.quicktx
 
 ```ts
 build(txplanYaml: string, utxos: Utxo[], protocolParams: ProtocolParams,
       execUnits?: ExecUnits[] | null, additionalSigners = 0): TxResult
-buildWith(txplanYaml: string, provider: ChainDataProvider, sender: string,
+buildWith(txplanYaml: string, provider: ChainDataProvider, senders: string[],
           evaluator?: TransactionEvaluator | null, additionalSigners = 0): Promise<TxResult>
 ```
 
@@ -201,7 +203,7 @@ buildWith(txplanYaml: string, provider: ChainDataProvider, sender: string,
 - `additionalSigners` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate, `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
 - **Large numbers are safe.** Inputs are serialized with `lossless-json`, so quantities above 2^53 survive exactly.
 - `execUnits` — for Plutus transactions, `[{ mem, steps }]`, one entry per redeemer in transaction order. When omitted, the native library computes them **offline** with the embedded Scalus evaluator, so script transactions build with no network access. Supply your own to override, or use an [evaluator](providers.md#evaluators) for node-backed costing.
-- **`buildWith`** fetches UTXOs and protocol parameters from a [provider](providers.md), then builds. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
+- **`buildWith`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```js
 const result = bridge.quicktx.build(yaml, utxos, params);

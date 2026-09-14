@@ -48,15 +48,16 @@ use ccl::{Bridge, Network};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge = Bridge::new()?; // torn down automatically on drop (RAII)
 
-    // Create a new account (24-word mnemonic, testnet addresses).
-    let created = bridge.account().create(Network::Testnet)?;
-    let account: serde_json::Value = serde_json::from_str(&created)?;
-    println!("{}", account["base_address"]);  // addr_test1...
-    println!("{}", account["stake_address"]); // stake_test1...
+    // Create a new managed account (testnet). Its info never contains the phrase;
+    // export the recovery phrase once, deliberately.
+    let account = bridge.accounts().create(Network::Testnet)?;
+    let info = account.info()?;
+    println!("{}", info["base_address"]);  // addr_test1...
+    println!("{}", info["stake_address"]); // stake_test1...
+    let mnemonic = account.export_recovery_phrase()?;
 
-    // Restore it later from the mnemonic.
-    let mnemonic = account["mnemonic"].as_str().unwrap();
-    let _restored = bridge.account().from_mnemonic(mnemonic, Network::Testnet, 0, 0)?;
+    // Restore it later from the phrase.
+    let _restored = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
     Ok(())
 }
 ```
@@ -82,7 +83,7 @@ transaction:
 let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params, None)?;
 // result.tx_cbor, result.tx_hash, result.fee
 
-let signed = bridge.account().sign_tx(mnemonic, Network::Testnet, 0, 0, &result.tx_cbor)?;
+let signed = sender.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?; // sender = bridge.accounts().from_mnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
@@ -92,7 +93,7 @@ With a provider (requires the `providers` feature), fetching the chain data is o
 use ccl::providers::YaciProvider;
 
 let provider = YaciProvider::default(); // local Yaci DevKit
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, 0, None)?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Design in one paragraph
@@ -106,7 +107,7 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 ## Networks
 
 ```rust
-pub enum Network { Mainnet, Testnet, Preprod, Preview }
+pub enum Network { Mainnet, Testnet }
 ```
 
 Every key-derivation method takes a typed `Network` — there is no integer API. Note the underlying values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet` → ordinal 0, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).

@@ -28,11 +28,13 @@ transaction:
 `, sender, receiver)
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-result, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 // (or bridge.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-signed, err := bridge.Account.SignTx(mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+defer acct.Close()
+signed, err := acct.SignTx(result.TxCbor, ccl.RolePayment)
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
 txBytes, _ := hex.DecodeString(signed)
@@ -41,15 +43,15 @@ resp, err := http.Post(submitURL+"/tx/submit", "application/cbor", bytes.NewRead
 
 ## Which keys sign what
 
-`SignTx` witnesses with the payment key only. Certificates need their own witness — use `SignTxWithKeys` with roles **in order**:
+`SignTx` witnesses with the payment key only. Certificates need their own witness — combine `SigningRole` flags with `|` (witnesses apply in canonical order):
 
 | Transaction contains | Roles |
 |---|---|
-| Payments, metadata, minting, Plutus operations | `"payment"` (or plain `SignTx`) |
-| `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `"payment", "stake"` |
-| `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `"payment", "drep"` |
-| `governance_proposal` | `"payment"` |
-| `pool_registration` / `pool_update` / `pool_retirement` | `"payment", "stake"` when the pool is keyed to the account's stake key |
+| Payments, metadata, minting, Plutus operations | `ccl.RolePayment` |
+| `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `RolePayment\|RoleStake` |
+| `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `RolePayment\|RoleDRep` |
+| `governance_proposal` | `RolePayment` |
+| `pool_registration` / `pool_update` / `pool_retirement` | `RolePayment\|RoleStake` when the pool is keyed to the account's stake key |
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
 The same table gives the fee's witness budget: pass `additional_signers = len(keys) - 1` to the build (the input UTXOs already cover the payment key). For a native-script spend whose only inputs sit at the script address, pass the number of the script's `sig` keys instead.
@@ -70,8 +72,8 @@ transaction:
           stake_address: %s
 `, sender, account.StakeAddress)
 
-reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, sender, 1)
-signedReg, err := bridge.Account.SignTxWithKeys(mnemonic, ccl.Testnet, 0, 0, reg.TxCbor, "payment", "stake")
+reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
+signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleStake)
 // submit signedReg; wait for inclusion before the next step
 
 delegYaml := fmt.Sprintf(`
@@ -85,8 +87,8 @@ transaction:
           pool_id: pool1...
 `, sender, account.StakeAddress)
 
-deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, sender, 1)
-signedDeleg, err := bridge.Account.SignTxWithKeys(mnemonic, ccl.Testnet, 0, 0, deleg.TxCbor, "payment", "stake")
+deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
+signedDeleg, err := acct.SignTx(deleg.TxCbor, ccl.RolePayment|ccl.RoleStake)
 ```
 
 ## Worked example: DRep registration, then vote
@@ -94,7 +96,7 @@ signedDeleg, err := bridge.Account.SignTxWithKeys(mnemonic, ccl.Testnet, 0, 0, d
 The DRep credential comes from the governance API:
 
 ```go
-drep, err := bridge.Gov.DrepKeyFromMnemonic(mnemonic, ccl.Testnet, 0)
+drep, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "drep")
 
 drepYaml := fmt.Sprintf(`
 version: 1.0
@@ -107,13 +109,13 @@ transaction:
           drep_credential_type: key_hash
           anchor_url: https://example.com/meta.json
           anchor_hash: %s
-`, sender, drep.VerificationKeyHash, anchorHash)
+`, sender, drep.PublicKeyHash, anchorHash)
 
-reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, sender, 1)
-signedReg, err := bridge.Account.SignTxWithKeys(mnemonic, ccl.Testnet, 0, 0, reg.TxCbor, "payment", "drep")
+reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
+signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleDRep)
 ```
 
-To vote on a governance action, the action id is the proposal transaction's hash plus its index (a proposal you submit yourself returns its hash from `Build` — `result.TxHash`). Sign the `voting` transaction with `"payment", "drep"`.
+To vote on a governance action, the action id is the proposal transaction's hash plus its index (a proposal you submit yourself returns its hash from `Build` — `result.TxHash`). Sign the `voting` transaction with `RolePayment\|RoleDRep`.
 
 ## Worked example: mint under a native script
 
@@ -133,8 +135,8 @@ transaction:
           script_type: 0
 `, sender, receiver)
 
-mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, sender, 0)
-signedMint, err := bridge.Account.SignTx(mnemonic, ccl.Testnet, 0, 0, mint.TxCbor)
+mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
+signedMint, err := acct.SignTx(mint.TxCbor, ccl.RolePayment)
 ```
 
 An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed policy needs the corresponding key's witness.
@@ -144,14 +146,14 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, sender, 0)
+result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
 ```
 
 To cost against a real node instead, pass an evaluator — `BuildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```go
 evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, sender, 0, evaluator)
+result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
 ```
 
 Or supply units yourself with the offline `Build`:

@@ -3,8 +3,9 @@ from ccl.network import Network
 
 def test_address_info(ccl):
     # Create an account to get a valid address
-    created = ccl.account.create(Network.MAINNET)
-    info = ccl.address.info(created['base_address'])
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        base_address = acct.info['base_address']
+    info = ccl.address.info(base_address)
 
     assert info['type'] == 'Base'
     assert info['network_id'] == 1
@@ -12,8 +13,8 @@ def test_address_info(ccl):
 
 
 def test_address_to_and_from_bytes(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    addr = created['base_address']
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        addr = acct.info['base_address']
 
     hex_bytes = ccl.address.to_bytes(addr)
     assert len(hex_bytes) > 0
@@ -23,8 +24,9 @@ def test_address_to_and_from_bytes(ccl):
 
 
 def test_address_validate(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    assert ccl.address.validate(created['base_address']) is True
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        addr = acct.info['base_address']
+    assert ccl.address.validate(addr) is True
     assert ccl.address.validate("invalid_address") is False
 
 

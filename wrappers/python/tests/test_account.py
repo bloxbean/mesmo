@@ -2,57 +2,43 @@ from ccl.network import Network
 
 
 def test_account_create_mainnet(ccl):
-    result = ccl.account.create(Network.MAINNET)
-    assert 'mnemonic' in result
-    assert 'base_address' in result
-    assert result['base_address'].startswith('addr1')
-    words = result['mnemonic'].split()
-    assert len(words) == 24
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        info = acct.info
+        assert info['base_address'].startswith('addr1')
+        assert 'mnemonic' not in info  # never part of the ordinary representation
+        words = acct.export_recovery_phrase().split()
+        assert len(words) == 24
 
 
 def test_account_create_testnet(ccl):
-    result = ccl.account.create(Network.TESTNET)
-    assert result['base_address'].startswith('addr_test1')
+    with ccl.accounts.create(Network.TESTNET) as acct:
+        assert acct.info['base_address'].startswith('addr_test1')
 
 
 def test_account_from_mnemonic(ccl):
-    # Create an account first to get a valid mnemonic
-    created = ccl.account.create(Network.MAINNET)
-    mnemonic = created['mnemonic']
+    # Create an account and export its phrase; restoring must produce the same addresses.
+    with ccl.accounts.create(Network.MAINNET) as created:
+        info = created.info
+        mnemonic = created.export_recovery_phrase()
 
-    # Restore from mnemonic should produce same addresses
-    restored = ccl.account.from_mnemonic(mnemonic, Network.MAINNET)
-    assert restored['base_address'] == created['base_address']
-    assert restored['enterprise_address'] == created['enterprise_address']
-    assert restored['stake_address'] == created['stake_address']
+    with ccl.accounts.from_mnemonic(mnemonic, Network.MAINNET) as restored:
+        assert restored.info['base_address'] == info['base_address']
+        assert restored.info['enterprise_address'] == info['enterprise_address']
+        assert restored.info['stake_address'] == info['stake_address']
 
 
 def test_account_different_indices(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    mnemonic = created['mnemonic']
+    with ccl.accounts.create(Network.MAINNET) as created:
+        mnemonic = created.export_recovery_phrase()
 
-    addr0 = ccl.account.from_mnemonic(mnemonic, Network.MAINNET, 0, 0)
-    addr1 = ccl.account.from_mnemonic(mnemonic, Network.MAINNET, 0, 1)
-    assert addr0['base_address'] != addr1['base_address']
-
-
-def test_account_get_keys(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    mnemonic = created['mnemonic']
-
-    private_key = ccl.account.get_private_key(mnemonic, Network.MAINNET)
-    assert len(private_key) > 0
-
-    public_key = ccl.account.get_public_key(mnemonic, Network.MAINNET)
-    assert len(public_key) == 64  # 32 bytes = 64 hex chars
+    with ccl.accounts.from_mnemonic(mnemonic, Network.MAINNET, 0, 0) as a0, \
+            ccl.accounts.from_mnemonic(mnemonic, Network.MAINNET, 0, 1) as a1:
+        assert a0.info['base_address'] != a1.info['base_address']
 
 
 def test_account_drep_id(ccl):
-    created = ccl.account.create(Network.MAINNET)
-    mnemonic = created['mnemonic']
-
-    drep_id = ccl.account.get_drep_id(mnemonic, Network.MAINNET)
-    assert drep_id.startswith('drep1')
+    with ccl.accounts.create(Network.MAINNET) as acct:
+        assert acct.info['drep_id'].startswith('drep1')
 
 
 # --- Negative / Error Tests ---
@@ -60,7 +46,8 @@ def test_account_drep_id(ccl):
 def test_account_from_invalid_mnemonic(ccl):
     from ccl._ffi import CclError
     try:
-        ccl.account.from_mnemonic("invalid words that are not a valid mnemonic phrase at all", Network.MAINNET)
+        ccl.accounts.from_mnemonic(
+            "invalid words that are not a valid mnemonic phrase at all", Network.MAINNET)
         assert False, "Should have raised CclError"
     except CclError:
         pass  # expected
@@ -69,7 +56,7 @@ def test_account_from_invalid_mnemonic(ccl):
 def test_account_from_empty_mnemonic(ccl):
     from ccl._ffi import CclError
     try:
-        ccl.account.from_mnemonic("", Network.MAINNET)
+        ccl.accounts.from_mnemonic("", Network.MAINNET)
         assert False, "Should have raised CclError"
     except CclError:
         pass  # expected
@@ -77,9 +64,9 @@ def test_account_from_empty_mnemonic(ccl):
 
 def test_account_sign_tx_invalid_cbor(ccl):
     from ccl._ffi import CclError
-    created = ccl.account.create(Network.TESTNET)
-    try:
-        ccl.account.sign_tx(created['mnemonic'], "deadbeef", Network.TESTNET)
-        assert False, "Should have raised CclError"
-    except CclError:
-        pass  # expected
+    with ccl.accounts.create(Network.TESTNET) as acct:
+        try:
+            acct.sign_tx("deadbeef")
+            assert False, "Should have raised CclError"
+        except CclError:
+            pass  # expected

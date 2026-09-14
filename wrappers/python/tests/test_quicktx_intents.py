@@ -64,15 +64,16 @@ INTENT_MNEMONIC = "test walk nut penalty hip pave soap entry language right filt
 
 
 def test_sign_with_stake_key(ccl):
-    # A stake registration must be witnessed by the stake key too; sign_tx_with_keys adds it.
+    # A stake registration must be witnessed by the stake key too; the stake role adds it.
     yaml = (FIXTURES / "stake_registration.yaml").read_text()
     utxos = [{"tx_hash": "a" * 64, "output_index": 0, "address": SENDER,
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
     built = ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
 
-    signed_payment = ccl.account.sign_tx(INTENT_MNEMONIC, built["tx_cbor"], Network.TESTNET, 0, 0)
-    signed_stake = ccl.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, built["tx_cbor"], ["payment", "stake"], Network.TESTNET, 0, 0)
+    from ccl import SigningRole
+    with ccl.accounts.from_mnemonic(INTENT_MNEMONIC, Network.TESTNET) as acct:
+        signed_payment = acct.sign_tx(built["tx_cbor"])
+        signed_stake = acct.sign_tx(built["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
     assert len(signed_stake) > len(signed_payment)
 
 

@@ -14,7 +14,7 @@ describe('use-after-close', () => {
     const bridge = new CclBridge();
     bridge.close();
 
-    expect(() => bridge.account.create(TESTNET)).toThrow(CclClosedError);
+    expect(() => bridge.accounts.create(TESTNET)).toThrow(CclClosedError);
     expect(() => bridge.version()).toThrow(CclClosedError);
   });
 
@@ -45,7 +45,7 @@ describe('use-after-close', () => {
       import { CclBridge, CclClosedError, TESTNET } from '${import.meta.dir}/../src/index.js';
       const b = new CclBridge();
       b.close();
-      try { b.account.create(TESTNET); } catch (e) { if (e instanceof CclClosedError) console.log('raised'); }
+      try { b.accounts.create(TESTNET); } catch (e) { if (e instanceof CclClosedError) console.log('raised'); }
       console.log('survived');
     `;
     const proc = Bun.spawnSync(['bun', '-e', code]);
