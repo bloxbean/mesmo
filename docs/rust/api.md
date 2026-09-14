@@ -191,7 +191,7 @@ pub fn build(&self, yaml: &str, utxos: &serde_json::Value, protocol_params: &ser
              exec_units: Option<&serde_json::Value>, additional_signers: u32) -> Result<TxResult>;
 
 // with `--features providers`:
-pub fn build_with(&self, yaml: &str, provider: &dyn ChainDataProvider, sender: &str,
+pub fn build_with(&self, yaml: &str, provider: &dyn ChainDataProvider, senders: &[&str],
                   additional_signers: u32, evaluator: Option<&dyn TransactionEvaluator>) -> Result<TxResult>;
 ```
 
@@ -200,7 +200,7 @@ pub fn build_with(&self, yaml: &str, provider: &dyn ChainDataProvider, sender: &
 - `protocol_params` is the CCL `ProtocolParams` JSON model; unknown fields are ignored.
 - `exec_units` — for Plutus transactions, `Some(&json!([{"mem": ..., "steps": ...}]))`, one entry per redeemer in transaction order. Pass `None` to let the native library compute them **offline** with the embedded Scalus evaluator.
 - `additional_signers` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate, `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
-- **`build_with`** fetches UTXOs and protocol parameters from a [provider](providers.md), then builds. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
+- **`build_with`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```rust
 use serde_json::json;

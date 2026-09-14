@@ -111,7 +111,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 use ccl::providers::BlockfrostProvider; // or YaciProvider
 
 let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, None)?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `ChainDataProvider` trait (`utxos`,
@@ -124,7 +124,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step (pass `None`):
 
 ```rust
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, None)?; // Scalus computes the units
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?; // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -136,7 +136,7 @@ lives here in the wrapper (also behind the `providers` feature):
 use ccl::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new("proj_id", "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, sender, Some(&evaluator))?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, Some(&evaluator))?;
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `TransactionEvaluator` trait (`evaluate`). To

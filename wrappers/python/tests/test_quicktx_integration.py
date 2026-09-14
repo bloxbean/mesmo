@@ -276,7 +276,7 @@ def test_build_with_yaci_provider(ccl_lib, devkit, funded_sender):
     provider = YaciProvider()  # defaults to the local DevKit cluster
     yaml_str = _payment_yaml(funded_sender.info["base_address"], receiver, "5000000")
 
-    result = ccl_lib.quicktx.build_with(yaml_str, provider, funded_sender.info["base_address"])
+    result = ccl_lib.quicktx.build_with(yaml_str, provider, [funded_sender.info["base_address"]])
 
     assert len(result["tx_cbor"]) > 0
     assert len(result["tx_hash"]) == 64

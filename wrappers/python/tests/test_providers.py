@@ -82,7 +82,7 @@ def test_build_with_composes_fetch_and_build():
         calls.append((y, u, p, e, additional_signers)), {"tx_cbor": "DRAFT"})[1]
 
     # No evaluator → fetch chain data, then build once with no units (the offline Scalus default).
-    qt.build_with("YAML", StubProvider(), "addrX")
+    qt.build_with("YAML", StubProvider(), ["addrX"])
     assert calls == [("YAML", sentinel_utxos, sentinel_pp, None, 0)]
 
     # With an evaluator → two-pass: draft build, evaluate(draft), rebuild with the returned units.
@@ -94,8 +94,32 @@ def test_build_with_composes_fetch_and_build():
             assert utxos == sentinel_utxos
             return [{"mem": 1, "steps": 2}]
 
-    qt.build_with("YAML", StubProvider(), "addrX", evaluator=StubEvaluator())
+    qt.build_with("YAML", StubProvider(), ["addrX"], evaluator=StubEvaluator())
     assert calls == [
         ("YAML", sentinel_utxos, sentinel_pp, None, 0),                      # draft
         ("YAML", sentinel_utxos, sentinel_pp, [{"mem": 1, "steps": 2}], 0),  # rebuild
     ]
+
+
+def test_build_with_merges_and_dedupes_utxos_across_senders():
+    """Multi-sender fetch: UTXOs are merged per sender and de-duplicated by
+    (tx_hash, output_index) — overlapping senders must not double-fund the build."""
+    shared = {"tx_hash": "a" * 64, "output_index": 0, "address": "addrA",
+              "amount": [{"unit": "lovelace", "quantity": "9"}]}
+    only_b = {"tx_hash": "b" * 64, "output_index": 1, "address": "addrB",
+              "amount": [{"unit": "lovelace", "quantity": "7"}]}
+
+    class TwoSenderProvider(ChainDataProvider):
+        def utxos(self, address):
+            return [shared] if address == "addrA" else [shared, only_b]
+
+        def protocol_params(self):
+            return {"min_fee_a": 44}
+
+    qt = QuickTx(bridge=None)
+    calls = []
+    qt.build = lambda y, u, p, e=None, additional_signers=0: (
+        calls.append(u), {"tx_cbor": "DRAFT"})[1]
+
+    qt.build_with("YAML", TwoSenderProvider(), ["addrA", "addrB"])
+    assert calls == [[shared, only_b]], "the shared UTXO must appear exactly once"

@@ -106,7 +106,7 @@ for you over HTTP (stdlib `net/http`), so the native library stays offline and p
 
 ```go
 provider, _ := ccl.NewBlockfrostProvider(projectID, "preprod") // or ccl.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `ccl.ChainDataProvider` interface
@@ -119,7 +119,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress) // Scalus computes the units
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0) // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -129,7 +129,7 @@ here in the wrapper:
 
 ```go
 evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress, evaluator)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0, evaluator)
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `ccl.TransactionEvaluator` interface

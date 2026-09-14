@@ -104,7 +104,7 @@ func TestBuildWithOffline(t *testing.T) {
 
 	provider := NewYaciProvider(srv.URL)
 	yaml := quickTxYaml(sender, intentSender2, "5000000")
-	res, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0)
+	res, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith: %v", err)
 	}
@@ -113,5 +113,41 @@ func TestBuildWithOffline(t *testing.T) {
 	}
 	if len(res.TxCbor) == 0 {
 		t.Error("expected non-empty tx cbor")
+	}
+}
+
+// Multi-sender fetch: UTXOs are merged per sender and de-duplicated by (tx_hash, output_index).
+// With the shared UTXO duplicated by naive concatenation, the build would double-count or emit
+// duplicate inputs — so a successful build with exactly-once funding is the regression pin.
+func TestBuildWithMergesAndDedupesAcrossSenders(t *testing.T) {
+	senderA := intentSender
+	senderB := intentSender2
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/utxos") {
+			// Both senders report the same funding UTXO (owned by senderA) plus B's own.
+			if strings.Contains(r.URL.Path, senderB) {
+				utxos := makeUtxos(senderA, 2000000000)
+				utxos = append(utxos, map[string]interface{}{
+					"tx_hash": strings.Repeat("b", 64), "output_index": 1, "address": senderB,
+					"amount": []map[string]interface{}{{"unit": "lovelace", "quantity": "7000000"}},
+				})
+				json.NewEncoder(w).Encode(utxos)
+			} else {
+				json.NewEncoder(w).Encode(makeUtxos(senderA, 2000000000))
+			}
+		} else {
+			json.NewEncoder(w).Encode(testProtocolParams())
+		}
+	}))
+	defer srv.Close()
+
+	provider := NewYaciProvider(srv.URL)
+	yaml := quickTxYaml(senderA, senderB, "5000000")
+	res, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderA, senderB}, 0)
+	if err != nil {
+		t.Fatalf("BuildWith(two senders): %v", err)
+	}
+	if len(res.TxHash) != 64 {
+		t.Errorf("expected 64-char tx hash, got %d", len(res.TxHash))
 	}
 }

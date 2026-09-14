@@ -503,7 +503,7 @@ Mint under a Plutus policy (`script_minting`, shown in [example 5](#5-plutus-min
 
 Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?, additionalSigners)` that
 marshals the chain data to JSON, calls `ccl_quicktx_build`, and parses the YAML result — plus a
-`build_with(yaml, provider, sender, additionalSigners, evaluator?)` convenience that fetches the
+`build_with(yaml, provider, senders, additionalSigners, evaluator?)` convenience that fetches the
 chain data from a provider first (see
 each wrapper's providers guide). The result is an object/dict/struct with `tx_cbor`, `tx_hash`, and
 `fee`. Both return an **unsigned** transaction — sign `tx_cbor` with the account sign API, then

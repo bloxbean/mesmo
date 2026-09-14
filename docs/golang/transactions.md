@@ -28,7 +28,7 @@ transaction:
 `, sender, receiver)
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-result, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 // (or bridge.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
@@ -72,7 +72,7 @@ transaction:
           stake_address: %s
 `, sender, account.StakeAddress)
 
-reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, sender, 1)
+reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
 signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleStake)
 // submit signedReg; wait for inclusion before the next step
 
@@ -87,7 +87,7 @@ transaction:
           pool_id: pool1...
 `, sender, account.StakeAddress)
 
-deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, sender, 1)
+deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
 signedDeleg, err := acct.SignTx(deleg.TxCbor, ccl.RolePayment|ccl.RoleStake)
 ```
 
@@ -111,7 +111,7 @@ transaction:
           anchor_hash: %s
 `, sender, drep.PublicKeyHash, anchorHash)
 
-reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, sender, 1)
+reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
 signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleDRep)
 ```
 
@@ -135,7 +135,7 @@ transaction:
           script_type: 0
 `, sender, receiver)
 
-mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, sender, 0)
+mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
 signedMint, err := acct.SignTx(mint.TxCbor, ccl.RolePayment)
 ```
 
@@ -146,14 +146,14 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, sender, 0)
+result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
 ```
 
 To cost against a real node instead, pass an evaluator — `BuildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```go
 evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, sender, 0, evaluator)
+result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
 ```
 
 Or supply units yourself with the offline `Build`:

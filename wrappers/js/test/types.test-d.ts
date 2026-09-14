@@ -179,9 +179,9 @@ const custom: ChainDataProvider = {
     protocolParams: async () => protocolParams,
 };
 
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', yaci, account.base_address));
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', blockfrost, account.base_address, evaluator));
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', custom, account.base_address));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', yaci, [account.base_address]));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', blockfrost, [account.base_address], evaluator));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', custom, [account.base_address]));
 expectType<Promise<Utxo[]>>(yaci.utxos(account.base_address));
 expectType<Promise<ProtocolParams>>(yaci.protocolParams());
 expectType<Promise<ExecUnits[]>>(evaluator.evaluate(built.tx_cbor, utxos));
@@ -198,3 +198,6 @@ expectType<CclClosedError>(new CclClosedError());
 expectType<string>(resolveLibFile());
 expectType<string>(resolveLibFile('/opt/ccl/lib'));
 expectType<string>(platformSuffix());
+
+// @ts-expect-error senders is an array — a bare string is the old single-sender signature
+bridge.quicktx.buildWith('version: 1.0', yaci, account.base_address);

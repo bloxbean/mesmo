@@ -256,7 +256,8 @@ export declare class QuickTxApi {
     buildWith(
         txplanYaml: string,
         provider: ChainDataProvider,
-        sender: string,
+        /** Addresses whose UTXOs fund the transaction(s); de-duplicated across senders. */
+        senders: string[],
         evaluator?: TransactionEvaluator | null,
     ): Promise<TxResult>;
 }

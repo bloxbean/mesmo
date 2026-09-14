@@ -183,7 +183,7 @@ An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment
 
 ```python
 build(txplan_yaml, utxos, protocol_params, exec_units=None, additional_signers=0) -> dict
-build_with(txplan_yaml, provider, sender, evaluator=None, additional_signers=0) -> dict
+build_with(txplan_yaml, provider, senders, evaluator=None, additional_signers=0) -> dict
 ```
 
 Both return `{"tx_cbor": str, "tx_hash": str, "fee": str}`.
@@ -193,7 +193,7 @@ Both return `{"tx_cbor": str, "tx_hash": str, "fee": str}`.
 - `protocol_params` is the CCL `ProtocolParams` dict; unknown fields are ignored.
 - `exec_units` — for Plutus transactions, `[{"mem": ..., "steps": ...}]`, one entry per redeemer in transaction order. When omitted, the native library computes them **offline** with the embedded Scalus evaluator.
 - `additional_signers` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate (`payment`+`stake` signing), `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
-- **`build_with`** fetches UTXOs and protocol parameters from a [provider](providers.md), then builds. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
+- **`build_with`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```python
 result = lib.quicktx.build(yaml, utxos, params)                      # plain payment: 0 extra signers

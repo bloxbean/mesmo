@@ -28,7 +28,7 @@ with CclLib() as lib:
     """
 
     # 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-    result = lib.quicktx.build_with(yaml, provider, sender)
+    result = lib.quicktx.build_with(yaml, provider, [sender])
     # (or lib.quicktx.build(yaml, utxos, protocol_params) with your own chain data)
 
     # 3. Sign — with the key roles the transaction's certificates require
@@ -76,7 +76,7 @@ transaction:
         - type: stake_registration
           stake_address: {account["stake_address"]}
 """
-reg = lib.quicktx.build_with(stake_yaml, provider, sender, additional_signers=1)
+reg = lib.quicktx.build_with(stake_yaml, provider, [sender], additional_signers=1)
 signed_reg = acct.sign_tx(reg["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
 # submit signed_reg; wait for inclusion before the next step
 
@@ -90,7 +90,7 @@ transaction:
           stake_address: {account["stake_address"]}
           pool_id: pool1...
 """
-deleg = lib.quicktx.build_with(deleg_yaml, provider, sender, additional_signers=1)
+deleg = lib.quicktx.build_with(deleg_yaml, provider, [sender], additional_signers=1)
 signed_deleg = acct.sign_tx(deleg["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
 ```
 
@@ -114,7 +114,7 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: {anchor_hash}
 """
-reg = lib.quicktx.build_with(drep_yaml, provider, sender, additional_signers=1)
+reg = lib.quicktx.build_with(drep_yaml, provider, [sender], additional_signers=1)
 signed = acct.sign_tx(reg["tx_cbor"], SigningRole.PAYMENT | SigningRole.DREP)
 ```
 
@@ -137,7 +137,7 @@ transaction:
           script_hex: "820180"
           script_type: 0
 """
-mint = lib.quicktx.build_with(mint_yaml, provider, sender)
+mint = lib.quicktx.build_with(mint_yaml, provider, [sender])
 signed = acct.sign_tx(mint["tx_cbor"])
 ```
 
@@ -148,7 +148,7 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```python
-result = lib.quicktx.build_with(plutus_mint_yaml, provider, sender)
+result = lib.quicktx.build_with(plutus_mint_yaml, provider, [sender])
 ```
 
 To cost against a real node instead, pass an evaluator — `build_with` then runs the two-pass flow (draft → remote evaluate → rebuild):
@@ -157,7 +157,7 @@ To cost against a real node instead, pass an evaluator — `build_with` then run
 from ccl import BlockfrostEvaluator
 
 evaluator = BlockfrostEvaluator(project_id, network="preprod")
-result = lib.quicktx.build_with(plutus_mint_yaml, provider, sender, evaluator)
+result = lib.quicktx.build_with(plutus_mint_yaml, provider, [sender], evaluator)
 ```
 
 Or supply units yourself with the offline `build`:

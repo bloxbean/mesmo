@@ -16,7 +16,7 @@ package ccl
 // Use one directly, or via QuickTxApi.BuildWith:
 //
 //	provider := ccl.NewBlockfrostProvider(projectID, "preprod") // or ccl.NewYaciProvider("")
-//	result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress)
+//	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 
 import (
 	"bytes"
@@ -333,10 +333,24 @@ func (e *BlockfrostEvaluator) Evaluate(txCbor string, _ []map[string]interface{}
 //
 // additionalSigners budgets fee witnesses beyond those implied by the input UTXOs — see
 // QuickTxApi.Build.
-func (q *QuickTxApi) BuildWith(yaml string, provider ChainDataProvider, sender string, additionalSigners int, evaluator ...TransactionEvaluator) (*TxResult, error) {
-	utxos, err := provider.Utxos(sender)
-	if err != nil {
-		return nil, fmt.Errorf("provider utxos: %w", err)
+func (q *QuickTxApi) BuildWith(yaml string, provider ChainDataProvider, senders []string, additionalSigners int, evaluator ...TransactionEvaluator) (*TxResult, error) {
+	// UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so overlapping
+	// senders can't double-fund the build. For multi-sender transactions, TxPlan's
+	// context.fee_payer decides who pays the fee.
+	var utxos []map[string]interface{}
+	seen := make(map[string]bool)
+	for _, sender := range senders {
+		us, err := provider.Utxos(sender)
+		if err != nil {
+			return nil, fmt.Errorf("provider utxos: %w", err)
+		}
+		for _, u := range us {
+			key := fmt.Sprintf("%v#%v", u["tx_hash"], u["output_index"])
+			if !seen[key] {
+				seen[key] = true
+				utxos = append(utxos, u)
+			}
+		}
 	}
 	pp, err := provider.ProtocolParams()
 	if err != nil {

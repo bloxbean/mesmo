@@ -144,7 +144,7 @@ from ccl import CclLib, YaciProvider, BlockfrostProvider
 
 lib = CclLib()
 provider = BlockfrostProvider(project_id, network="preprod")  # or YaciProvider()
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address)
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])
 ```
 
 Plug in any backend (Koios, Ogmios, …) by supplying an object with `utxos(address)` and
@@ -157,7 +157,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```python
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address)  # Scalus computes the units
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])  # Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -169,7 +169,7 @@ lives here in the wrapper:
 from ccl import BlockfrostEvaluator
 
 evaluator = BlockfrostEvaluator(project_id, network="preprod")
-result = lib.quicktx.build_with(txplan_yaml, provider, sender_address, evaluator=evaluator)
+result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address], evaluator=evaluator)
 ```
 
 Plug in any evaluator (Ogmios, …) by supplying an object with `evaluate(tx_cbor, utxos)`. To supply

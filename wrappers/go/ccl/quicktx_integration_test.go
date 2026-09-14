@@ -461,7 +461,7 @@ func TestIntegrationBuildWith(t *testing.T) {
 
 	provider := NewYaciProvider("") // local DevKit cluster
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "5000000")
-	result, err := bridge.QuickTx.BuildWith(yaml, provider, sender.BaseAddress, 0)
+	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith: %v", err)
 	}

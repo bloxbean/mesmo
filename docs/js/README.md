@@ -91,7 +91,7 @@ With a provider, fetching the chain data is one call:
 import { YaciProvider } from "@bloxbean/cardano-client-lib";
 
 const provider = new YaciProvider();  // local Yaci DevKit
-const result = await bridge.quicktx.buildWith(yaml, provider, account.base_address);
+const result = await bridge.quicktx.buildWith(yaml, provider, [account.base_address]);
 ```
 
 ## Design in one paragraph

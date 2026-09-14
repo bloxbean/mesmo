@@ -23,7 +23,7 @@ func NewYaciProvider(baseURL string) *YaciProvider // "" → "http://localhost:1
 
 ```go
 provider := ccl.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ### BlockfrostProvider
@@ -39,7 +39,7 @@ func NewBlockfrostProviderURL(projectID, baseURL string) *BlockfrostProvider    
 
 ```go
 provider, err := ccl.NewBlockfrostProvider(os.Getenv("BF_PROJECT_ID"), "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, senderAddress, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ## Evaluators
@@ -63,7 +63,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```go
 evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0, evaluator)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 

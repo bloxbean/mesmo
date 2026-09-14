@@ -164,7 +164,7 @@ transaction:
     // The shipped provider fetches the devnet's real UTXOs + protocol params and feeds build().
     const provider = new YaciProvider();
     const yaml = paymentYaml(sender.base_address, receiver.base_address, "5000000");
-    const result = await bridge.quicktx.buildWith(yaml, provider, sender.base_address);
+    const result = await bridge.quicktx.buildWith(yaml, provider, [sender.base_address]);
 
     expect(result.tx_cbor.length).toBeGreaterThan(0);
     expect(result.tx_hash.length).toBe(64);

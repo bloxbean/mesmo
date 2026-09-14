@@ -80,7 +80,7 @@ With a provider, fetching the chain data is one call:
 from ccl import YaciProvider
 
 provider = YaciProvider()  # local Yaci DevKit
-result = lib.quicktx.build_with(yaml, provider, account["base_address"])
+result = lib.quicktx.build_with(yaml, provider, [account["base_address"]])
 ```
 
 ## Design in one paragraph

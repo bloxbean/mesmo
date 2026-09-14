@@ -54,7 +54,7 @@ fn build_with_offline() {
     );
     let res = bridge
         .quicktx()
-        .build_with(&yaml, &StubProvider, SENDER, 0, None)
+        .build_with(&yaml, &StubProvider, &[SENDER], 0, None)
         .expect("build_with");
     assert_eq!(res.tx_hash.len(), 64);
     assert!(!res.tx_cbor.is_empty());
@@ -126,4 +126,39 @@ fn blockfrost_paginates_injects_address_and_sends_project_id() {
 #[test]
 fn blockfrost_unknown_network_errs() {
     assert!(BlockfrostProvider::new("p", "nope").is_err());
+}
+
+/// Multi-sender fetch: UTXOs are merged per sender and de-duplicated by (tx_hash, output_index) —
+/// with naive concatenation the shared UTXO would double-count and the build would misbehave.
+struct TwoSenderProvider;
+impl ChainDataProvider for TwoSenderProvider {
+    fn utxos(&self, address: &str) -> Result<Value> {
+        let shared = static_utxos();
+        if address == SENDER {
+            Ok(shared)
+        } else {
+            let mut arr = shared.as_array().unwrap().clone();
+            arr.push(json!({
+                "tx_hash": "b".repeat(64), "output_index": 1, "address": address,
+                "amount": [{ "unit": "lovelace", "quantity": "7000000" }]
+            }));
+            Ok(Value::Array(arr))
+        }
+    }
+    fn protocol_params(&self) -> Result<Value> {
+        Ok(static_protocol_params())
+    }
+}
+
+#[test]
+fn build_with_merges_and_dedupes_across_senders() {
+    let bridge = Bridge::new().expect("bridge");
+    let yaml = format!(
+        "version: 1.0\ntransaction:\n  - tx:\n      from: {SENDER}\n      intents:\n        - type: payment\n          address: {RECEIVER}\n          amounts:\n            - unit: lovelace\n              quantity: \"5000000\"\n"
+    );
+    let res = bridge
+        .quicktx()
+        .build_with(&yaml, &TwoSenderProvider, &[SENDER, RECEIVER], 0, None)
+        .expect("multi-sender build_with");
+    assert_eq!(res.tx_hash.len(), 64);
 }

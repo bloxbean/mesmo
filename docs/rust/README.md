@@ -93,7 +93,7 @@ With a provider (requires the `providers` feature), fetching the chain data is o
 use ccl::providers::YaciProvider;
 
 let provider = YaciProvider::default(); // local Yaci DevKit
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, 0, None)?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Design in one paragraph

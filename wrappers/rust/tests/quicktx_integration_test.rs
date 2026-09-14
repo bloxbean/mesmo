@@ -161,7 +161,7 @@ fn test_integration_build_with_yaci_provider() {
     let yaml = payment_yaml(&sender, &receiver, "5000000");
     let result = bridge
         .quicktx()
-        .build_with(&yaml, &provider, &sender, 0, None)
+        .build_with(&yaml, &provider, &[sender.as_str()], 0, None)
         .expect("build_with failed");
 
     assert!(!result.tx_cbor.is_empty());

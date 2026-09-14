@@ -27,7 +27,7 @@ transaction:
 `;
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-const result = await bridge.quicktx.buildWith(yaml, provider, sender);
+const result = await bridge.quicktx.buildWith(yaml, provider, [sender]);
 // (or bridge.quicktx.build(yaml, utxos, protocolParams) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
@@ -77,7 +77,7 @@ transaction:
         - type: stake_registration
           stake_address: ${account.stake_address}
 `;
-const reg = await bridge.quicktx.buildWith(stakeYaml, provider, sender, null, 1);
+const reg = await bridge.quicktx.buildWith(stakeYaml, provider, [sender], null, 1);
 const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedReg);          // wait for inclusion before the next step
 
@@ -91,7 +91,7 @@ transaction:
           stake_address: ${account.stake_address}
           pool_id: pool1...
 `;
-const deleg = await bridge.quicktx.buildWith(delegYaml, provider, sender, null, 1);
+const deleg = await bridge.quicktx.buildWith(delegYaml, provider, [sender], null, 1);
 const signedDeleg = acct.signTx(deleg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedDeleg);
 ```
@@ -115,7 +115,7 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const reg = await bridge.quicktx.buildWith(drepYaml, provider, sender, null, 1);
+const reg = await bridge.quicktx.buildWith(drepYaml, provider, [sender], null, 1);
 const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 await submit(signedReg);
 ```
@@ -137,7 +137,7 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const vote = await bridge.quicktx.buildWith(voteYaml, provider, sender, null, 1);
+const vote = await bridge.quicktx.buildWith(voteYaml, provider, [sender], null, 1);
 const signedVote = acct.signTx(vote.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 ```
 
@@ -160,7 +160,7 @@ transaction:
           script_hex: "820180"
           script_type: 0
 `;
-const mint = await bridge.quicktx.buildWith(mintYaml, provider, sender);
+const mint = await bridge.quicktx.buildWith(mintYaml, provider, [sender]);
 const signedMint = acct.signTx(mint.tx_cbor);
 ```
 
@@ -169,7 +169,7 @@ const signedMint = acct.signTx(mint.tx_cbor);
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```js
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, sender);
+const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender]);
 ```
 
 To cost against a real node instead, pass an evaluator — `buildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
@@ -178,7 +178,7 @@ To cost against a real node instead, pass an evaluator — `buildWith` then runs
 import { BlockfrostEvaluator } from "@bloxbean/cardano-client-lib";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, sender, evaluator);
+const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender], evaluator);
 ```
 
 Or supply units yourself with the offline `build`:

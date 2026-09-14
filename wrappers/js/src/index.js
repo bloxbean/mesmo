@@ -583,8 +583,21 @@ export class QuickTxApi {
    * @param {Array<{mem: (number|string), steps: (number|string)}>} [execUnits]
    * @returns {Promise<{tx_cbor: string, tx_hash: string, fee: string}>}
    */
-  async buildWith(txplanYaml, provider, sender, evaluator = null, additionalSigners = 0) {
-    const utxos = await provider.utxos(sender);
+  async buildWith(txplanYaml, provider, senders, evaluator = null, additionalSigners = 0) {
+    // UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so overlapping
+    // senders can't double-fund the build. For multi-sender transactions, TxPlan's
+    // context.fee_payer decides who pays the fee.
+    const utxos = [];
+    const seen = new Set();
+    for (const sender of senders) {
+      for (const u of await provider.utxos(sender)) {
+        const key = `${u.tx_hash}#${u.output_index}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          utxos.push(u);
+        }
+      }
+    }
     const protocolParams = await provider.protocolParams();
     let execUnits = null;
     if (evaluator != null) {

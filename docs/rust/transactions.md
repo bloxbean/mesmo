@@ -28,7 +28,7 @@ transaction:
 "#);
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, 0, None)?;
+let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 // (or bridge.quicktx().build(&yaml, &utxos, &protocol_params, None, additional_signers) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
@@ -73,7 +73,7 @@ transaction:
           stake_address: {stake_address}
 "#);
 
-let reg = bridge.quicktx().build_with(&stake_yaml, &provider, &sender, 1, None)?;
+let reg = bridge.quicktx().build_with(&stake_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed_reg = acct.sign_tx(&reg.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 // submit signed_reg; wait for inclusion before the next step
 
@@ -88,7 +88,7 @@ transaction:
           pool_id: pool1...
 "#);
 
-let deleg = bridge.quicktx().build_with(&deleg_yaml, &provider, &sender, 1, None)?;
+let deleg = bridge.quicktx().build_with(&deleg_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed_deleg = acct.sign_tx(&deleg.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 ```
 
@@ -114,7 +114,7 @@ transaction:
           anchor_hash: {anchor_hash}
 "#);
 
-let reg = bridge.quicktx().build_with(&drep_yaml, &provider, &sender, 1, None)?;
+let reg = bridge.quicktx().build_with(&drep_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed = acct.sign_tx(&reg.tx_cbor, SigningRole::PAYMENT | SigningRole::DREP)?;
 ```
 
@@ -138,7 +138,7 @@ transaction:
           script_type: 0
 "#);
 
-let mint = bridge.quicktx().build_with(&mint_yaml, &provider, &sender, 0, None)?;
+let mint = bridge.quicktx().build_with(&mint_yaml, &provider, &[sender.as_str()], 0, None)?;
 let signed = acct.sign_tx(&mint.tx_cbor, SigningRole::PAYMENT)?;
 ```
 
@@ -149,7 +149,7 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```rust
-let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &sender, 0, None)?;
+let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 To cost against a real node instead, pass an evaluator — `build_with` then runs the two-pass flow (draft → remote evaluate → rebuild):
@@ -158,7 +158,7 @@ To cost against a real node instead, pass an evaluator — `build_with` then run
 use ccl::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
-let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &sender, 0, Some(&evaluator))?;
+let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
 ```
 
 Or supply units yourself with the offline `build`:

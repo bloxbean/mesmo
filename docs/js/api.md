@@ -191,7 +191,7 @@ recovery phrase with one managed handle per CIP-1852 payment leaf — pass `addr
 ```ts
 build(txplanYaml: string, utxos: Utxo[], protocolParams: ProtocolParams,
       execUnits?: ExecUnits[] | null, additionalSigners = 0): TxResult
-buildWith(txplanYaml: string, provider: ChainDataProvider, sender: string,
+buildWith(txplanYaml: string, provider: ChainDataProvider, senders: string[],
           evaluator?: TransactionEvaluator | null, additionalSigners = 0): Promise<TxResult>
 ```
 
@@ -203,7 +203,7 @@ buildWith(txplanYaml: string, provider: ChainDataProvider, sender: string,
 - `additionalSigners` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate, `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
 - **Large numbers are safe.** Inputs are serialized with `lossless-json`, so quantities above 2^53 survive exactly.
 - `execUnits` — for Plutus transactions, `[{ mem, steps }]`, one entry per redeemer in transaction order. When omitted, the native library computes them **offline** with the embedded Scalus evaluator, so script transactions build with no network access. Supply your own to override, or use an [evaluator](providers.md#evaluators) for node-backed costing.
-- **`buildWith`** fetches UTXOs and protocol parameters from a [provider](providers.md), then builds. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
+- **`buildWith`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```js
 const result = bridge.quicktx.build(yaml, utxos, params);

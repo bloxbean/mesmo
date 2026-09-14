@@ -92,7 +92,7 @@ With a provider, fetching the chain data is one call:
 
 ```go
 provider := ccl.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
-result, err := bridge.QuickTx.BuildWith(yaml, provider, sender.BaseAddress, 0)
+result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 ```
 
 ## Design in one paragraph
