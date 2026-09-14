@@ -35,14 +35,18 @@ func main() {
 	}
 	defer bridge.Close()
 
-	sender, _ := bridge.Account.Create(ccl.Testnet)
-	receiver, _ := bridge.Account.Create(ccl.Testnet)
+	sender, _ := bridge.Accounts.Create(ccl.Testnet) // managed handle — signs below
+	defer sender.Close()
+	senderInfo, _ := sender.Info()
+	receiver, _ := bridge.Accounts.Create(ccl.Testnet)
+	receiverInfo, _ := receiver.Info()
+	receiver.Close()
 
 	// A static UTXO the sender controls (100 ADA), instead of querying a node.
 	utxos := []map[string]interface{}{{
 		"tx_hash":      strings.Repeat("a", 64),
 		"output_index": 0,
-		"address":      sender.BaseAddress,
+		"address":      senderInfo.BaseAddress,
 		"amount":       []map[string]interface{}{{"unit": "lovelace", "quantity": "100000000"}},
 	}}
 
@@ -58,7 +62,7 @@ transaction:
           amounts:
             - unit: lovelace
               quantity: "5000000"
-`, sender.BaseAddress, receiver.BaseAddress)
+`, senderInfo.BaseAddress, receiverInfo.BaseAddress)
 
 	// Build the unsigned transaction offline.
 	result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams, 0)
@@ -70,8 +74,8 @@ transaction:
 	fmt.Println("  fee    :", result.Fee)
 	fmt.Println("  cbor   :", result.TxCbor[:80], "...")
 
-	// Sign it with the sender's mnemonic.
-	signed, err := bridge.Account.SignTx(sender.Mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+	// Sign it with the sender's managed handle — no mnemonic in the call.
+	signed, err := sender.SignTx(result.TxCbor, ccl.RolePayment)
 	if err != nil {
 		log.Fatal(err)
 	}

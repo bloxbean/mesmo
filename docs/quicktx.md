@@ -287,9 +287,9 @@ The shapes below are taken from the repository's integration-test fixtures
 (`test-fixtures/quicktx-intents/`), which every wrapper submits against a real devnet in CI — they
 are known-good. Each snippet shows the `intents:` (and where relevant `inputs:`/`scripts:`) block;
 the surrounding skeleton (`version`, `context.fee_payer`, `tx.from`, `tx.change_address`) is the
-same as in the examples above. The **Sign with** column lists the key roles for
-`sign_tx_with_keys` — certificates must be witnessed by their key or the node rejects the
-transaction with `MissingVKeyWitnessesUTXOW`.
+same as in the examples above. The **Sign with** column lists the signing roles for the managed
+account's `sign_tx` (combine `SigningRole` flags with `|`) — certificates must be witnessed by
+their key or the node rejects the transaction with `MissingVKeyWitnessesUTXOW`.
 
 ### Staking
 
@@ -342,7 +342,7 @@ intents:
     drep_credential_type: key_hash
 ```
 
-The credential hex is the DRep `verification_key_hash` from the governance API (`drep_key_from_mnemonic`).
+The credential hex is the DRep `public_key_hash` from the stateless key utility (`crypto.derive_key(mnemonic, role="drep")`).
 
 ### Governance — voting
 
@@ -503,7 +503,7 @@ Mint under a Plutus policy (`script_minting`, shown in [example 5](#5-plutus-min
 
 Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?, additionalSigners)` that
 marshals the chain data to JSON, calls `ccl_quicktx_build`, and parses the YAML result — plus a
-`build_with(yaml, provider, sender, additionalSigners, evaluator?)` convenience that fetches the
+`build_with(yaml, provider, senders, additionalSigners, evaluator?)` convenience that fetches the
 chain data from a provider first (see
 each wrapper's providers guide). The result is an object/dict/struct with `tx_cbor`, `tx_hash`, and
 `fee`. Both return an **unsigned** transaction — sign `tx_cbor` with the account sign API, then
@@ -512,29 +512,31 @@ submit it yourself.
 > **Signing stake/governance transactions.** `sign_tx` adds only the **payment** key. Certificates
 > in stake registration/deregistration/delegation, reward withdrawal, and DRep/vote operations must
 > also be witnessed by the **stake** (or **DRep**) key, or the node rejects the tx with
-> `MissingVKeyWitnessesUTXOW`. Use `sign_tx_with_keys(..., keys)` (Go `SignTxWithKeys`, JS
-> `signTxWithKeys`) with the roles you need, e.g. `["payment", "stake"]` or `["payment", "drep"]`
-> (roles: `payment`, `stake`, `drep`, `committee_cold`, `committee_hot`).
+> `MissingVKeyWitnessesUTXOW`. Sign through a managed account handle with the roles you need,
+> e.g. `SigningRole.PAYMENT | SigningRole.STAKE` or `PAYMENT | DREP`
+> (roles: `PAYMENT`, `STAKE`, `DREP`, `COMMITTEE_COLD`, `COMMITTEE_HOT`).
 
 ### Python
 
 ```python
-from ccl import CclLib
+from ccl import CclLib, Network, SigningRole
 
 lib = CclLib()
 # additional_signers: witnesses beyond the input-implied payment key(s) — here 1 (a stake cert)
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params, additional_signers=1)
-signed = lib.account.sign_tx(mnemonic, result["tx_cbor"], CclLib.TESTNET, 0, 0)
+with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
+    signed = acct.sign_tx(result["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
 ```
 
 ### JavaScript (Bun)
 
 ```javascript
-import { CclBridge, TESTNET } from '@bloxbean/cardano-client-lib';
+import { CclBridge, TESTNET, SigningRole } from '@bloxbean/cardano-client-lib';
 
 const bridge = new CclBridge();
 const result = bridge.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
-const signed = bridge.account.signTx(mnemonic, TESTNET, 0, 0, result.tx_cbor);
+using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 ```
 
 ### Go
@@ -544,7 +546,9 @@ bridge, _ := ccl.New()
 defer bridge.Close()
 
 result, _ := bridge.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
-signed, _ := bridge.Account.SignTx(mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+defer acct.Close()
+signed, _ := acct.SignTx(result.TxCbor, ccl.RolePayment|ccl.RoleStake)
 ```
 
 ### Rust
@@ -552,9 +556,14 @@ signed, _ := bridge.Account.SignTx(mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
 ```rust
 let bridge = ccl::Bridge::new().unwrap();
 
+use ccl::accounts::SigningRole;
+
 let result = bridge.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
-let signed = bridge.account()
-    .sign_tx(&mnemonic, ccl::network::TESTNET, 0, 0, &result.tx_cbor)
+let acct = bridge.accounts()
+    .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+    .unwrap();
+let signed = acct
+    .sign_tx(&result.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)
     .unwrap();
 ```
 

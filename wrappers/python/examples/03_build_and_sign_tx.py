@@ -27,14 +27,15 @@ PROTOCOL_PARAMS = {
 def main():
     lib = CclLib()
     try:
-        sender = lib.account.create(Network.TESTNET)
-        receiver = lib.account.create(Network.TESTNET)
+        sender = lib.accounts.create(Network.TESTNET)   # managed handle — signs below
+        with lib.accounts.create(Network.TESTNET) as r:
+            receiver_address = r.info["base_address"]
 
         # A static UTXO the sender controls (100 ADA), instead of querying a node.
         utxos = [{
             "tx_hash": "a" * 64,
             "output_index": 0,
-            "address": sender["base_address"],
+            "address": sender.info["base_address"],
             "amount": [{"unit": "lovelace", "quantity": "100000000"}],
         }]
 
@@ -43,10 +44,10 @@ def main():
 version: 1.0
 transaction:
   - tx:
-      from: {sender['base_address']}
+      from: {sender.info["base_address"]}
       intents:
         - type: payment
-          address: {receiver['base_address']}
+          address: {receiver_address}
           amounts:
             - unit: lovelace
               quantity: "5000000"
@@ -58,8 +59,8 @@ transaction:
         print("  fee    :", result["fee"])
         print("  cbor   :", result["tx_cbor"][:80], "...")
 
-        signed = lib.account.sign_tx(
-            sender["mnemonic"], result["tx_cbor"], Network.TESTNET, 0, 0)
+        signed = sender.sign_tx(result["tx_cbor"])
+        sender.close()
         print("Signed transaction cbor:", signed[:80], "...")
         print("\nNext step (not shown): submit `signed` to a Cardano node over HTTP.")
     finally:

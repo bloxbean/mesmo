@@ -27,11 +27,12 @@ transaction:
 `;
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-const result = await bridge.quicktx.buildWith(yaml, provider, sender);
+const result = await bridge.quicktx.buildWith(yaml, provider, [sender]);
 // (or bridge.quicktx.build(yaml, utxos, protocolParams) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-const signed = bridge.account.signTx(mnemonic, TESTNET, 0, 0, result.tx_cbor);
+using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+const signed = acct.signTx(result.tx_cbor);
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
 const resp = await fetch(`${submitUrl}/tx/submit`, {
@@ -45,15 +46,18 @@ const txHash = (await resp.text()).trim().replace(/"/g, "");
 
 ## Which keys sign what
 
-`signTx` witnesses with the payment key only. Certificates need their own witness — use `signTxWithKeys` with roles **in order**:
+`acct.signTx(txCbor)` witnesses with the payment key only. Certificates need their own witness —
+combine `SigningRole` flags with `|` (witnesses apply in canonical order):
 
-| Transaction contains | `keys` |
+| Transaction contains | roles |
 |---|---|
-| Payments, metadata, minting, Plutus operations | `["payment"]` (or plain `signTx`) |
-| `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `["payment", "stake"]` |
-| `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `["payment", "drep"]` |
-| `governance_proposal` | `["payment"]` |
-| `pool_registration` / `pool_update` / `pool_retirement` | `["payment", "stake"]` when the pool is keyed to the account's stake key |
+| Payments, metadata, minting, Plutus operations | `SigningRole.PAYMENT` (the default) |
+| `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `PAYMENT \| STAKE` |
+| `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `PAYMENT \| DREP` |
+| `governance_proposal` | `PAYMENT` |
+| `pool_registration` / `pool_update` / `pool_retirement` | `PAYMENT \| STAKE` when the pool is keyed to the account's stake key |
+
+The examples below assume an open handle: `using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET)` (with `SigningRole` imported).
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
 The same table gives the fee's witness budget: pass `additional_signers = len(keys) - 1` to the build (the input UTXOs already cover the payment key). For a native-script spend whose only inputs sit at the script address, pass the number of the script's `sig` keys instead.
@@ -73,8 +77,8 @@ transaction:
         - type: stake_registration
           stake_address: ${account.stake_address}
 `;
-const reg = await bridge.quicktx.buildWith(stakeYaml, provider, sender, null, 1);
-const signedReg = bridge.account.signTxWithKeys(mnemonic, TESTNET, 0, 0, reg.tx_cbor, ["payment", "stake"]);
+const reg = await bridge.quicktx.buildWith(stakeYaml, provider, [sender], null, 1);
+const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedReg);          // wait for inclusion before the next step
 
 const delegYaml = `
@@ -87,8 +91,8 @@ transaction:
           stake_address: ${account.stake_address}
           pool_id: pool1...
 `;
-const deleg = await bridge.quicktx.buildWith(delegYaml, provider, sender, null, 1);
-const signedDeleg = bridge.account.signTxWithKeys(mnemonic, TESTNET, 0, 0, deleg.tx_cbor, ["payment", "stake"]);
+const deleg = await bridge.quicktx.buildWith(delegYaml, provider, [sender], null, 1);
+const signedDeleg = acct.signTx(deleg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedDeleg);
 ```
 
@@ -97,7 +101,7 @@ await submit(signedDeleg);
 The DRep credential comes from the governance API:
 
 ```js
-const drep = bridge.gov.drepKeyFromMnemonic(mnemonic, TESTNET, 0);
+const drep = bridge.crypto.deriveKey(mnemonic, 0, 0, 'drep');
 
 const drepYaml = `
 version: 1.0
@@ -106,13 +110,13 @@ transaction:
       from: ${sender}
       intents:
         - type: drep_registration
-          drep_credential_hex: ${drep.verification_key_hash}
+          drep_credential_hex: ${drep.public_key_hash}
           drep_credential_type: key_hash
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const reg = await bridge.quicktx.buildWith(drepYaml, provider, sender, null, 1);
-const signedReg = bridge.account.signTxWithKeys(mnemonic, TESTNET, 0, 0, reg.tx_cbor, ["payment", "drep"]);
+const reg = await bridge.quicktx.buildWith(drepYaml, provider, [sender], null, 1);
+const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 await submit(signedReg);
 ```
 
@@ -133,8 +137,8 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const vote = await bridge.quicktx.buildWith(voteYaml, provider, sender, null, 1);
-const signedVote = bridge.account.signTxWithKeys(mnemonic, TESTNET, 0, 0, vote.tx_cbor, ["payment", "drep"]);
+const vote = await bridge.quicktx.buildWith(voteYaml, provider, [sender], null, 1);
+const signedVote = acct.signTx(vote.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 ```
 
 ## Worked example: mint under a native script
@@ -156,8 +160,8 @@ transaction:
           script_hex: "820180"
           script_type: 0
 `;
-const mint = await bridge.quicktx.buildWith(mintYaml, provider, sender);
-const signedMint = bridge.account.signTx(mnemonic, TESTNET, 0, 0, mint.tx_cbor);
+const mint = await bridge.quicktx.buildWith(mintYaml, provider, [sender]);
+const signedMint = acct.signTx(mint.tx_cbor);
 ```
 
 ## Worked example: Plutus mint
@@ -165,7 +169,7 @@ const signedMint = bridge.account.signTx(mnemonic, TESTNET, 0, 0, mint.tx_cbor);
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```js
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, sender);
+const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender]);
 ```
 
 To cost against a real node instead, pass an evaluator — `buildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
@@ -174,7 +178,7 @@ To cost against a real node instead, pass an evaluator — `buildWith` then runs
 import { BlockfrostEvaluator } from "@bloxbean/cardano-client-lib";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, sender, evaluator);
+const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender], evaluator);
 ```
 
 Or supply units yourself with the offline `build`:

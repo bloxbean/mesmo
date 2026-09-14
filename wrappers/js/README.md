@@ -76,9 +76,9 @@ import { CclBridge, TESTNET } from './src/index.js';
 
 const bridge = new CclBridge();      // loads libccl, starts a GraalVM isolate
 try {
-  const account = bridge.account.create(TESTNET);
-  console.log(account.base_address); // addr_test1...
-  console.log(account.mnemonic);     // 24-word phrase
+  using account = bridge.accounts.create(TESTNET); // managed handle (ADR-0016)
+  console.log(account.info.base_address);        // addr_test1...
+  console.log(account.exportRecoveryPhrase());   // 24-word phrase — one-shot, deliberate
 } finally {
   bridge.close();                    // tears down the isolate
 }
@@ -87,8 +87,8 @@ try {
 ## API namespaces
 
 A `CclBridge` instance exposes these namespaces (all offline operations):
-`bridge.account`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`,
-`bridge.script`, `bridge.gov`, `bridge.wallet`, `bridge.quicktx`.
+`bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`,
+`bridge.script`, `bridge.quicktx`.
 
 Errors throw `CclError`; using a bridge after `close()` throws `CclClosedError`.
 
@@ -100,31 +100,29 @@ Every `network` parameter takes one of the exported constants:
 |---|---|
 | `MAINNET` | `0` |
 | `TESTNET` | `1` |
-| `PREPROD` | `2` |
-| `PREVIEW` | `3` |
 
 > **⚠️ These are CCL's `Network` enum ordinals, NOT Cardano's on-chain network id — and they are
 > inverted with respect to it.** On-chain, `0 = testnet` and `1 = mainnet`; here `MAINNET = 0` and
-> `TESTNET = 1`. So `bridge.account.create(0)` derives a **mainnet** key, not a testnet one.
+> `TESTNET = 1`. So `bridge.accounts.create(0)` derives a **mainnet** key, not a testnet one.
 > **Never pass a raw number — always pass a constant.**
 
 `network` is **required** (there is no mainnet default), an out-of-range value throws, and the
-TypeScript type is closed (`type Network = 0 | 1 | 2 | 3`), so `create(99)` will not compile:
+TypeScript type is closed (`type Network = 0 | 1`), so `create(99)` will not compile:
 
 ```js
 import { CclBridge, TESTNET, MAINNET } from '@bloxbean/cardano-client-lib';
 
-bridge.account.create(TESTNET);            // addr_test1… — on-chain network_id 0
-bridge.account.create();                   // TypeError: network is required
-bridge.account.create(99);                 // RangeError: invalid network
+bridge.accounts.create(TESTNET);           // addr_test1… — on-chain network_id 0
+bridge.accounts.create();                  // TypeError: network is required
+bridge.accounts.create(99);                // RangeError: invalid network
 ```
 
 The **genuine on-chain network id** is the `network_id` field returned by `address.info()` — it is
 *not* a `Network` ordinal and must not be fed back into `create()`:
 
 ```js
-const acct = bridge.account.create(MAINNET);            // MAINNET is the ordinal 0 …
-bridge.address.info(acct.base_address).network_id;      // … but the on-chain id is 1
+using acct = bridge.accounts.create(MAINNET);           // MAINNET is the ordinal 0 …
+bridge.address.info(acct.info.base_address).network_id; // … but the on-chain id is 1
 ```
 
 ### TypeScript
@@ -153,7 +151,7 @@ import { CclBridge, YaciProvider, BlockfrostProvider } from "@bloxbean/cardano-c
 
 const bridge = new CclBridge();
 const provider = new BlockfrostProvider(projectId, { network: "preprod" }); // or new YaciProvider()
-const result = await bridge.quicktx.buildWith(yaml, provider, senderAddress);
+const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 Plug in any backend (Koios, Ogmios, …) by supplying an object with `utxos(address)` and
@@ -166,7 +164,7 @@ A Plutus build needs each redeemer's execution units. The bridge computes them *
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```javascript
-const result = await bridge.quicktx.buildWith(yaml, provider, senderAddress); // Scalus computes the units
+const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]); // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -178,7 +176,7 @@ here in the wrapper:
 import { BlockfrostEvaluator } from "@bloxbean/cardano-client-lib";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, senderAddress, evaluator);
+const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress], evaluator);
 ```
 
 Plug in any evaluator (Ogmios, …) by supplying an object with `evaluate(txCbor, utxos)`. To supply

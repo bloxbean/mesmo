@@ -21,10 +21,7 @@ func assertCclError(t *testing.T, op string, err error) {
 
 // A testnet account's base address is bech32 with the addr_test1 prefix (network id 0 on the wire).
 func TestAccountCreateTestnet(t *testing.T) {
-	info, err := bridge.Account.Create(Testnet)
-	if err != nil {
-		t.Fatalf("Account.Create(Testnet) failed: %v", err)
-	}
+	info := createTestAccount(t, Testnet)
 	if !strings.HasPrefix(info.BaseAddress, "addr_test1") {
 		t.Errorf("expected addr_test1 prefix, got %s", info.BaseAddress)
 	}
@@ -32,14 +29,16 @@ func TestAccountCreateTestnet(t *testing.T) {
 
 // Restoring from a mnemonic must reproduce every derived address, not just the base one.
 func TestAccountFromMnemonicRestoresAllAddresses(t *testing.T) {
-	created, err := bridge.Account.Create(Mainnet)
-	if err != nil {
-		t.Fatalf("Account.Create() failed: %v", err)
-	}
+	created := createTestAccount(t, Mainnet)
 
-	restored, err := bridge.Account.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
+	acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
 	if err != nil {
-		t.Fatalf("Account.FromMnemonic() failed: %v", err)
+		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
+	}
+	defer acct.Close()
+	restored, err := acct.Info()
+	if err != nil {
+		t.Fatalf("Info() failed: %v", err)
 	}
 
 	if restored.BaseAddress != created.BaseAddress {
@@ -55,41 +54,44 @@ func TestAccountFromMnemonicRestoresAllAddresses(t *testing.T) {
 
 // Different address indices derive different base addresses from the same mnemonic.
 func TestAccountFromMnemonicDifferentIndices(t *testing.T) {
-	created, err := bridge.Account.Create(Mainnet)
-	if err != nil {
-		t.Fatalf("Account.Create() failed: %v", err)
-	}
+	created := createTestAccount(t, Mainnet)
 
-	addr0, err := bridge.Account.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
-	if err != nil {
-		t.Fatalf("FromMnemonic(0,0) failed: %v", err)
+	infoAt := func(index int) *AccountPublicInfo {
+		acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, index)
+		if err != nil {
+			t.Fatalf("FromMnemonic(0,%d) failed: %v", index, err)
+		}
+		defer acct.Close()
+		info, err := acct.Info()
+		if err != nil {
+			t.Fatalf("Info() failed: %v", err)
+		}
+		return info
 	}
-	addr1, err := bridge.Account.FromMnemonic(created.Mnemonic, Mainnet, 0, 1)
-	if err != nil {
-		t.Fatalf("FromMnemonic(0,1) failed: %v", err)
-	}
-	if addr0.BaseAddress == addr1.BaseAddress {
-		t.Errorf("addresses at different indices should differ, both %s", addr0.BaseAddress)
+	if infoAt(0).BaseAddress == infoAt(1).BaseAddress {
+		t.Error("addresses at different indices should differ")
 	}
 }
 
 // --- Negative / Error Tests ---
 
 func TestAccountFromInvalidMnemonic(t *testing.T) {
-	_, err := bridge.Account.FromMnemonic("invalid words that are not a valid mnemonic phrase at all", Mainnet, 0, 0)
+	_, err := bridge.Accounts.FromMnemonic("invalid words that are not a valid mnemonic phrase at all", Mainnet, 0, 0)
 	assertCclError(t, "FromMnemonic(invalid)", err)
 }
 
 func TestAccountFromEmptyMnemonic(t *testing.T) {
-	_, err := bridge.Account.FromMnemonic("", Mainnet, 0, 0)
+	_, err := bridge.Accounts.FromMnemonic("", Mainnet, 0, 0)
 	assertCclError(t, "FromMnemonic(empty)", err)
 }
 
 func TestAccountSignTxInvalidCbor(t *testing.T) {
-	created, err := bridge.Account.Create(Testnet)
+	created := createTestAccount(t, Testnet)
+	acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Testnet, 0, 0)
 	if err != nil {
-		t.Fatalf("Account.Create() failed: %v", err)
+		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}
-	_, err = bridge.Account.SignTx(created.Mnemonic, Testnet, 0, 0, "deadbeef")
+	defer acct.Close()
+	_, err = acct.SignTx("deadbeef", RolePayment)
 	assertCclError(t, "SignTx(invalid cbor)", err)
 }

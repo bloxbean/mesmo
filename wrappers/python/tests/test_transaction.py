@@ -27,10 +27,8 @@ def test_tx_deserialize(ccl):
 
 
 def test_account_sign_tx(ccl):
-    created = ccl.account.create(Network.TESTNET)
-    mnemonic = created['mnemonic']
-
-    signed_tx = ccl.account.sign_tx(mnemonic, SAMPLE_TX_CBOR, Network.TESTNET)
+    with ccl.accounts.create(Network.TESTNET) as acct:
+        signed_tx = acct.sign_tx(SAMPLE_TX_CBOR)
     assert len(signed_tx) > len(SAMPLE_TX_CBOR)
 
 
@@ -43,8 +41,8 @@ def test_tx_from_json(ccl):
 
 @pytest.mark.skip(reason="tx_sign_with_secret_key expects CBOR-encoded SecretKey, not raw private key hex")
 def test_tx_sign_with_secret_key(ccl):
-    created = ccl.account.create(Network.TESTNET)
-    private_key = ccl.account.get_private_key(created['mnemonic'], Network.TESTNET)
+    mnemonic = ccl.crypto.generate_mnemonic(24)
+    private_key = ccl.crypto.derive_key(mnemonic)['private_key']
     signed_tx = ccl.tx.sign_with_secret_key(SAMPLE_TX_CBOR, private_key)
     assert len(signed_tx) > len(SAMPLE_TX_CBOR)
 

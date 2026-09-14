@@ -40,7 +40,7 @@ but there is no standalone "C wrapper" product.
 - [ ] `P2` Split the monolithic Go `wrappers/go/ccl/ccl.go` (~2k LOC) and Rust `wrappers/rust/src/lib.rs` into focused modules for maintainability.
 - [ ] `P2` Cross-wrapper error-handling review for consistent `CclError` semantics (codes, messages, idiomatic types).
 - [x] `P2` ~~Give the Go wrapper a clear build-time message when `CGO_ENABLED=0`~~ **Obsolete** — the Go wrapper no longer uses cgo. It was migrated to **purego** (pure-Go `dlopen`, builds with `CGO_ENABLED=0`; see [ADR-0014](docs/adr/0014-go-distribution-purego-runtime-resolution.md)), so cgo is *not* required and there is no cgo linker error to guard against. The item's premise no longer holds.
-- [x] `P2` ~~Expose **stake-key signing**~~ **Done** — added `ccl_account_sign_tx_multi(…, keys)`, which signs with any subset of `payment` / `stake` / `drep` / `committee_cold` / `committee_hot` (CCL's `Account.signWith*Key`), wired through all four wrappers (`sign_tx_with_keys` / `SignTxWithKeys` / `signTxWithKeys`). Fixes the `MissingVKeyWitnessesUTXOW` rejection for stake/vote/DRep certs; the original `ccl_account_sign_tx` (payment only) is unchanged.
+- [x] `P2` ~~Expose **stake-key signing**~~ **Done** — added multi-role signing (historically `ccl_account_sign_tx_multi`; today the typed role mask on `ccl_account_sign_tx_handle`), which signs with any subset of `payment` / `stake` / `drep` / `committee_cold` / `committee_hot` (CCL's `Account.signWith*Key`), wired through all four wrappers (`sign_tx_with_keys` / `SignTxWithKeys` / `signTxWithKeys`). Fixes the `MissingVKeyWitnessesUTXOW` rejection for stake/vote/DRep certs; the original `ccl_account_sign_tx` (payment only) is unchanged.
 
 ## 2. Development — Build, CI & Distribution
 

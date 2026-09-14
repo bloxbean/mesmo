@@ -30,8 +30,8 @@ public final class TransactionApi {
      * Signs a transaction with a raw Ed25519 secret key.
      *
      * <p>Exported as {@code ccl_tx_sign_with_secret_key}. On success the result is the signed
-     * transaction as CBOR hex. Use this when you hold a key directly rather than a mnemonic
-     * (cf. {@code ccl_account_sign_tx}).
+     * transaction as CBOR hex. Use this when you hold a key directly rather than a managed
+     * account handle (cf. {@code ccl_account_sign_tx_handle}).
      *
      * @param thread        the current isolate thread
      * @param txCborHexPtr  the transaction as CBOR hex

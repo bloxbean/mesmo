@@ -31,25 +31,51 @@ int main(int argc, char **argv) {
     printf("  Version: %s\n", version);
     ccl_free_string(thread, version);
 
-    /* Test: account create (mainnet) */
-    rc = ccl_account_create(thread, 0);
-    ASSERT(rc == 0, "ccl_account_create mainnet");
+    /* Test: managed account create (mainnet) — ADR-0016 handle API */
+    long long handle = 0;
+    rc = ccl_account_create_handle(thread, 0, &handle);
+    ASSERT(rc == 0, "ccl_account_create_handle mainnet");
+    ASSERT(handle != 0, "handle is non-zero");
+    rc = ccl_account_get_info(thread, handle);
+    ASSERT(rc == 0, "ccl_account_get_info");
     char *account_json = ccl_get_result(thread);
-    ASSERT(account_json != NULL, "account result not null");
-    ASSERT(strstr(account_json, "base_address") != NULL, "account has base_address");
-    ASSERT(strstr(account_json, "mnemonic") != NULL, "account has mnemonic");
-    printf("  Account (first 100 chars): %.100s...\n", account_json);
+    ASSERT(account_json != NULL, "account info not null");
+    ASSERT(strstr(account_json, "base_address") != NULL, "account info has base_address");
+    ASSERT(strstr(account_json, "mnemonic") == NULL, "account info never contains the mnemonic");
+    printf("  Account info (first 100 chars): %.100s...\n", account_json);
     ccl_free_string(thread, account_json);
 
-    /* Test: account create (testnet) */
-    rc = ccl_account_create(thread, 1);
-    ASSERT(rc == 0, "ccl_account_create testnet");
+    /* Test: one-shot recovery-phrase export — delivered via out-param in the same call */
+    char *phrase = NULL;
+    rc = ccl_account_export_recovery_phrase(thread, handle, &phrase);
+    ASSERT(rc == 0, "ccl_account_export_recovery_phrase");
+    ASSERT(phrase != NULL && strlen(phrase) > 0, "recovery phrase delivered in-call");
+    ccl_free_string(thread, phrase);
+    char *again = NULL;
+    rc = ccl_account_export_recovery_phrase(thread, handle, &again);
+    ASSERT(rc != 0, "second export fails (one-shot)");
+    ASSERT(again == NULL, "failed export writes nothing");
+
+    /* Test: close is effective — the handle is dead afterwards */
+    rc = ccl_account_close(thread, handle);
+    ASSERT(rc == 0, "ccl_account_close");
+    rc = ccl_account_get_info(thread, handle);
+    ASSERT(rc == -11, "closed handle returns CCL_ERROR_INVALID_HANDLE");
+
+    /* Test: managed account create (testnet) */
+    long long testnet_handle = 0;
+    rc = ccl_account_create_handle(thread, 1, &testnet_handle);
+    ASSERT(rc == 0, "ccl_account_create_handle testnet");
+    rc = ccl_account_get_info(thread, testnet_handle);
+    ASSERT(rc == 0, "ccl_account_get_info testnet");
     char *testnet_json = ccl_get_result(thread);
     ASSERT(strstr(testnet_json, "addr_test1") != NULL, "testnet address has addr_test1 prefix");
     ccl_free_string(thread, testnet_json);
+    ccl_account_close(thread, testnet_handle);
 
     /* Test: invalid network */
-    rc = ccl_account_create(thread, 99);
+    long long bogus_handle = 0;
+    rc = ccl_account_create_handle(thread, 99, &bogus_handle);
     ASSERT(rc == -5, "invalid network returns CCL_ERROR_INVALID_NETWORK");
 
     /* Test: crypto blake2b_256 */
@@ -76,13 +102,6 @@ int main(int argc, char **argv) {
     /* Test: validate invalid mnemonic */
     rc = ccl_crypto_validate_mnemonic(thread, "invalid mnemonic phrase");
     ASSERT(rc != 0, "invalid mnemonic returns error");
-
-    /* Test: address validation */
-    rc = ccl_account_create(thread, 0);
-    ASSERT(rc == 0, "create account for address test");
-    char *acct = ccl_get_result(thread);
-    /* We'd need JSON parsing in C to extract the address, so just test with known good addr */
-    ccl_free_string(thread, acct);
 
     /* Summary */
     printf("\n=== Results: %d failures ===\n", failures);

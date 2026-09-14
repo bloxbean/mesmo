@@ -61,7 +61,7 @@ func main() {
 	defer bridge.Close()
 
 	// 1) Offline default: no evaluator -> Scalus runs the validator and stamps the computed units.
-	result, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0)
+	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func main() {
 	//    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
 	//
 	//	evaluator, _ := ccl.NewBlockfrostEvaluator("preprod_your_project_id", "preprod")
-	//	result, err := bridge.QuickTx.BuildWith(yaml, provider, sender, 0, evaluator)
+	//	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 	//
 	// To supply units yourself, call Build directly with the units as the last argument.
 }

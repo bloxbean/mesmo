@@ -1,4 +1,5 @@
 mod ffi;
+pub mod accounts;
 
 #[cfg(feature = "providers")]
 pub mod providers;
@@ -26,16 +27,17 @@ pub mod error_codes {
     pub const CCL_ERROR_INVALID_TRANSACTION: i32 = -9;
     /// Malformed TxPlan — the most common failure on the core build path.
     pub const CCL_ERROR_TX_BUILD: i32 = -10;
+    pub const CCL_ERROR_INVALID_HANDLE: i32 = -11;
 }
 
 /// Which Cardano network to derive addresses/keys for.
 ///
 /// # These are *not* Cardano's on-chain network ids
 ///
-/// The discriminants below are **CCL's own enum ordinals** (`Mainnet = 0`, `Testnet = 1`,
-/// `Preprod = 2`, `Preview = 3`) — they are what the native library expects. Cardano's *on-chain*
-/// network id, the one encoded in an address, is the opposite way round: **0 = testnet, 1 =
-/// mainnet**. So the two disagree exactly where it hurts most:
+/// The discriminants below are **CCL's own enum ordinals** (`Mainnet = 0`, `Testnet = 1`) —
+/// they are what the native library expects. Cardano's *on-chain* network id, the one encoded
+/// in an address, is the opposite way round: **0 = testnet, 1 = mainnet**. So the two disagree
+/// exactly where it hurts most:
 ///
 /// | | CCL ordinal (this enum) | on-chain network id |
 /// |---|---|---|
@@ -57,8 +59,6 @@ pub mod error_codes {
 pub enum Network {
     Mainnet,
     Testnet,
-    Preprod,
-    Preview,
 }
 
 impl Network {
@@ -105,6 +105,56 @@ fn to_cstring(s: &str) -> Result<CString> {
     })
 }
 
+/// Close-aware view of the bridge's isolate thread, shared with owned [`accounts::Account`]s.
+pub(crate) struct BridgeShared {
+    pub(crate) thread: std::cell::Cell<*mut ffi::graal_isolatethread_t>,
+}
+
+impl BridgeShared {
+    /// The live isolate thread, or a typed error once the Bridge has been dropped.
+    pub(crate) fn thread(&self) -> Result<*mut ffi::graal_isolatethread_t> {
+        let t = self.thread.get();
+        if t.is_null() {
+            return Err(CclError {
+                code: error_codes::CCL_ERROR_INVALID_HANDLE,
+                message: "Bridge is closed; this Account's handle is no longer valid".to_string(),
+            });
+        }
+        Ok(t)
+    }
+}
+
+pub(crate) fn get_result_at(thread: *mut ffi::graal_isolatethread_t) -> String {
+    unsafe {
+        let ptr = ffi::ccl_get_result(thread);
+        if ptr.is_null() {
+            return String::new();
+        }
+        let result = CStr::from_ptr(ptr as *const c_char).to_string_lossy().into_owned();
+        ffi::ccl_free_string(thread, ptr);
+        result
+    }
+}
+
+pub(crate) fn get_error_at(thread: *mut ffi::graal_isolatethread_t) -> String {
+    unsafe {
+        let ptr = ffi::ccl_get_last_error(thread);
+        if ptr.is_null() {
+            return String::new();
+        }
+        let result = CStr::from_ptr(ptr as *const c_char).to_string_lossy().into_owned();
+        ffi::ccl_free_string(thread, ptr);
+        result
+    }
+}
+
+pub(crate) fn check_at(thread: *mut ffi::graal_isolatethread_t, rc: i32) -> Result<String> {
+    if rc != error_codes::CCL_SUCCESS {
+        return Err(CclError { code: rc, message: get_error_at(thread) });
+    }
+    Ok(get_result_at(thread))
+}
+
 /// Safe wrapper around the CCL native library.
 ///
 /// # Threading
@@ -115,8 +165,8 @@ fn to_cstring(s: &str) -> Result<CString> {
 ///
 /// This is not a conservative choice; it is what the native library requires. A `Bridge` holds a
 /// `graal_isolatethread_t*`, and that handle belongs to the OS thread that created it — it carries
-/// that thread's stack bounds and the VM's thread-local state, including the result/error slots that
-/// [`Bridge::get_result`] reads back after each call. Handing it to another thread corrupts the VM.
+/// that thread's stack bounds and the VM's thread-local state, including the result/error slots the
+/// wrapper reads back after each call. Handing it to another thread corrupts the VM.
 /// (The *isolate* — the heap — can be shared; the isolate **thread** cannot. Conflating the two is
 /// what made the previous `unsafe impl Send for Bridge` unsound: it let safe code do exactly this,
 /// with no `unsafe` block anywhere in sight, and it appeared to work right up until it didn't.)
@@ -144,7 +194,12 @@ fn to_cstring(s: &str) -> Result<CString> {
 pub struct Bridge {
     #[allow(dead_code)]
     isolate: *mut ffi::graal_isolate_t,
-    thread: *mut ffi::graal_isolatethread_t,
+    // The single home of the isolate-thread pointer, shared with owned Accounts (Rc: the Bridge
+    // is !Send, so no atomics needed). Drop takes the pointer out of the cell (nulling it) before
+    // tearing the isolate down, hard-invalidating every outstanding Account in the same act:
+    // their calls then fail with a normal CclError instead of touching a dead isolate. Keeping
+    // exactly one copy means no future close/reset path can desync Bridge and Accounts.
+    pub(crate) shared: std::rc::Rc<BridgeShared>,
     // Raw pointers are already !Send + !Sync, so no negative impl is needed — but that is a load-
     // bearing property of this type, not an accident, and removing this field must not silently
     // make it Send again.
@@ -170,7 +225,7 @@ impl Bridge {
 
         let bridge = Bridge {
             isolate,
-            thread,
+            shared: std::rc::Rc::new(BridgeShared { thread: std::cell::Cell::new(thread) }),
             _not_send: PhantomData,
         };
         bridge.check_version()?;
@@ -201,53 +256,21 @@ impl Bridge {
         Ok(())
     }
 
-    fn get_result(&self) -> String {
-        unsafe {
-            let ptr = ffi::ccl_get_result(self.thread);
-            if ptr.is_null() {
-                return String::new();
-            }
-            let result = CStr::from_ptr(ptr as *const c_char)
-                .to_string_lossy()
-                .into_owned();
-            ffi::ccl_free_string(self.thread, ptr);
-            result
-        }
-    }
-
-    fn get_error(&self) -> String {
-        unsafe {
-            let ptr = ffi::ccl_get_last_error(self.thread);
-            if ptr.is_null() {
-                return String::new();
-            }
-            let result = CStr::from_ptr(ptr as *const c_char)
-                .to_string_lossy()
-                .into_owned();
-            ffi::ccl_free_string(self.thread, ptr);
-            result
-        }
+    /// The live isolate thread. Infallible for the Bridge's own methods: while a `&Bridge`
+    /// exists, `Drop` cannot have run, so the cell is non-null by construction. (Accounts, which
+    /// can outlive the Bridge, go through the fallible [`BridgeShared::thread`] instead.)
+    fn thread(&self) -> *mut ffi::graal_isolatethread_t {
+        self.shared.thread.get()
     }
 
     fn check(&self, rc: i32) -> Result<String> {
-        if rc != error_codes::CCL_SUCCESS {
-            return Err(CclError {
-                code: rc,
-                message: self.get_error(),
-            });
-        }
-        Ok(self.get_result())
+        check_at(self.thread(), rc)
     }
 
     /// Get the library version.
     pub fn version(&self) -> Result<String> {
-        let rc = unsafe { ffi::ccl_version(self.thread) };
+        let rc = unsafe { ffi::ccl_version(self.thread()) };
         self.check(rc)
-    }
-
-    /// Get the account namespace API.
-    pub fn account(&self) -> AccountApi<'_> {
-        AccountApi { bridge: self }
     }
 
     /// Get the address namespace API.
@@ -275,14 +298,9 @@ impl Bridge {
         ScriptApi { bridge: self }
     }
 
-    /// Get the governance namespace API.
-    pub fn gov(&self) -> GovApi<'_> {
-        GovApi { bridge: self }
-    }
-
-    /// Get the wallet namespace API.
-    pub fn wallet(&self) -> WalletApi<'_> {
-        WalletApi { bridge: self }
+    /// Managed accounts (ADR-0016): open once, hold an owned Account, sign with typed roles.
+    pub fn accounts(&self) -> accounts::AccountsApi<'_> {
+        accounts::AccountsApi { bridge: self }
     }
 
     /// Get the quicktx namespace API.
@@ -293,150 +311,15 @@ impl Bridge {
 
 impl Drop for Bridge {
     fn drop(&mut self) {
-        if !self.thread.is_null() {
+        // Take the pointer out of the cell (nulling it) before the isolate dies: outstanding
+        // Accounts are invalidated in the same act — their calls become typed errors, never
+        // dangling-isolate dereferences.
+        let thread = self.shared.thread.replace(ptr::null_mut());
+        if !thread.is_null() {
             unsafe {
-                ffi::graal_tear_down_isolate(self.thread);
+                ffi::graal_tear_down_isolate(thread);
             }
         }
-    }
-}
-
-// --- AccountApi ---
-
-pub struct AccountApi<'a> {
-    bridge: &'a Bridge,
-}
-
-impl<'a> AccountApi<'a> {
-    pub fn create(&self, network: Network) -> Result<String> {
-        let rc = unsafe { ffi::ccl_account_create(self.bridge.thread, network.as_i32()) };
-        self.bridge.check(rc)
-    }
-
-    pub fn from_mnemonic(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-        address_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_account_from_mnemonic(
-                self.bridge.thread,
-                network.as_i32(),
-                cs.as_ptr(),
-                account_index,
-                address_index,
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn get_public_key(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-        address_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_account_get_public_key(
-                self.bridge.thread,
-                cs.as_ptr(),
-                network.as_i32(),
-                account_index,
-                address_index,
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn get_private_key(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-        address_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_account_get_private_key(
-                self.bridge.thread,
-                cs.as_ptr(),
-                network.as_i32(),
-                account_index,
-                address_index,
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn sign_tx(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-        address_index: i32,
-        tx_cbor_hex: &str,
-    ) -> Result<String> {
-        let cs_mnemonic = to_cstring(mnemonic)?;
-        let cs_tx = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe {
-            ffi::ccl_account_sign_tx(
-                self.bridge.thread,
-                cs_mnemonic.as_ptr(),
-                network.as_i32(),
-                account_index,
-                address_index,
-                cs_tx.as_ptr(),
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    /// Sign a transaction with one or more of the account's keys, selected by role (any of
-    /// `payment`, `stake`, `drep`, `committee_cold`, `committee_hot`, applied in order). Use this
-    /// for transactions whose certificates also need the stake or DRep key — stake
-    /// registration/delegation/withdrawal and DRep/vote operations.
-    pub fn sign_tx_with_keys(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-        address_index: i32,
-        tx_cbor_hex: &str,
-        keys: &[&str],
-    ) -> Result<String> {
-        let cs_mnemonic = to_cstring(mnemonic)?;
-        let cs_tx = to_cstring(tx_cbor_hex)?;
-        let cs_keys = to_cstring(&keys.join(","))?;
-        let rc = unsafe {
-            ffi::ccl_account_sign_tx_multi(
-                self.bridge.thread,
-                cs_mnemonic.as_ptr(),
-                network.as_i32(),
-                account_index,
-                address_index,
-                cs_tx.as_ptr(),
-                cs_keys.as_ptr(),
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn get_drep_id(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_account_get_drep_id(self.bridge.thread, cs.as_ptr(), network.as_i32(), account_index)
-        };
-        self.bridge.check(rc)
     }
 }
 
@@ -449,7 +332,7 @@ pub struct AddressApi<'a> {
 impl<'a> AddressApi<'a> {
     pub fn info(&self, bech32: &str) -> Result<String> {
         let cs = to_cstring(bech32)?;
-        let rc = unsafe { ffi::ccl_address_info(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_address_info(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
@@ -458,19 +341,19 @@ impl<'a> AddressApi<'a> {
             Ok(s) => s,
             Err(_) => return false,
         };
-        let rc = unsafe { ffi::ccl_address_validate(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_address_validate(self.bridge.thread(), cs.as_ptr()) };
         rc == error_codes::CCL_SUCCESS
     }
 
     pub fn to_bytes(&self, bech32: &str) -> Result<String> {
         let cs = to_cstring(bech32)?;
-        let rc = unsafe { ffi::ccl_address_to_bytes(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_address_to_bytes(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn from_bytes(&self, hex_bytes: &str) -> Result<String> {
         let cs = to_cstring(hex_bytes)?;
-        let rc = unsafe { ffi::ccl_address_from_bytes(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_address_from_bytes(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 }
@@ -484,18 +367,18 @@ pub struct CryptoApi<'a> {
 impl<'a> CryptoApi<'a> {
     pub fn blake2b_256(&self, data_hex: &str) -> Result<String> {
         let cs = to_cstring(data_hex)?;
-        let rc = unsafe { ffi::ccl_crypto_blake2b_256(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_crypto_blake2b_256(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn blake2b_224(&self, data_hex: &str) -> Result<String> {
         let cs = to_cstring(data_hex)?;
-        let rc = unsafe { ffi::ccl_crypto_blake2b_224(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_crypto_blake2b_224(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn generate_mnemonic(&self, word_count: i32) -> Result<String> {
-        let rc = unsafe { ffi::ccl_crypto_generate_mnemonic(self.bridge.thread, word_count) };
+        let rc = unsafe { ffi::ccl_crypto_generate_mnemonic(self.bridge.thread(), word_count) };
         self.bridge.check(rc)
     }
 
@@ -504,14 +387,16 @@ impl<'a> CryptoApi<'a> {
             Ok(s) => s,
             Err(_) => return false,
         };
-        let rc = unsafe { ffi::ccl_crypto_validate_mnemonic(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_crypto_validate_mnemonic(self.bridge.thread(), cs.as_ptr()) };
         rc == error_codes::CCL_SUCCESS
     }
 
+    /// Ed25519 sign. `sk_hex` is a 32-byte seed (64 hex chars) or a 64-byte BIP32-Ed25519
+    /// extended key (128 hex chars, e.g. `derive_key`'s `private_key`) — detected by length.
     pub fn sign(&self, message_hex: &str, sk_hex: &str) -> Result<String> {
         let cs_msg = to_cstring(message_hex)?;
         let cs_sk = to_cstring(sk_hex)?;
-        let rc = unsafe { ffi::ccl_crypto_sign(self.bridge.thread, cs_msg.as_ptr(), cs_sk.as_ptr()) };
+        let rc = unsafe { ffi::ccl_crypto_sign(self.bridge.thread(), cs_msg.as_ptr(), cs_sk.as_ptr()) };
         self.bridge.check(rc)
     }
 
@@ -529,9 +414,38 @@ impl<'a> CryptoApi<'a> {
             Err(_) => return false,
         };
         let rc = unsafe {
-            ffi::ccl_crypto_verify(self.bridge.thread, cs_sig.as_ptr(), cs_msg.as_ptr(), cs_pk.as_ptr())
+            ffi::ccl_crypto_verify(self.bridge.thread(), cs_sig.as_ptr(), cs_msg.as_ptr(), cs_pk.as_ptr())
         };
         rc == error_codes::CCL_SUCCESS
+    }
+
+    /// Stateless CIP-1852 key derivation — the explicit "raw key material" utility.
+    ///
+    /// `role` is one of `"payment"`, `"change"`, `"stake"`, `"drep"`, `"committee_cold"`,
+    /// `"committee_hot"`. Returns the JSON `{"path","private_key","public_key","public_key_hash"}`.
+    /// Pass `private_key` (the 64-byte extended BIP32-Ed25519 key) whole to [`CryptoApi::sign`],
+    /// which detects the extended form by length — never slice it, its first half is a clamped
+    /// scalar, not a seed. Key derivation is network-independent. Prefer the managed accounts
+    /// API for signing — handles never expose key bytes.
+    pub fn derive_key(
+        &self,
+        mnemonic: &str,
+        account_index: i32,
+        address_index: i32,
+        role: &str,
+    ) -> Result<String> {
+        let cs_mnemonic = to_cstring(mnemonic)?;
+        let cs_role = to_cstring(role)?;
+        let rc = unsafe {
+            ffi::ccl_crypto_derive_key(
+                self.bridge.thread(),
+                cs_mnemonic.as_ptr(),
+                account_index,
+                address_index,
+                cs_role.as_ptr(),
+            )
+        };
+        self.bridge.check(rc)
     }
 }
 
@@ -544,7 +458,7 @@ pub struct TxApi<'a> {
 impl<'a> TxApi<'a> {
     pub fn hash(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::ccl_tx_hash(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_tx_hash(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
@@ -552,26 +466,26 @@ impl<'a> TxApi<'a> {
         let cs_tx = to_cstring(tx_cbor_hex)?;
         let cs_sk = to_cstring(sk_cbor_hex)?;
         let rc = unsafe {
-            ffi::ccl_tx_sign_with_secret_key(self.bridge.thread, cs_tx.as_ptr(), cs_sk.as_ptr())
+            ffi::ccl_tx_sign_with_secret_key(self.bridge.thread(), cs_tx.as_ptr(), cs_sk.as_ptr())
         };
         self.bridge.check(rc)
     }
 
     pub fn to_json(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::ccl_tx_to_json(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_tx_to_json(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn from_json(&self, tx_json: &str) -> Result<String> {
         let cs = to_cstring(tx_json)?;
-        let rc = unsafe { ffi::ccl_tx_from_json(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_tx_from_json(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn deserialize(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::ccl_tx_deserialize(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_tx_deserialize(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 }
@@ -585,19 +499,19 @@ pub struct PlutusApi<'a> {
 impl<'a> PlutusApi<'a> {
     pub fn data_hash(&self, datum_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(datum_cbor_hex)?;
-        let rc = unsafe { ffi::ccl_plutus_data_hash(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_plutus_data_hash(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn data_to_json(&self, cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(cbor_hex)?;
-        let rc = unsafe { ffi::ccl_plutus_data_to_json(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_plutus_data_to_json(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn data_from_json(&self, json: &str) -> Result<String> {
         let cs = to_cstring(json)?;
-        let rc = unsafe { ffi::ccl_plutus_data_from_json(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_plutus_data_from_json(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 }
@@ -611,101 +525,13 @@ pub struct ScriptApi<'a> {
 impl<'a> ScriptApi<'a> {
     pub fn native_from_json(&self, json: &str) -> Result<String> {
         let cs = to_cstring(json)?;
-        let rc = unsafe { ffi::ccl_script_native_from_json(self.bridge.thread, cs.as_ptr()) };
+        let rc = unsafe { ffi::ccl_script_native_from_json(self.bridge.thread(), cs.as_ptr()) };
         self.bridge.check(rc)
     }
 
     pub fn hash(&self, script_cbor_hex: &str, script_type: i32) -> Result<String> {
         let cs = to_cstring(script_cbor_hex)?;
-        let rc = unsafe { ffi::ccl_script_hash(self.bridge.thread, cs.as_ptr(), script_type) };
-        self.bridge.check(rc)
-    }
-}
-
-// --- GovApi ---
-
-pub struct GovApi<'a> {
-    bridge: &'a Bridge,
-}
-
-impl<'a> GovApi<'a> {
-    pub fn drep_key_from_mnemonic(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_gov_drep_key_from_mnemonic(self.bridge.thread, cs.as_ptr(), network.as_i32(), account_index)
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn committee_cold_key_from_mnemonic(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_gov_committee_cold_key_from_mnemonic(
-                self.bridge.thread,
-                cs.as_ptr(),
-                network.as_i32(),
-                account_index,
-            )
-        };
-        self.bridge.check(rc)
-    }
-
-    pub fn committee_hot_key_from_mnemonic(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        account_index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe {
-            ffi::ccl_gov_committee_hot_key_from_mnemonic(
-                self.bridge.thread,
-                cs.as_ptr(),
-                network.as_i32(),
-                account_index,
-            )
-        };
-        self.bridge.check(rc)
-    }
-}
-
-// --- WalletApi ---
-
-pub struct WalletApi<'a> {
-    bridge: &'a Bridge,
-}
-
-impl<'a> WalletApi<'a> {
-    pub fn create(&self, network: Network) -> Result<String> {
-        let rc = unsafe { ffi::ccl_wallet_create(self.bridge.thread, network.as_i32()) };
-        self.bridge.check(rc)
-    }
-
-    pub fn from_mnemonic(&self, mnemonic: &str, network: Network) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc = unsafe { ffi::ccl_wallet_from_mnemonic(self.bridge.thread, cs.as_ptr(), network.as_i32()) };
-        self.bridge.check(rc)
-    }
-
-    pub fn get_address(
-        &self,
-        mnemonic: &str,
-        network: Network,
-        index: i32,
-    ) -> Result<String> {
-        let cs = to_cstring(mnemonic)?;
-        let rc =
-            unsafe { ffi::ccl_wallet_get_address(self.bridge.thread, cs.as_ptr(), network.as_i32(), index) };
+        let rc = unsafe { ffi::ccl_script_hash(self.bridge.thread(), cs.as_ptr(), script_type) };
         self.bridge.check(rc)
     }
 }
@@ -779,7 +605,7 @@ impl<'a> QuickTxApi<'a> {
 
         let rc = unsafe {
             ffi::ccl_quicktx_build(
-                self.bridge.thread,
+                self.bridge.thread(),
                 yaml_cs.as_ptr(),
                 utxos_cs.as_ptr(),
                 pp_cs.as_ptr(),

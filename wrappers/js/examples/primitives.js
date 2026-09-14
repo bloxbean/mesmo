@@ -20,18 +20,21 @@ try {
   console.log("Blake2b-224('Hello'):", bridge.crypto.blake2b224('48656c6c6f'));
 
   // --- Ed25519 signing ---
-  // getPrivateKey returns the 64-byte extended key; sign expects a 32-byte
-  // Ed25519 key, so take the first 32 bytes (64 hex chars).
-  const acct = bridge.account.create(TESTNET);
-  const sk = bridge.account.getPrivateKey(acct.mnemonic, TESTNET).slice(0, 64);
-  const pk = bridge.account.getPublicKey(acct.mnemonic, TESTNET);
+  // deriveKey returns the 64-byte extended BIP32-Ed25519 key; pass it whole to
+  // sign — the extended form is detected by length. (Never slice it: its first
+  // half is a clamped scalar, not a seed.)
+  const mnemonic = bridge.crypto.generateMnemonic(24);
+  const key = bridge.crypto.deriveKey(mnemonic);
+  const sk = key.private_key;
+  const pk = key.public_key;
   const messageHex = '68656c6c6f'; // "hello"
   console.log('Ed25519 signature:', bridge.crypto.sign(messageHex, sk));
   // A tampered signature is correctly rejected.
   console.log('  verify(fake signature) ->', bridge.crypto.verify('00'.repeat(64), messageHex, pk));
 
   // --- Address parsing & validation ---
-  const addr = acct.base_address;
+  using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+  const addr = acct.info.base_address;
   console.log('Address valid?', bridge.address.validate(addr));
   console.log('Address info  :', bridge.address.info(addr));
   const raw = bridge.address.toBytes(addr);

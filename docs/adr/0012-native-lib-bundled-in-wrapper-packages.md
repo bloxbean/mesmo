@@ -4,17 +4,6 @@
 - **Date:** 2026-07-01
 - **Deciders:** bloxbean maintainers
 
-> **Update:** the question this ADR "left genuinely open for Go" (see Alternatives) is resolved by
-> [ADR-0014](0014-go-distribution-purego-runtime-resolution.md) — Go drops cgo for **purego** and
-> resolves the library at **runtime**. The "Go via cgo / build-time linking / Go-C-follow-the-same-
-> shape" descriptions below are superseded for Go; the bundling decision for Python/JS still stands.
->
-> **Update (musl):** "musl/Alpine remain unbuilt" below is superseded by
-> [ADR-0008](0008-linux-glibc-baseline-portability.md)'s 2026-07-08/2026-07-15 updates — a
-> `linux-musl-x86_64` library is built and shipped, the fetching wrappers (Rust, Go) pick it up
-> automatically, and npm has a musl platform package selected via the `libc` field. Only the
-> **musllinux wheel publishing** is still deferred (to the Python publish workflow).
-
 ## Context
 
 Cardano Client Bindings ships a native shared library (`libccl.{so,dylib,dll}`, [ADR-0001](0001-native-shared-library-ffi.md))
@@ -86,19 +75,19 @@ matrix, `auditwheel repair` to relabel the Linux wheel `manylinux_2_28_x86_64` (
 - The set of shippable platforms is bounded by what we build: `linux-x86_64` + `linux-aarch64` (both
   glibc-baseline), `macos-aarch64`, and `windows-x86_64`. `macos-x86_64` (Intel) is **not** built —
   Oracle GraalVM is dropping Intel-Mac support (its 25.1 line ships none). `windows-arm64` remains
-  unbuilt; musl/Alpine has since gained its own `linux-musl-x86_64` artifact (see the musl Update
-  above), though its *wheel* is still unpublished.
+  unbuilt; musl/Alpine has its own `linux-musl-x86_64` artifact
+  ([ADR-0008](0008-linux-glibc-baseline-portability.md)), though its *wheel* is still unpublished.
 - Each ecosystem needs its own bundling code and its own publishing story; the four will land incrementally,
   not atomically.
 - A lib a version behind its wrapper still fails confusingly — bundling makes version-lock easier (same
   release builds both) but does not by itself add a runtime check (tracked separately).
 - **The two wrapper families resolve the lib differently.** Python (ctypes) and JS (`dlopen`) load a file
   *by path* at runtime, so the lib's install name is irrelevant — they just point at the bundled copy. The
-  **native-linked** wrappers (Rust `extern "C"`, C, and Go via cgo) *link* against `libccl` at build time,
+  **native-linked** wrappers (Rust `extern "C"` and C) *link* against `libccl` at build time — Go resolves it at runtime via purego ([ADR-0014](0014-go-distribution-purego-runtime-resolution.md)) —
   so removing the env-var requirement means making the runtime loader find it: stage the lib and reference
   it via **`@rpath`** (macOS needs `install_name_tool -id @rpath/libccl.dylib` because GraalVM stamps an
   absolute build path — exactly what forced `DYLD_LIBRARY_PATH` before; the Linux `.so`'s SONAME is already
-  the leaf name), plus emit an `rpath`. Rust does this in `build.rs`; Go/C will follow the same shape.
+  the leaf name), plus emit an `rpath`. Rust does this in `build.rs`.
 
 ## Alternatives considered
 

@@ -16,7 +16,7 @@
 //! # let sender = "addr_test1...";
 //! let bridge = Bridge::new()?;
 //! let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-//! let result = bridge.quicktx().build_with(yaml, &provider, sender, 0, None)?;
+//! let result = bridge.quicktx().build_with(yaml, &provider, &[sender], 0, None)?;
 //! # Ok::<(), ccl::CclError>(())
 //! ```
 
@@ -303,11 +303,26 @@ impl<'a> QuickTxApi<'a> {
         &self,
         yaml: &str,
         provider: &dyn ChainDataProvider,
-        sender: &str,
+        senders: &[&str],
         additional_signers: u32,
         evaluator: Option<&dyn TransactionEvaluator>,
     ) -> Result<TxResult> {
-        let utxos = provider.utxos(sender)?;
+        // UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so
+        // overlapping senders can't double-fund the build. For multi-sender transactions,
+        // TxPlan's context.fee_payer decides who pays the fee.
+        let mut merged = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for sender in senders {
+            if let Some(arr) = provider.utxos(sender)?.as_array() {
+                for u in arr {
+                    let key = format!("{}#{}", u["tx_hash"], u["output_index"]);
+                    if seen.insert(key) {
+                        merged.push(u.clone());
+                    }
+                }
+            }
+        }
+        let utxos = serde_json::Value::Array(merged);
         let protocol_params = provider.protocol_params()?;
         let exec_units = match evaluator {
             Some(ev) => {

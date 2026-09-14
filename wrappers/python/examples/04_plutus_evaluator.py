@@ -45,14 +45,14 @@ def main():
 
     # 1) Offline default: no evaluator -> the bridge runs the validator with Scalus and stamps the
     #    computed units. Just works, no network.
-    result = lib.quicktx.build_with(YAML, LocalProvider(), SENDER)
+    result = lib.quicktx.build_with(YAML, LocalProvider(), [SENDER])
     print("offline (Scalus) — fee:", result["fee"], "tx_hash:", result["tx_hash"])
 
     # 2) Remote evaluator (illustrative — needs a Blockfrost project id). The two-pass builds a
     #    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
     #
     #     evaluator = BlockfrostEvaluator("preprod_your_project_id", network="preprod")
-    #     result = lib.quicktx.build_with(YAML, LocalProvider(), SENDER, evaluator=evaluator)
+    #     result = lib.quicktx.build_with(YAML, LocalProvider(), [SENDER], evaluator=evaluator)
     #
     # To supply units you computed yourself, skip the evaluator and call build() directly:
     #     lib.quicktx.build(YAML, UTXOS, PARAMS, exec_units=[{"mem": 2000000, "steps": 500000000}])

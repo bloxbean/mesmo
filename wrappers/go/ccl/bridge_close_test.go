@@ -30,7 +30,7 @@ func TestUseAfterCloseReturnsErrorNotDeadlock(t *testing.T) {
 	}
 
 	// And the mutex must not be poisoned — a second call still returns promptly.
-	go func() { _, e := b.Account.Create(Testnet); done <- e }()
+	go func() { _, e := b.Accounts.Create(Testnet); done <- e }()
 	select {
 	case e := <-done:
 		if !errors.Is(e, ErrBridgeClosed) {

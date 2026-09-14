@@ -17,12 +17,12 @@ use serde_json::json;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge = Bridge::new()?;
 
-    let sender: serde_json::Value =
-        serde_json::from_str(&bridge.account().create(Network::Testnet)?)?;
-    let receiver: serde_json::Value =
-        serde_json::from_str(&bridge.account().create(Network::Testnet)?)?;
-    let sender_addr = sender["base_address"].as_str().unwrap();
-    let receiver_addr = receiver["base_address"].as_str().unwrap();
+    let sender = bridge.accounts().create(Network::Testnet)?; // managed handle — signs below
+    let sender_info = sender.info()?;
+    let receiver = bridge.accounts().create(Network::Testnet)?;
+    let receiver_info = receiver.info()?;
+    let sender_addr = sender_info["base_address"].as_str().unwrap();
+    let receiver_addr = receiver_info["base_address"].as_str().unwrap();
 
     // Minimal protocol parameters (CCL test-resource values).
     let protocol_params = json!({
@@ -64,10 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  cbor   : {}...", &result.tx_cbor[..80]);
 
     // Sign it with the sender's mnemonic.
-    let mnemonic = sender["mnemonic"].as_str().unwrap();
-    let signed = bridge
-        .account()
-        .sign_tx(mnemonic, Network::Testnet, 0, 0, &result.tx_cbor)?;
+    let signed = sender.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)?;
     println!("Signed transaction cbor: {}...", &signed[..80]);
     println!("\nNext step (not shown): submit `signed` to a Cardano node over HTTP.");
     Ok(())

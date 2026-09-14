@@ -20,32 +20,35 @@ func main() {
 	}
 	defer bridge.Close()
 
-	// 1. Create a brand-new testnet account (random mnemonic).
-	account, err := bridge.Account.Create(ccl.Testnet)
+	// 1. Create a brand-new testnet account (managed handle; the recovery phrase is
+	//    exported once, deliberately — it is never part of the account's Info).
+	account, err := bridge.Accounts.Create(ccl.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer account.Close()
+	info, _ := account.Info()
+	mnemonic, _ := account.ExportRecoveryPhrase()
 	fmt.Println("Created account")
-	fmt.Println("  base address:", account.BaseAddress)
-	fmt.Println("  mnemonic    :", account.Mnemonic)
+	fmt.Println("  base address:", info.BaseAddress)
+	fmt.Println("  DRep ID     :", info.DRepID)
+	fmt.Println("  mnemonic    :", mnemonic)
 
-	// 2. Restore the same account from its mnemonic — the address must match.
-	restored, err := bridge.Account.FromMnemonic(account.Mnemonic, ccl.Testnet, 0, 0)
+	// 2. Restore the same account from its phrase — the address must match.
+	restored, err := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if restored.BaseAddress != account.BaseAddress {
+	defer restored.Close()
+	rinfo, _ := restored.Info()
+	if rinfo.BaseAddress != info.BaseAddress {
 		log.Fatal("restored address does not match")
 	}
-	fmt.Println("Restored from mnemonic — address matches:", restored.BaseAddress)
+	fmt.Println("Restored from mnemonic — address matches:", rinfo.BaseAddress)
 
-	// 3. Derive keys.
-	priv, _ := bridge.Account.GetPrivateKey(account.Mnemonic, ccl.Testnet, 0, 0)
-	pub, _ := bridge.Account.GetPublicKey(account.Mnemonic, ccl.Testnet, 0, 0)
-	fmt.Println("  private key (extended, hex):", priv)
-	fmt.Println("  public key (hex)           :", pub)
-
-	// 4. Derive the governance DRep ID.
-	drepID, _ := bridge.Account.GetDRepID(account.Mnemonic, ccl.Testnet, 0)
-	fmt.Println("  DRep ID:", drepID)
+	// 3. Raw key material, when interop genuinely needs it, comes from the stateless
+	//    derivation utility — handles never expose key bytes.
+	key, _ := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+	fmt.Println("  private key (extended, hex):", key.PrivateKey)
+	fmt.Println("  public key (hex)           :", key.PublicKey)
 }

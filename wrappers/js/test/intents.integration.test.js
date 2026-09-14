@@ -20,7 +20,7 @@
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/intents.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { CclBridge, TESTNET } from "../src/index.js";
+import { CclBridge, TESTNET, SigningRole } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -107,10 +107,20 @@ describe("Intents Integration (DevKit)", () => {
   // The fee's witness budget defaults to keys.length - 1 (the signer count is known here, exactly as
   // it is for a real caller); pass additionalSigners explicitly where the inputs imply no payment
   // key (e.g. a script-only-input spend).
+  function rolesMask(keys) {
+    const map = { payment: SigningRole.PAYMENT, stake: SigningRole.STAKE, drep: SigningRole.DREP };
+    return keys.reduce((mask, k) => mask | map[k], 0);
+  }
+
+  function intentSign(txCbor, keys, addressIndex = 0) {
+    using acct = bridge.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET, 0, addressIndex);
+    return acct.signTx(txCbor, rolesMask(keys));
+  }
+
   async function signSubmit(yaml, utxos, pp, execUnits, keys, additionalSigners = null) {
     const budget = additionalSigners ?? Math.max(0, keys.length - 1);
     const result = bridge.quicktx.build(yaml, utxos, pp, execUnits ?? null, budget);
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, keys);
+    const signed = intentSign(result.tx_cbor, keys);
     return submitExpectHash(signed);
   }
 
@@ -160,6 +170,24 @@ describe("Intents Integration (DevKit)", () => {
   }
 
   // --- Stake certificates ---
+
+  // ADR-0016 end-to-end: build offline, sign with a managed Account handle (typed role mask, no
+  // mnemonic in the signing call), and have the node accept the transaction.
+  it("submits a transaction signed via a managed Account handle", async () => {
+    if (skip) return;
+    await resetAndFund();
+    const utxos = await devkit.getUtxos(INTENT_SENDER);
+    const built = bridge.quicktx.build(
+      readFixture("stake_registration.yaml"), utxos, await devnetPP(), null, 1);
+    const acct = bridge.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
+    let signed;
+    try {
+      signed = acct.signTx(built.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
+    } finally {
+      acct.close();
+    }
+    await submitExpectHash(signed);
+  });
 
   // Mirrors Go TestIntegrationStakeRegistration. The stake-registration certificate is witnessed by
   // the stake key, so sign with payment+stake.
@@ -283,9 +311,9 @@ describe("Intents Integration (DevKit)", () => {
   });
 
   // Mirrors Go TestIntegrationDRepKeyRequired (negative). A DRep-registration certificate must be
-  // witnessed by the DRep key, so signing with the payment key alone (ccl_account_sign_tx, no drep
+  // witnessed by the DRep key, so signing with the payment key alone (SigningRole.PAYMENT only, no drep
   // witness) must be rejected by the node (MissingVKeyWitnessesUTXOW). This proves the extra witness
-  // sign_tx_with_keys adds is genuinely required — not cosmetic — complementing the positive
+  // the stake role adds is genuinely required — not cosmetic — complementing the positive
   // registration test above.
   it("rejects a DRep registration signed with the payment key only", async () => {
     if (skip) return;
@@ -299,7 +327,7 @@ describe("Intents Integration (DevKit)", () => {
     const built = bridge.quicktx.build(readFixture("drep_registration.yaml"), utxos, pp, null, 1);
 
     // Sign with the payment key ONLY, omitting the DRep-key witness.
-    const signedPaymentOnly = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 0, built.tx_cbor);
+    const signedPaymentOnly = intentSign(built.tx_cbor, ['payment']);
     const res = await devkit.submitTx(signedPaymentOnly);
     // The node must reject it — so no 64-char tx hash comes back, only the ledger error body.
     expect(res).not.toMatch(TX_HASH_RE);
@@ -357,7 +385,7 @@ describe("Intents Integration (DevKit)", () => {
     const u3 = await devkit.getUtxos(INTENT_SENDER);
     const proposal = bridge.quicktx.build(readFixture("governance_proposal.yaml"), u3, pp);
     const actionTxHash = proposal.tx_hash;
-    const signedProposal = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, proposal.tx_cbor, ["payment"]);
+    const signedProposal = intentSign(proposal.tx_cbor, ["payment"]);
     await submitExpectHash(signedProposal);
     await devkit.waitForBlock(3000);
 
@@ -439,7 +467,7 @@ describe("Intents Integration (DevKit)", () => {
     const utxos = await devkit.getUtxos(INTENT_SENDER);
     const result = bridge.quicktx.build(readFixture("plutus/aiken_mint_fail.yaml"),
       utxos, await devnetPP(), [{ mem: 2000000, steps: 500000000 }]);
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, ["payment"]);
+    const signed = intentSign(result.tx_cbor, ["payment"]);
     const res = await devkit.submitTx(signed);
     expect(TX_HASH_RE.test(res)).toBe(false); // the node must reject, not return a tx hash
   });
@@ -508,7 +536,7 @@ describe("Intents Integration (DevKit)", () => {
   async function signSubmitFee(yaml, utxos, pp, execUnits, keys) {
     const result = bridge.quicktx.build(yaml, utxos, pp, execUnits ?? null,
       Math.max(0, keys.length - 1));
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, keys);
+    const signed = intentSign(result.tx_cbor, keys);
     await submitExpectHash(signed);
     return Number(result.fee);
   }
@@ -741,8 +769,8 @@ transaction:
       ...(await devkit.getUtxos(INTENT_SENDER2)),
     ];
     const result = bridge.quicktx.build(readFixture("compose.yaml"), utxos, pp);
-    const once = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor);
-    const twice = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 1, once);
+    const once = intentSign(result.tx_cbor, ['payment']);
+    const twice = intentSign(once, ['payment'], 1);
     await submitExpectHash(twice);
     await devkit.waitForBlock(3000);
 

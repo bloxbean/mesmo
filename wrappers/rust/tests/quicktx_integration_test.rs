@@ -55,10 +55,14 @@ fn test_integration_simple_ada_transfer() {
     assert!(!result.tx_cbor.is_empty());
     assert_eq!(result.tx_hash.len(), 64);
 
-    let signed_tx = bridge
-        .account()
-        .sign_tx(&mnemonic, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-        .expect("sign failed");
+    let signed_tx = {
+        let acct = bridge
+            .accounts()
+            .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+            .expect("open account");
+        acct.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)
+            .expect("sign failed")
+    };
     let tx_hash = devkit_submit_tx(&signed_tx);
     assert!(!tx_hash.is_empty());
 
@@ -103,10 +107,14 @@ fn test_integration_multiple_receivers() {
     );
 
     let result = bridge.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build failed");
-    let signed_tx = bridge
-        .account()
-        .sign_tx(&mnemonic, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-        .expect("sign failed");
+    let signed_tx = {
+        let acct = bridge
+            .accounts()
+            .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+            .expect("open account");
+        acct.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)
+            .expect("sign failed")
+    };
     let tx_hash = devkit_submit_tx(&signed_tx);
     assert!(!tx_hash.is_empty());
 
@@ -153,7 +161,7 @@ fn test_integration_build_with_yaci_provider() {
     let yaml = payment_yaml(&sender, &receiver, "5000000");
     let result = bridge
         .quicktx()
-        .build_with(&yaml, &provider, &sender, 0, None)
+        .build_with(&yaml, &provider, &[sender.as_str()], 0, None)
         .expect("build_with failed");
 
     assert!(!result.tx_cbor.is_empty());
@@ -186,10 +194,7 @@ fn test_integration_donation_treasury() {
             &format!("current_treasury_value: {}", treasury),
         );
         let result = bridge.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build");
-        let signed = bridge
-            .account()
-            .sign_tx(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-            .expect("sign");
+        let signed = intent_sign(&bridge, &result.tx_cbor, &["payment"]);
         match devkit_try_submit(&signed) {
             Ok(tx_hash) => {
                 assert!(!tx_hash.is_empty(), "empty tx hash from submit");

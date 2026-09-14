@@ -33,19 +33,22 @@ func main() {
 	fmt.Println("Blake2b-224('Hello'):", h224)
 
 	// --- Ed25519 signing ---
-	// GetPrivateKey returns the 64-byte extended key; Sign expects a 32-byte
-	// Ed25519 key, so take the first 32 bytes (64 hex chars).
-	acct, _ := bridge.Account.Create(ccl.Testnet)
-	privExt, _ := bridge.Account.GetPrivateKey(acct.Mnemonic, ccl.Testnet, 0, 0)
-	pub, _ := bridge.Account.GetPublicKey(acct.Mnemonic, ccl.Testnet, 0, 0)
+	// DeriveKey returns the 64-byte extended BIP32-Ed25519 key; pass it whole to
+	// Sign — the extended form is detected by length. (Never slice it: its first
+	// half is a clamped scalar, not a seed.)
+	key, _ := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+	privExt, pub := key.PrivateKey, key.PublicKey
 	messageHex := "68656c6c6f" // "hello"
-	sig, _ := bridge.Crypto.Sign(messageHex, privExt[:64])
+	sig, _ := bridge.Crypto.Sign(messageHex, privExt)
 	fmt.Println("Ed25519 signature:", sig)
 	// A tampered signature is correctly rejected.
 	fmt.Println("  verify(fake signature) ->", bridge.Crypto.Verify("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", messageHex, pub))
 
 	// --- Address parsing & validation ---
-	addr := acct.BaseAddress
+	acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	defer acct.Close()
+	acctInfo, _ := acct.Info()
+	addr := acctInfo.BaseAddress
 	fmt.Println("Address valid?", bridge.Address.Validate(addr))
 	info, _ := bridge.Address.Info(addr)
 	fmt.Printf("Address info  : %+v\n", info)

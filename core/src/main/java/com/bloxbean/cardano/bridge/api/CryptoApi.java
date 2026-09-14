@@ -2,13 +2,20 @@ package com.bloxbean.cardano.bridge.api;
 
 import com.bloxbean.cardano.bridge.ErrorCodes;
 import com.bloxbean.cardano.bridge.util.ErrorState;
+import com.bloxbean.cardano.bridge.util.JsonHelper;
 import com.bloxbean.cardano.bridge.util.NativeString;
 import com.bloxbean.cardano.bridge.util.ResultState;
 import com.bloxbean.cardano.client.crypto.Blake2bUtil;
 import com.bloxbean.cardano.client.crypto.MnemonicUtil;
 import com.bloxbean.cardano.client.crypto.bip39.Words;
+import com.bloxbean.cardano.client.crypto.cip1852.CIP1852;
+import com.bloxbean.cardano.client.crypto.cip1852.DerivationPath;
+import com.bloxbean.cardano.client.crypto.cip1852.Segment;
 import com.bloxbean.cardano.client.crypto.config.CryptoConfiguration;
 import com.bloxbean.cardano.client.util.HexUtil;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.graalvm.nativeimage.IsolateThread;
 import org.graalvm.nativeimage.c.function.CEntryPoint;
 import org.graalvm.nativeimage.c.type.CCharPointer;
@@ -146,16 +153,26 @@ public final class CryptoApi {
     }
 
     /**
-     * Produces an Ed25519 signature.
+     * Produces an Ed25519 signature. The key form is dispatched on length:
+     *
+     * <ul>
+     *   <li><b>32 bytes (64 hex chars)</b> — a standard Ed25519 <em>seed</em>: it is SHA-512
+     *       hashed and clamped per RFC 8032 before signing.</li>
+     *   <li><b>64 bytes (128 hex chars)</b> — a BIP32-Ed25519 <em>extended</em> key (kL‖kR), as
+     *       returned by {@code ccl_crypto_derive_key}: kL is already the final clamped scalar, so
+     *       CCL's {@code signExtended} is used. Never pass the first half of an extended key as a
+     *       seed — the clamping would be applied twice and the signature would verify against a
+     *       different public key.</li>
+     * </ul>
      *
      * <p>Exported as {@code ccl_crypto_sign}. On success the result is the hex-encoded 64-byte
-     * signature. {@code skHex} must be a raw 32-byte Ed25519 secret key (64 hex chars) — note an
-     * account's extended private key is 64 bytes, so use its first 32 bytes here.
+     * signature, verifiable with {@code ccl_crypto_verify} against the key's public key.
      *
      * @param thread        the current isolate thread
      * @param messageHexPtr the message bytes as hex (UTF-8 C string)
-     * @param skHexPtr      the 32-byte Ed25519 secret key as hex (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @param skHexPtr      the secret key as hex: 64 hex chars (seed) or 128 hex chars (extended)
+     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT} /
+     *         {@link ErrorCodes#CCL_ERROR_CRYPTO}
      */
     @CEntryPoint(name = "ccl_crypto_sign")
     public static int sign(IsolateThread thread, CCharPointer messageHexPtr, CCharPointer skHexPtr) {
@@ -174,7 +191,18 @@ public final class CryptoApi {
 
             byte[] message = HexUtil.decodeHexString(messageHex);
             byte[] sk = HexUtil.decodeHexString(skHex);
-            byte[] signature = CryptoConfiguration.INSTANCE.getSigningProvider().sign(message, sk);
+            byte[] signature;
+            if (sk.length == 32) {
+                // Standard Ed25519 seed: hashed + clamped by the provider.
+                signature = CryptoConfiguration.INSTANCE.getSigningProvider().sign(message, sk);
+            } else if (sk.length == 64) {
+                // BIP32-Ed25519 extended key (kL already clamped): must NOT re-derive the scalar.
+                signature = CryptoConfiguration.INSTANCE.getSigningProvider().signExtended(message, sk);
+            } else {
+                ErrorState.set("Secret key must be 32 bytes (Ed25519 seed) or 64 bytes "
+                        + "(BIP32-Ed25519 extended key); got " + sk.length + " bytes");
+                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+            }
             ResultState.set(HexUtil.encodeHexString(signature));
             return ErrorCodes.CCL_SUCCESS;
         } catch (Exception e) {
@@ -228,6 +256,116 @@ public final class CryptoApi {
                 ErrorState.set("Signature verification failed");
                 return ErrorCodes.CCL_ERROR_CRYPTO;
             }
+        } catch (Exception e) {
+            ErrorState.set(e.getMessage());
+            return ErrorCodes.CCL_ERROR_CRYPTO;
+        }
+    }
+
+    // CIP-1852 role indices accepted by ccl_crypto_derive_key.
+    private static final Map<String, Integer> DERIVE_ROLES = Map.of(
+            "payment", 0,
+            "change", 1,
+            "stake", 2,
+            "drep", 3,
+            "committee_cold", 4,
+            "committee_hot", 5);
+
+    /**
+     * Stateless CIP-1852 key derivation: mnemonic in, one role's key pair out. This is the explicit
+     * "give me raw key material" utility — deliberately a pure crypto function, not an operation on
+     * a managed account handle (handles sign; they never hand out key bytes).
+     *
+     * <p>Exported as {@code ccl_crypto_derive_key}. On success the result is a JSON object:
+     * <pre>{@code {"path","private_key","public_key","public_key_hash"}}</pre>
+     * For the governance roles ({@code drep}, {@code committee_cold}, {@code committee_hot}) the
+     * result additionally carries the CIP-105 bech32 encodings {@code bech32_verification_key}
+     * ({@code drep_vk1…}/{@code cc_cold_vk1…}/{@code cc_hot_vk1…}) and
+     * {@code bech32_verification_key_hash} ({@code …_vkh1…}) — the forms cardano-cli and GovTool
+     * accept for registration.
+     * {@code private_key} is the hex-encoded 64-byte extended BIP32-Ed25519 private key — pass it
+     * <b>whole</b> to {@code ccl_crypto_sign} (which detects the extended form by length); its
+     * first half is a clamped scalar, not a seed, and must never be used as one;
+     * {@code public_key} is the 32-byte verification key; {@code public_key_hash} its blake2b-224
+     * hash — for the committee roles this is the credential used in committee certificates.
+     *
+     * <p>Key derivation is network-independent, so no network id is taken. Use {@code addressIndex}
+     * 0 for the stake/drep/committee roles (their conventional CIP-1852 leaf).
+     *
+     * @param thread       the current isolate thread
+     * @param mnemonicPtr  the BIP-39 mnemonic phrase (UTF-8 C string)
+     * @param accountIndex HD account index (hardened)
+     * @param addressIndex HD address index within the role
+     * @param rolePtr      one of {@code payment}, {@code change}, {@code stake}, {@code drep},
+     *                     {@code committee_cold}, {@code committee_hot}
+     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT} /
+     *         {@link ErrorCodes#CCL_ERROR_INVALID_MNEMONIC} / {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     */
+    @CEntryPoint(name = "ccl_crypto_derive_key")
+    public static int deriveKey(IsolateThread thread, CCharPointer mnemonicPtr,
+                                int accountIndex, int addressIndex, CCharPointer rolePtr) {
+        try {
+            String mnemonic = NativeString.toJavaString(mnemonicPtr);
+            if (mnemonic == null || mnemonic.isEmpty()) {
+                ErrorState.set("Mnemonic is required");
+                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+            }
+            String role = NativeString.toJavaString(rolePtr);
+            Integer roleIndex = role == null ? null : DERIVE_ROLES.get(role);
+            if (roleIndex == null) {
+                ErrorState.set("Unknown role: " + role + " (expected one of "
+                        + String.join(", ", DERIVE_ROLES.keySet().stream().sorted().toList()) + ")");
+                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+            }
+            if (accountIndex < 0 || addressIndex < 0) {
+                ErrorState.set("Account and address indices must be >= 0");
+                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+            }
+            try {
+                MnemonicUtil.validateMnemonic(mnemonic);
+            } catch (Exception e) {
+                ErrorState.set("Invalid mnemonic: " + e.getMessage());
+                return ErrorCodes.CCL_ERROR_INVALID_MNEMONIC;
+            }
+
+            DerivationPath path = DerivationPath.builder()
+                    .purpose(new Segment(1852, true))
+                    .coinType(new Segment(1815, true))
+                    .account(new Segment(accountIndex, true))
+                    .role(new Segment(roleIndex, false))
+                    .index(new Segment(addressIndex, false))
+                    .build();
+            var keyPair = new CIP1852().getKeyPairFromMnemonic(mnemonic, path);
+            byte[] publicKey = keyPair.getPublicKey().getKeyData();
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("path", "m/1852'/1815'/" + accountIndex + "'/" + roleIndex + "/" + addressIndex);
+            result.put("private_key", HexUtil.encodeHexString(keyPair.getPrivateKey().getKeyData()));
+            result.put("public_key", HexUtil.encodeHexString(publicKey));
+            result.put("public_key_hash", HexUtil.encodeHexString(Blake2bUtil.blake2bHash224(publicKey)));
+            // CIP-105 bech32 encodings for the governance roles — the forms cardano-cli and
+            // GovTool take for DRep/committee registration. Non-governance roles have no
+            // CIP-105 key encoding, so the fields are deliberately absent there.
+            switch (role) {
+                case "drep" -> {
+                    var k = com.bloxbean.cardano.client.governance.keys.DRepKey.from(keyPair);
+                    result.put("bech32_verification_key", k.bech32VerificationKey());
+                    result.put("bech32_verification_key_hash", k.bech32VerificationKeyHash());
+                }
+                case "committee_cold" -> {
+                    var k = com.bloxbean.cardano.client.governance.keys.CommitteeColdKey.from(keyPair);
+                    result.put("bech32_verification_key", k.bech32VerificationKey());
+                    result.put("bech32_verification_key_hash", k.bech32VerificationKeyHash());
+                }
+                case "committee_hot" -> {
+                    var k = com.bloxbean.cardano.client.governance.keys.CommitteeHotKey.from(keyPair);
+                    result.put("bech32_verification_key", k.bech32VerificationKey());
+                    result.put("bech32_verification_key_hash", k.bech32VerificationKeyHash());
+                }
+                default -> { /* payment/change/stake: no CIP-105 encoding */ }
+            }
+            ResultState.set(JsonHelper.toJson(result));
+            return ErrorCodes.CCL_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
             return ErrorCodes.CCL_ERROR_CRYPTO;

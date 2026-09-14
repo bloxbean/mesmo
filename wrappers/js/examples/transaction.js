@@ -23,14 +23,16 @@ const protocolParams = {
 
 const bridge = new CclBridge();
 try {
-  const sender = bridge.account.create(TESTNET);
-  const receiver = bridge.account.create(TESTNET);
+  using sender = bridge.accounts.create(TESTNET); // managed handle — signs below
+  using receiver = bridge.accounts.create(TESTNET);
+  const senderAddress = sender.info.base_address;
+  const receiverAddress = receiver.info.base_address;
 
   // A static UTXO the sender controls (100 ADA), instead of querying a node.
   const utxos = [{
     tx_hash: 'a'.repeat(64),
     output_index: 0,
-    address: sender.base_address,
+    address: senderAddress,
     amount: [{ unit: 'lovelace', quantity: '100000000' }],
   }];
 
@@ -39,10 +41,10 @@ try {
 version: 1.0
 transaction:
   - tx:
-      from: ${sender.base_address}
+      from: ${senderAddress}
       intents:
         - type: payment
-          address: ${receiver.base_address}
+          address: ${receiverAddress}
           amounts:
             - unit: lovelace
               quantity: "5000000"
@@ -55,8 +57,8 @@ transaction:
   console.log('  fee    :', result.fee);
   console.log('  cbor   :', result.tx_cbor.slice(0, 80), '...');
 
-  // Sign it with the sender's mnemonic.
-  const signed = bridge.account.signTx(sender.mnemonic, TESTNET, 0, 0, result.tx_cbor);
+  // Sign it with the sender's managed handle — no mnemonic in the call.
+  const signed = sender.signTx(result.tx_cbor);
   console.log('Signed transaction cbor:', signed.slice(0, 80), '...');
   console.log('\nNext step (not shown): submit `signed` to a Cardano node over HTTP.');
 } finally {

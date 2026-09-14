@@ -142,4 +142,80 @@ class CryptoApiTest {
         boolean valid = CryptoConfiguration.INSTANCE.getSigningProvider().verify(signature, wrongMessage, account.publicKeyBytes());
         assertFalse(valid);
     }
+
+    // --- Extended-key signing: the derive_key -> sign -> verify contract ---
+    //
+    // A CIP-1852-derived private key is a 64-byte BIP32-Ed25519 EXTENDED key: its first half (kL)
+    // is already the final, clamped scalar. Signing must therefore use signExtended — feeding kL
+    // to the seed-based sign() re-hashes and re-clamps it, producing a signature under a
+    // DIFFERENT keypair. These tests pin both directions so the documented workflow
+    // (derive_key -> ccl_crypto_sign with the whole 64-byte key -> ccl_crypto_verify against the
+    // returned public_key) can never silently regress again.
+
+    private com.bloxbean.cardano.client.crypto.bip32.HdKeyPair deriveTestKeyPair() {
+        String mnemonic = MnemonicUtil.generateNew(Words.TWENTY_FOUR);
+        var path = com.bloxbean.cardano.client.crypto.cip1852.DerivationPath.createExternalAddressDerivationPath(0);
+        return new com.bloxbean.cardano.client.crypto.cip1852.CIP1852().getKeyPairFromMnemonic(mnemonic, path);
+    }
+
+    @Test
+    void extendedKeySignatureVerifiesAgainstDerivedPublicKey() {
+        var keyPair = deriveTestKeyPair();
+        byte[] extendedKey = keyPair.getPrivateKey().getKeyData(); // 64 bytes: kL || kR
+        byte[] publicKey = keyPair.getPublicKey().getKeyData();    // 32 bytes: kL·B
+        byte[] message = "hello".getBytes();
+        assertEquals(64, extendedKey.length, "CIP-1852 private keys are extended (64-byte) keys");
+
+        var provider = CryptoConfiguration.INSTANCE.getSigningProvider();
+        byte[] signature = provider.signExtended(message, extendedKey);
+
+        assertTrue(provider.verify(signature, message, publicKey),
+                "signExtended output must verify against the derived public key");
+    }
+
+    @Test
+    void seedSigningWithHalfAnExtendedKeyDoesNotVerify_theBugTheDispatchPrevents() {
+        var keyPair = deriveTestKeyPair();
+        byte[] extendedKey = keyPair.getPrivateKey().getKeyData();
+        byte[] publicKey = keyPair.getPublicKey().getKeyData();
+        byte[] kL = java.util.Arrays.copyOfRange(extendedKey, 0, 32);
+        byte[] message = "hello".getBytes();
+
+        var provider = CryptoConfiguration.INSTANCE.getSigningProvider();
+        byte[] wrongSignature = provider.sign(message, kL); // treats the clamped scalar as a seed
+
+        assertFalse(provider.verify(wrongSignature, message, publicKey),
+                "kL fed to the seed path signs under a different keypair — if this ever verifies, "
+                        + "the seed/extended distinction has changed and the dispatch must be revisited");
+    }
+
+    @Test
+    void seedSignatureStillVerifiesAgainstItsOwnPublicKey() {
+        // The 32-byte seed path is unchanged: a genuine seed round-trips.
+        byte[] seed = new byte[32];
+        new java.security.SecureRandom().nextBytes(seed);
+        byte[] message = "hello".getBytes();
+
+        var provider = CryptoConfiguration.INSTANCE.getSigningProvider();
+        byte[] signature = provider.sign(message, seed);
+        byte[] publicKey = com.bloxbean.cardano.client.crypto.KeyGenUtil.getPublicKeyFromPrivateKey(seed);
+
+        assertTrue(provider.verify(signature, message, publicKey),
+                "seed-based signing must verify against the seed's derived public key");
+    }
+
+    @Test
+    void governanceRolesCarryCip105Bech32Encodings() {
+        // Pins the CIP-105 prefixes derive_key exposes for governance roles; if CCL ever changes
+        // these encodings, the wrappers' registration workflows change with them — fail loudly.
+        var keyPair = deriveTestKeyPair();
+        assertTrue(com.bloxbean.cardano.client.governance.keys.DRepKey.from(keyPair)
+                .bech32VerificationKey().startsWith("drep_vk1"));
+        assertTrue(com.bloxbean.cardano.client.governance.keys.DRepKey.from(keyPair)
+                .bech32VerificationKeyHash().startsWith("drep_vkh1"));
+        assertTrue(com.bloxbean.cardano.client.governance.keys.CommitteeColdKey.from(keyPair)
+                .bech32VerificationKeyHash().startsWith("cc_cold_vkh1"));
+        assertTrue(com.bloxbean.cardano.client.governance.keys.CommitteeHotKey.from(keyPair)
+                .bech32VerificationKeyHash().startsWith("cc_hot_vkh1"));
+    }
 }

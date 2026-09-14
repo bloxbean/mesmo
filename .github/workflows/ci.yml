@@ -47,7 +47,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/wheelvenv"
           "$RUNNER_TEMP/wheelvenv/bin/pip" install --quiet wrappers/python/dist/*.whl
           cd "$RUNNER_TEMP" && env -u CCL_LIB_PATH -u DYLD_LIBRARY_PATH -u LD_LIBRARY_PATH \
-            "$RUNNER_TEMP/wheelvenv/bin/python" -c "import ccl; assert ccl.CclLib().version(); ccl.CclLib().account.create(ccl.CclLib.TESTNET); print('bundled wheel OK, no CCL_LIB_PATH')"
+            "$RUNNER_TEMP/wheelvenv/bin/python" -c "import ccl; assert ccl.CclLib().version(); ccl.CclLib().accounts.create(ccl.CclLib.TESTNET).close(); print('bundled wheel OK, no CCL_LIB_PATH')"
       - name: Run Go tests
         run: ./gradlew :wrappers:go:test
       # Prove the Go wrapper is distributable: it builds as pure Go (CGO_ENABLED=0 — no cgo, no C
@@ -94,7 +94,7 @@ jobs:
           echo '{"name":"verify","type":"module"}' > package.json
           bun add "$TGZ"
           env -u CCL_LIB_PATH -u DYLD_LIBRARY_PATH -u LD_LIBRARY_PATH \
-            bun -e "import {CclBridge} from '@bloxbean/cardano-client-lib'; const b=new CclBridge(); if(!b.version()) throw new Error('no version'); b.account.create(1); console.log('bundled npm package OK, no CCL_LIB_PATH')"
+            bun -e "import {CclBridge} from '@bloxbean/cardano-client-lib'; const b=new CclBridge(); if(!b.version()) throw new Error('no version'); b.accounts.create(1).close(); console.log('bundled npm package OK, no CCL_LIB_PATH')"
 
   # Windows: verify the native library (libccl.dll) builds, core logic passes, and all four
   # language wrappers run their test suites against the DLL.

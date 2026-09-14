@@ -26,14 +26,6 @@ var (
 var (
 	cclVersion func(thread uintptr) int32
 
-	cclAccountCreate       func(thread uintptr, network int32) int32
-	cclAccountFromMnemonic func(thread uintptr, network int32, mnemonic string, accIdx, addrIdx int32) int32
-	cclAccountGetPublicKey func(thread uintptr, mnemonic string, network, accIdx, addrIdx int32) int32
-	cclAccountGetPrivKey   func(thread uintptr, mnemonic string, network, accIdx, addrIdx int32) int32
-	cclAccountGetDRepID    func(thread uintptr, mnemonic string, network, accIdx int32) int32
-	cclAccountSignTx       func(thread uintptr, mnemonic string, network, accIdx, addrIdx int32, tx string) int32
-	cclAccountSignTxMulti  func(thread uintptr, mnemonic string, network, accIdx, addrIdx int32, tx, keys string) int32
-
 	cclAddressInfo      func(thread uintptr, bech32 string) int32
 	cclAddressValidate  func(thread uintptr, bech32 string) int32
 	cclAddressToBytes   func(thread uintptr, bech32 string) int32
@@ -44,6 +36,7 @@ var (
 	cclCryptoGenerateMnemon func(thread uintptr, wordCount int32) int32
 	cclCryptoValidateMnemon func(thread uintptr, mnemonic string) int32
 	cclCryptoSign           func(thread uintptr, messageHex, skHex string) int32
+	cclCryptoDeriveKey      func(thread uintptr, mnemonic string, accIdx, addrIdx int32, role string) int32
 	cclCryptoVerify         func(thread uintptr, signatureHex, messageHex, pkHex string) int32
 
 	cclTxHash          func(thread uintptr, tx string) int32
@@ -59,15 +52,15 @@ var (
 	cclScriptNativeFromJSON func(thread uintptr, jsonStr string) int32
 	cclScriptHash           func(thread uintptr, scriptCbor string, scriptType int32) int32
 
-	cclGovDRepKey          func(thread uintptr, mnemonic string, network, accIdx int32) int32
-	cclGovCommitteeColdKey func(thread uintptr, mnemonic string, network, accIdx int32) int32
-	cclGovCommitteeHotKey  func(thread uintptr, mnemonic string, network, accIdx int32) int32
-
-	cclWalletCreate       func(thread uintptr, network int32) int32
-	cclWalletFromMnemonic func(thread uintptr, mnemonic string, network int32) int32
-	cclWalletGetAddress   func(thread uintptr, mnemonic string, network, index int32) int32
-
 	cclQuicktxBuild func(thread uintptr, yaml, utxos, params, execUnits string, additionalSigners int32) int32
+
+	// Managed account handles (ADR-0016)
+	cclAccountOpenMnemonic         func(thread uintptr, network int32, mnemonic string, accountIndex, addressIndex int32, outHandle *int64) int32
+	cclAccountGetInfo              func(thread uintptr, handle int64) int32
+	cclAccountSignTxHandle         func(thread uintptr, handle int64, txCbor string, roleMask int32) int32
+	cclAccountCloseHandle          func(thread uintptr, handle int64) int32
+	cclAccountCreateHandle         func(thread uintptr, network int32, outHandle *int64) int32
+	cclAccountExportRecoveryPhrase func(thread uintptr, handle int64, outPhrase **byte) int32
 )
 
 var (
@@ -99,13 +92,6 @@ func ensureLoaded() error {
 		reg(&cclFreeString, "ccl_free_string")
 
 		reg(&cclVersion, "ccl_version")
-		reg(&cclAccountCreate, "ccl_account_create")
-		reg(&cclAccountFromMnemonic, "ccl_account_from_mnemonic")
-		reg(&cclAccountGetPublicKey, "ccl_account_get_public_key")
-		reg(&cclAccountGetPrivKey, "ccl_account_get_private_key")
-		reg(&cclAccountGetDRepID, "ccl_account_get_drep_id")
-		reg(&cclAccountSignTx, "ccl_account_sign_tx")
-		reg(&cclAccountSignTxMulti, "ccl_account_sign_tx_multi")
 
 		reg(&cclAddressInfo, "ccl_address_info")
 		reg(&cclAddressValidate, "ccl_address_validate")
@@ -118,6 +104,7 @@ func ensureLoaded() error {
 		reg(&cclCryptoValidateMnemon, "ccl_crypto_validate_mnemonic")
 		reg(&cclCryptoSign, "ccl_crypto_sign")
 		reg(&cclCryptoVerify, "ccl_crypto_verify")
+		reg(&cclCryptoDeriveKey, "ccl_crypto_derive_key")
 
 		reg(&cclTxHash, "ccl_tx_hash")
 		reg(&cclTxSignSecretKey, "ccl_tx_sign_with_secret_key")
@@ -132,15 +119,13 @@ func ensureLoaded() error {
 		reg(&cclScriptNativeFromJSON, "ccl_script_native_from_json")
 		reg(&cclScriptHash, "ccl_script_hash")
 
-		reg(&cclGovDRepKey, "ccl_gov_drep_key_from_mnemonic")
-		reg(&cclGovCommitteeColdKey, "ccl_gov_committee_cold_key_from_mnemonic")
-		reg(&cclGovCommitteeHotKey, "ccl_gov_committee_hot_key_from_mnemonic")
-
-		reg(&cclWalletCreate, "ccl_wallet_create")
-		reg(&cclWalletFromMnemonic, "ccl_wallet_from_mnemonic")
-		reg(&cclWalletGetAddress, "ccl_wallet_get_address")
-
 		reg(&cclQuicktxBuild, "ccl_quicktx_build")
+		reg(&cclAccountOpenMnemonic, "ccl_account_open_mnemonic")
+		reg(&cclAccountGetInfo, "ccl_account_get_info")
+		reg(&cclAccountSignTxHandle, "ccl_account_sign_tx_handle")
+		reg(&cclAccountCloseHandle, "ccl_account_close")
+		reg(&cclAccountCreateHandle, "ccl_account_create_handle")
+		reg(&cclAccountExportRecoveryPhrase, "ccl_account_export_recovery_phrase")
 	})
 	return loadErr
 }

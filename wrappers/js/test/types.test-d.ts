@@ -1,7 +1,7 @@
 // Type-level tests for the shipped declarations (src/index.d.ts).
 //
 // Compiled — never executed — by `bun run typecheck` (tsc --noEmit). They exercise the *real*
-// runtime API (namespaced: `bridge.account.create(...)`), so a .d.ts that describes some other shape
+// runtime API (namespaced: `bridge.accounts.create(...)`), so a .d.ts that describes some other shape
 // (e.g. the old flat `bridge.accountCreate(...)`) fails the check instead of shipping.
 //
 // `@ts-expect-error` lines are assertions too: each marks code that MUST NOT compile (a wrong
@@ -24,22 +24,19 @@ import {
     platformSuffix,
     MAINNET,
     TESTNET,
-    PREPROD,
-    PREVIEW,
     CCL_SUCCESS,
     CCL_ERROR_TX_BUILD,
     type Network,
-    type AccountInfo,
+    type Account,
+    type AccountPublicInfo,
+    type DerivedKey,
+    SigningRole,
     type AddressInfo,
-    type WalletInfo,
-    type DrepKeyInfo,
-    type CommitteeKeyInfo,
     type Utxo,
     type Amount,
     type ProtocolParams,
     type ExecUnits,
     type TxResult,
-    type SigningKeyRole,
 } from '../src/index.js';
 
 // Compile-time assertion helpers.
@@ -50,12 +47,10 @@ declare function assignable<T>(): <U extends T>(value: U) => void;
 
 expectType<0>(MAINNET);
 expectType<1>(TESTNET);
-expectType<2>(PREPROD);
-expectType<3>(PREVIEW);
 expectType<0>(CCL_SUCCESS);
 expectType<-10>(CCL_ERROR_TX_BUILD);
 assignable<Network>()(MAINNET);
-assignable<Network>()(PREVIEW);
+assignable<Network>()(TESTNET);
 
 // --- Lifecycle -----------------------------------------------------------------------------------
 
@@ -66,34 +61,39 @@ expectType<void>(bridge.close());
 expectType<void>(bridge[Symbol.dispose]());
 void bridgeWithPath;
 
-// --- account (namespaced — the shape the README teaches) -----------------------------------------
+// --- accounts (managed handles — the shape the README teaches) -----------------------------------
 
-const account: AccountInfo = bridge.account.create(TESTNET);
-expectType<string>(account.mnemonic);
-expectType<string>(account.base_address);
-expectType<string>(account.enterprise_address);
-expectType<string>(account.stake_address);
-expectType<string>(account.change_address);
+const acct: Account = bridge.accounts.create(TESTNET);
+const info: AccountPublicInfo = acct.info;
+expectType<string>(info.base_address);
+expectType<string>(info.enterprise_address);
+expectType<string>(info.stake_address);
+expectType<string>(info.drep_id);
+expectType<string>(info.committee_cold_id);
+expectType<string>(info.committee_cold_credential);
+expectType<string>(info.committee_hot_id);
+expectType<string>(info.committee_hot_credential);
+expectType<number>(info.network);
+// @ts-expect-error info never contains the mnemonic
+info.mnemonic;
+const mnemonic: string = acct.exportRecoveryPhrase();
 
-expectType<AccountInfo>(bridge.account.fromMnemonic(account.mnemonic, MAINNET));
-expectType<AccountInfo>(bridge.account.fromMnemonic(account.mnemonic, PREPROD, 0, 0));
-expectType<string>(bridge.account.getPrivateKey(account.mnemonic, TESTNET));
-expectType<string>(bridge.account.getPublicKey(account.mnemonic, TESTNET, 0, 1));
-expectType<string>(bridge.account.getDrepId(account.mnemonic, TESTNET));
-expectType<string>(bridge.account.signTx(account.mnemonic, TESTNET, 0, 0, 'deadbeef'));
+expectType<Account>(bridge.accounts.fromMnemonic(mnemonic, MAINNET));
+expectType<Account>(bridge.accounts.fromMnemonic(mnemonic, TESTNET, 0, 0));
+expectType<string>(acct.signTx('deadbeef'));
+expectType<string>(acct.signTx('deadbeef', SigningRole.PAYMENT | SigningRole.STAKE));
+acct.close();
 
-const roles: SigningKeyRole[] = ['payment', 'stake', 'drep'];
-expectType<string>(bridge.account.signTxWithKeys(account.mnemonic, TESTNET, 0, 0, 'deadbeef', roles));
-expectType<string>(bridge.account.signTxWithKeys(account.mnemonic, TESTNET, 0, 0, 'deadbeef', 'payment'));
+const account = { mnemonic, base_address: info.base_address };
 
 // `network` is required — no silent mainnet default.
 // @ts-expect-error network is required
-bridge.account.create();
+bridge.accounts.create();
 // Out-of-range networks are a type error (the values are CCL enum ordinals, 0..3).
 // @ts-expect-error 99 is not a Network
-bridge.account.create(99);
+bridge.accounts.create(99);
 // @ts-expect-error 'mainnet' is not a Network
-bridge.account.create('mainnet');
+bridge.accounts.create('mainnet');
 // The old flat API is gone; only the namespaced one exists.
 // @ts-expect-error accountCreate() does not exist at runtime
 bridge.accountCreate(TESTNET);
@@ -137,23 +137,17 @@ expectType<string>(bridge.script.nativeFromJson('{"type":"sig"}'));
 expectType<string>(bridge.script.hash('4d01'));
 expectType<string>(bridge.script.hash('4d01', 3));
 
-// --- gov -----------------------------------------------------------------------------------------
+// --- crypto.deriveKey ----------------------------------------------------------------------------
 
-const drepKey: DrepKeyInfo = bridge.gov.drepKeyFromMnemonic(account.mnemonic, TESTNET);
-expectType<string>(drepKey.drep_id);
-expectType<string>(drepKey.bech32_verification_key_hash);
-const coldKey: CommitteeKeyInfo = bridge.gov.committeeColdKeyFromMnemonic(account.mnemonic, TESTNET, 0);
-expectType<string>(coldKey.id);
-expectType<CommitteeKeyInfo>(bridge.gov.committeeHotKeyFromMnemonic(account.mnemonic, TESTNET));
-
-// --- wallet --------------------------------------------------------------------------------------
-
-const wallet: WalletInfo = bridge.wallet.create(TESTNET);
-expectType<string[]>(wallet.addresses);
-expectType<WalletInfo>(bridge.wallet.fromMnemonic(wallet.mnemonic, TESTNET));
-expectType<string>(bridge.wallet.getAddress(wallet.mnemonic, TESTNET, 0));
-// @ts-expect-error network is required
-bridge.wallet.create();
+const drepKey: DerivedKey = bridge.crypto.deriveKey(account.mnemonic, 0, 0, 'drep');
+expectType<string>(drepKey.path);
+expectType<string>(drepKey.private_key);
+expectType<string>(drepKey.public_key);
+expectType<string>(drepKey.public_key_hash);
+expectType<DerivedKey>(bridge.crypto.deriveKey(account.mnemonic));
+expectType<DerivedKey>(bridge.crypto.deriveKey(account.mnemonic, 0, 0, 'committee_cold'));
+// @ts-expect-error unknown role is rejected at the type level
+bridge.crypto.deriveKey(account.mnemonic, 0, 0, 'bogus');
 
 // --- quicktx -------------------------------------------------------------------------------------
 
@@ -185,9 +179,9 @@ const custom: ChainDataProvider = {
     protocolParams: async () => protocolParams,
 };
 
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', yaci, account.base_address));
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', blockfrost, account.base_address, evaluator));
-expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', custom, account.base_address));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', yaci, [account.base_address]));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', blockfrost, [account.base_address], evaluator));
+expectType<Promise<TxResult>>(bridge.quicktx.buildWith('version: 1.0', custom, [account.base_address]));
 expectType<Promise<Utxo[]>>(yaci.utxos(account.base_address));
 expectType<Promise<ProtocolParams>>(yaci.protocolParams());
 expectType<Promise<ExecUnits[]>>(evaluator.evaluate(built.tx_cbor, utxos));
@@ -204,3 +198,6 @@ expectType<CclClosedError>(new CclClosedError());
 expectType<string>(resolveLibFile());
 expectType<string>(resolveLibFile('/opt/ccl/lib'));
 expectType<string>(platformSuffix());
+
+// @ts-expect-error senders is an array — a bare string is the old single-sender signature
+bridge.quicktx.buildWith('version: 1.0', yaci, account.base_address);
