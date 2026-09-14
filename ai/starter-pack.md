@@ -1,17 +1,17 @@
-# Cardano Client Bindings — AI Starter Pack
+# Mesmo — AI Starter Pack
 
 > **Read this entire document before generating code that uses these bindings.** It distills the offline contract, the API surface, the TxPlan YAML transaction format, error codes, signing rules, and the known limitations that AI agents most commonly get wrong. This pack is optimized for AI ingestion; the human-friendly guides are on the docsite.
 
 ## 1. What this is
 
-Cardano Client Bindings compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
+Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install cardano-client-lib`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
-| Go ≥ 1.21 | `go get github.com/bloxbean/cardano-client-bindings/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
-| Rust ≥ 1.70 | crate `cardano-client-lib` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
-| JavaScript | `bun add @bloxbean/cardano-client-lib` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
+| Python ≥ 3.8 | `pip install mesmo`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
+| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
+| Rust ≥ 1.70 | crate `mesmo` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
+| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
 
 All four have the same nine API groups — `account`, `address`, `crypto`, `tx`, `plutus`, `script`, `gov`, `wallet`, `quicktx` — the same error codes, and the same TxPlan YAML format. Semantics are identical; only naming idiom differs.
 

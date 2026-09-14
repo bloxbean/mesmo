@@ -1,4 +1,4 @@
-# Cardano Client Bindings
+# Mesmo
 
 > Cardano Client Lib (CCL) compiled to a native shared library (libccl) with a C ABI,
 > plus four first-class language wrappers — Python, Go, Rust, and JavaScript (Bun) —
@@ -7,54 +7,54 @@
 
 Key entry points for AI agents:
 
-- [AI Starter Pack](https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack.md): everything an agent needs to use the bindings correctly
-- [llms-full.txt](https://pages.bloxbean.com/cardano-client-bindings/llms-full.txt): the full docsite as one markdown file
+- [AI Starter Pack](https://pages.bloxbean.com/mesmo/ai/starter-pack.md): everything an agent needs to use the bindings correctly
+- [llms-full.txt](https://pages.bloxbean.com/mesmo/llms-full.txt): the full docsite as one markdown file
 
 ## AI
 
-- [Using Cardano Client Bindings with AI Agents](https://pages.bloxbean.com/cardano-client-bindings/ai/): How to use Claude Code, Cursor, Continue, ChatGPT, and other AI tools to build with Cardano Client Bindings.
-- [Cardano Client Bindings — AI Starter Pack](https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack/): Everything an AI agent needs to write correct code against the cardano-client-lib bindings on first try. Ingest this before generating code.
+- [Using Mesmo with AI Agents](https://pages.bloxbean.com/mesmo/ai/): How to use Claude Code, Cursor, Continue, ChatGPT, and other AI tools to build with Mesmo.
+- [Mesmo — AI Starter Pack](https://pages.bloxbean.com/mesmo/ai/starter-pack/): Everything an AI agent needs to write correct code against the Mesmo bindings on first try. Ingest this before generating code.
 
 ## Overview
 
-- [Overview](https://pages.bloxbean.com/cardano-client-bindings/overview/): Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
-- [Getting Started](https://pages.bloxbean.com/cardano-client-bindings/getting-started/): Install a wrapper package and build your first offline Cardano transaction in Python, Go, Rust, or JavaScript.
+- [Overview](https://pages.bloxbean.com/mesmo/overview/): Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
+- [Getting Started](https://pages.bloxbean.com/mesmo/getting-started/): Install a wrapper package and build your first offline Cardano transaction in Python, Go, Rust, or JavaScript.
 
 ## JavaScript (Bun)
 
-- [Cardano Client Lib for JavaScript (Bun)](https://pages.bloxbean.com/cardano-client-bindings/js/)
-- [JavaScript API Reference](https://pages.bloxbean.com/cardano-client-bindings/js/api/)
-- [Building Transactions (JavaScript)](https://pages.bloxbean.com/cardano-client-bindings/js/transactions/)
-- [Providers & Evaluators (JavaScript)](https://pages.bloxbean.com/cardano-client-bindings/js/providers/)
-- [Troubleshooting (JavaScript)](https://pages.bloxbean.com/cardano-client-bindings/js/troubleshooting/)
+- [Cardano Client Lib for JavaScript (Bun)](https://pages.bloxbean.com/mesmo/js/)
+- [JavaScript API Reference](https://pages.bloxbean.com/mesmo/js/api/)
+- [Building Transactions (JavaScript)](https://pages.bloxbean.com/mesmo/js/transactions/)
+- [Providers & Evaluators (JavaScript)](https://pages.bloxbean.com/mesmo/js/providers/)
+- [Troubleshooting (JavaScript)](https://pages.bloxbean.com/mesmo/js/troubleshooting/)
 
 ## Go
 
-- [Cardano Client Lib for Go](https://pages.bloxbean.com/cardano-client-bindings/go/)
-- [Go API Reference](https://pages.bloxbean.com/cardano-client-bindings/go/api/)
-- [Building Transactions (Go)](https://pages.bloxbean.com/cardano-client-bindings/go/transactions/)
-- [Providers & Evaluators (Go)](https://pages.bloxbean.com/cardano-client-bindings/go/providers/)
-- [Troubleshooting (Go)](https://pages.bloxbean.com/cardano-client-bindings/go/troubleshooting/)
+- [Cardano Client Lib for Go](https://pages.bloxbean.com/mesmo/go/)
+- [Go API Reference](https://pages.bloxbean.com/mesmo/go/api/)
+- [Building Transactions (Go)](https://pages.bloxbean.com/mesmo/go/transactions/)
+- [Providers & Evaluators (Go)](https://pages.bloxbean.com/mesmo/go/providers/)
+- [Troubleshooting (Go)](https://pages.bloxbean.com/mesmo/go/troubleshooting/)
 
 ## Rust
 
-- [Cardano Client Lib for Rust](https://pages.bloxbean.com/cardano-client-bindings/rust/)
-- [Rust API Reference](https://pages.bloxbean.com/cardano-client-bindings/rust/api/)
-- [Building Transactions (Rust)](https://pages.bloxbean.com/cardano-client-bindings/rust/transactions/)
-- [Providers & Evaluators (Rust)](https://pages.bloxbean.com/cardano-client-bindings/rust/providers/)
-- [Troubleshooting (Rust)](https://pages.bloxbean.com/cardano-client-bindings/rust/troubleshooting/)
+- [Cardano Client Lib for Rust](https://pages.bloxbean.com/mesmo/rust/)
+- [Rust API Reference](https://pages.bloxbean.com/mesmo/rust/api/)
+- [Building Transactions (Rust)](https://pages.bloxbean.com/mesmo/rust/transactions/)
+- [Providers & Evaluators (Rust)](https://pages.bloxbean.com/mesmo/rust/providers/)
+- [Troubleshooting (Rust)](https://pages.bloxbean.com/mesmo/rust/troubleshooting/)
 
 ## Python
 
-- [Cardano Client Lib for Python](https://pages.bloxbean.com/cardano-client-bindings/python/)
-- [Python API Reference](https://pages.bloxbean.com/cardano-client-bindings/python/api/)
-- [Building Transactions (Python)](https://pages.bloxbean.com/cardano-client-bindings/python/transactions/)
-- [Providers & Evaluators (Python)](https://pages.bloxbean.com/cardano-client-bindings/python/providers/)
-- [Troubleshooting (Python)](https://pages.bloxbean.com/cardano-client-bindings/python/troubleshooting/)
+- [Cardano Client Lib for Python](https://pages.bloxbean.com/mesmo/python/)
+- [Python API Reference](https://pages.bloxbean.com/mesmo/python/api/)
+- [Building Transactions (Python)](https://pages.bloxbean.com/mesmo/python/transactions/)
+- [Providers & Evaluators (Python)](https://pages.bloxbean.com/mesmo/python/providers/)
+- [Troubleshooting (Python)](https://pages.bloxbean.com/mesmo/python/troubleshooting/)
 
 ## Reference
 
-- [QuickTx — TxPlan (YAML) Transaction Builder](https://pages.bloxbean.com/cardano-client-bindings/reference/txplan/)
-- [Platforms & Packages](https://pages.bloxbean.com/cardano-client-bindings/reference/platforms/): Supported operating systems and architectures, package sizes, and how the native library reaches each language.
-- [Caveats & Limitations](https://pages.bloxbean.com/cardano-client-bindings/reference/limitations/): What the bindings deliberately do not do, what does not work yet, and the sharp edges to know about before building on them.
-- [Architecture (ADRs)](https://pages.bloxbean.com/cardano-client-bindings/reference/architecture/): The architecture decision records behind the bindings — why things are the way they are.
+- [QuickTx — TxPlan (YAML) Transaction Builder](https://pages.bloxbean.com/mesmo/reference/txplan/)
+- [Platforms & Packages](https://pages.bloxbean.com/mesmo/reference/platforms/): Supported operating systems and architectures, package sizes, and how the native library reaches each language.
+- [Caveats & Limitations](https://pages.bloxbean.com/mesmo/reference/limitations/): What the bindings deliberately do not do, what does not work yet, and the sharp edges to know about before building on them.
+- [Architecture (ADRs)](https://pages.bloxbean.com/mesmo/reference/architecture/): The architecture decision records behind the bindings — why things are the way they are.

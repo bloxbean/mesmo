@@ -1,15 +1,15 @@
-# Cardano Client Bindings — full documentation
+# Mesmo — full documentation
 
 > Generated from the docsite. One file, all pages, for AI ingestion.
 
 
 ---
 
-# Using Cardano Client Bindings with AI Agents
+# Using Mesmo with AI Agents
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/ai/
+Source: https://pages.bloxbean.com/mesmo/ai/
 
-Cardano Client Bindings is designed to be **AI-friendly**: the API surface is small and identical across all four languages, transactions are plain YAML, and everything an agent needs fits in one document. Point your AI tool at the artifacts below and it can write correct code against the bindings without any training data about them.
+Mesmo is designed to be **AI-friendly**: the API surface is small and identical across all four languages, transactions are plain YAML, and everything an agent needs fits in one document. Point your AI tool at the artifacts below and it can write correct code against the bindings without any training data about them.
 
 ## TL;DR
 
@@ -18,8 +18,8 @@ Point your AI agent at the **[AI Starter Pack](../starter-pack/)** or the full d
 | File | When to use it |
 |---|---|
 | **[`/ai/starter-pack.md`](../starter-pack/)** | The single highest-leverage artifact. Distills the offline contract, the API groups, TxPlan YAML with the intent catalog, error codes, signing roles, and the known limitations agents trip over. |
-| **[`/llms.txt`](https://pages.bloxbean.com/cardano-client-bindings/llms.txt)** | Curated index of this docsite, following [llmstxt.org](https://llmstxt.org/). Small, agent-friendly. |
-| **[`/llms-full.txt`](https://pages.bloxbean.com/cardano-client-bindings/llms-full.txt)** | The full docsite concatenated as a single markdown file, for full-coverage ingestion. |
+| **[`/llms.txt`](https://pages.bloxbean.com/mesmo/llms.txt)** | Curated index of this docsite, following [llmstxt.org](https://llmstxt.org/). Small, agent-friendly. |
+| **[`/llms-full.txt`](https://pages.bloxbean.com/mesmo/llms-full.txt)** | The full docsite concatenated as a single markdown file, for full-coverage ingestion. |
 
 ## Per-tool setup
 
@@ -28,14 +28,14 @@ Point your AI agent at the **[AI Starter Pack](../starter-pack/)** or the full d
 Drop the starter pack into your project as `CLAUDE.md` (or append it to an existing one):
 
 ```bash
-curl -o CLAUDE.md https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack.md
+curl -o CLAUDE.md https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 ```
 
 Claude Code reads `CLAUDE.md` at the start of every session, so the agent always has the bindings' contract in context. For multi-project setups, reference the hosted version from your global `~/.claude/CLAUDE.md`:
 
 ```markdown
-When working with cardano-client-lib bindings (Python/Go/Rust/JS `ccl` packages),
-follow https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack/
+When working with the Mesmo bindings (Python/Go/Rust/JS `ccl` packages),
+follow https://pages.bloxbean.com/mesmo/ai/starter-pack/
 ```
 
 ### Cursor
@@ -44,7 +44,7 @@ Add a project rule:
 
 ```bash
 mkdir -p .cursor/rules
-curl -o .cursor/rules/ccl-bindings.mdc https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack.md
+curl -o .cursor/rules/ccl-bindings.mdc https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 ```
 
 ### Continue (VS Code / JetBrains)
@@ -54,14 +54,14 @@ Add a URL context provider in `.continue/config.json`:
 ```json
 {
   "contextProviders": [
-    { "name": "url", "params": { "url": "https://pages.bloxbean.com/cardano-client-bindings/llms-full.txt" } }
+    { "name": "url", "params": { "url": "https://pages.bloxbean.com/mesmo/llms-full.txt" } }
   ]
 }
 ```
 
 ### ChatGPT / Claude.ai / other chat UIs
 
-Paste the starter pack (or attach it as a file) at the start of the conversation, then ask for what you need — e.g. *"Using cardano-client-lib for Python as described above, build and sign a stake-delegation transaction."*
+Paste the starter pack (or attach it as a file) at the start of the conversation, then ask for what you need — e.g. *"Using Mesmo for Python as described above, build and sign a stake-delegation transaction."*
 
 ## What agents get wrong without context
 
@@ -77,22 +77,22 @@ These are the failure modes the starter pack exists to prevent:
 
 ---
 
-# Cardano Client Bindings — AI Starter Pack
+# Mesmo — AI Starter Pack
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack/
+Source: https://pages.bloxbean.com/mesmo/ai/starter-pack/
 
 > **Read this entire document before generating code that uses these bindings.** It distills the offline contract, the API surface, the TxPlan YAML transaction format, error codes, signing rules, and the known limitations that AI agents most commonly get wrong. This pack is optimized for AI ingestion; the human-friendly guides are on the docsite.
 
 ## 1. What this is
 
-Cardano Client Bindings compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
+Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install cardano-client-lib`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
-| Go ≥ 1.21 | `go get github.com/bloxbean/cardano-client-bindings/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
-| Rust ≥ 1.70 | crate `cardano-client-lib` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
-| JavaScript | `bun add @bloxbean/cardano-client-lib` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
+| Python ≥ 3.8 | `pip install mesmo`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
+| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
+| Rust ≥ 1.70 | crate `mesmo` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
+| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
 
 All four have the same nine API groups — `account`, `address`, `crypto`, `tx`, `plutus`, `script`, `gov`, `wallet`, `quicktx` — the same error codes, and the same TxPlan YAML format. Semantics are identical; only naming idiom differs.
 
@@ -332,9 +332,9 @@ Predicates (`validate`, `validate_mnemonic`, `verify`) return false instead of r
 
 # Overview
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/overview/
+Source: https://pages.bloxbean.com/mesmo/overview/
 
-Cardano Client Bindings compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
+Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
 
 ## Where this fits in the ecosystem
 
@@ -352,7 +352,7 @@ The honest costs of this approach: a ~50 MB platform-specific native binary in y
 
 ## Why?
 
-Cardano Client Lib is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Cardano Client Bindings makes selected CCL modules available as a **native shared library with a C ABI**, so Python, Go, Rust, and JavaScript reuse CCL's exact, well-tested behavior — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
+Cardano Client Lib is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Mesmo makes selected CCL modules available as a **native shared library with a C ABI**, so Python, Go, Rust, and JavaScript reuse CCL's exact, well-tested behavior — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
 
 ## What's included
 
@@ -378,10 +378,10 @@ All four wrappers are first-class and kept at strict parity — same API groups,
 
 | Language | Guide | Package |
 |---|---|---|
-| JavaScript (Bun) | [docs](../js/) | `@bloxbean/cardano-client-lib` (npm) |
-| Go | [docs](../go/) | `github.com/bloxbean/cardano-client-bindings/wrappers/go` |
-| Rust | [docs](../rust/) | `cardano-client-lib` (crate, imported as `ccl`) |
-| Python | [docs](../python/) | `cardano-client-lib` (PyPI, imported as `ccl`) |
+| JavaScript (Bun) | [docs](../js/) | `@bloxbean/mesmo` (npm) |
+| Go | [docs](../go/) | `github.com/bloxbean/mesmo/wrappers/go` |
+| Rust | [docs](../rust/) | `mesmo` (crate, imported as `ccl`) |
+| Python | [docs](../python/) | `mesmo` (PyPI, imported as `ccl`) |
 
 ## How big is it?
 
@@ -399,7 +399,7 @@ The native library is a **~50–60 MB** platform-specific binary (the embedded [
 
 # Getting Started
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/getting-started/
+Source: https://pages.bloxbean.com/mesmo/getting-started/
 
 Pick your language, install the package, and you're building transactions offline in minutes — the native library comes bundled or is fetched automatically; there is nothing else to install and **no JVM**.
 
@@ -408,7 +408,7 @@ Pick your language, install the package, and you're building transactions offlin
 ### JavaScript (Bun)
 
 ```bash
-bun add @bloxbean/cardano-client-lib
+bun add @bloxbean/mesmo
 ```
 
 Requires [Bun](https://bun.sh) 1.0+ — Node.js is [not supported](../reference/limitations/#javascript-runs-on-bun-only). The platform-specific native library arrives via `optionalDependencies`.
@@ -416,7 +416,7 @@ Requires [Bun](https://bun.sh) 1.0+ — Node.js is [not supported](../reference/
 ### Go
 
 ```bash
-go get github.com/bloxbean/cardano-client-bindings/wrappers/go
+go get github.com/bloxbean/mesmo/wrappers/go
 ```
 
 Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libccl` with purego and downloads it once on first use (then cached). Set `CCL_LIB_PATH` to use a local build instead.
@@ -425,7 +425,7 @@ Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libccl` with pureg
 
 ```toml
 [dependencies]
-ccl = { package = "cardano-client-lib", version = "0.1" }
+ccl = { package = "mesmo", version = "0.1" }
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -433,7 +433,7 @@ Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `
 ### Python
 
 ```bash
-pip install cardano-client-lib
+pip install mesmo
 ```
 
 Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`.
@@ -482,7 +482,7 @@ The transaction is described as [TxPlan YAML](../reference/txplan/); the library
 
 # Cardano Client Lib for JavaScript (Bun)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/js/
+Source: https://pages.bloxbean.com/mesmo/js/
 
 `@bloxbean/cardano-client-lib` brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to JavaScript as a native library. No JVM, no remote service: the heavy lifting happens inside `libccl`, a GraalVM native-image build of CCL that ships with the package.
 
@@ -604,7 +604,7 @@ Runnable examples live in [`wrappers/js/examples/`](../../wrappers/js/examples):
 
 # JavaScript API Reference
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/js/api/
+Source: https://pages.bloxbean.com/mesmo/js/api/
 
 All functionality hangs off a `CclBridge` instance. Import what you need from the package root:
 
@@ -830,7 +830,7 @@ platformSuffix(): string                             // e.g. "macos-aarch64", "l
 
 # Building Transactions (JavaScript)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/js/transactions/
+Source: https://pages.bloxbean.com/mesmo/js/transactions/
 
 This guide walks the full life of a transaction: describe it in [TxPlan YAML](../../reference/txplan/), build it offline, sign it with the right keys, and submit it with your own HTTP client. The YAML shapes for every intent — staking, governance, pools, minting, Plutus — are cataloged in the [TxPlan reference](../../reference/txplan/#intent-catalog--verified-shapes); this page shows how to drive them from JavaScript.
 
@@ -1032,7 +1032,7 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 # Providers & Evaluators (JavaScript)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/js/providers/
+Source: https://pages.bloxbean.com/mesmo/js/providers/
 
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences for feeding `quicktx.buildWith` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `quicktx.build` directly.
 
@@ -1124,7 +1124,7 @@ Every provider/evaluator request is bounded by a 60-second timeout (`AbortSignal
 
 # Troubleshooting (JavaScript)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/js/troubleshooting/
+Source: https://pages.bloxbean.com/mesmo/js/troubleshooting/
 
 ## How the native library is found
 
@@ -1214,7 +1214,7 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 
 # Cardano Client Lib for Go
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/go/
+Source: https://pages.bloxbean.com/mesmo/go/
 
 The `ccl` Go package brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Go as a native library. No JVM, **no cgo, no C toolchain**: the shared library is loaded at runtime with [purego](https://github.com/ebitengine/purego).
 
@@ -1346,7 +1346,7 @@ go run ./examples/account
 
 # Go API Reference
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/go/api/
+Source: https://pages.bloxbean.com/mesmo/go/api/
 
 Everything lives in package `ccl`:
 
@@ -1589,7 +1589,7 @@ plutusResult, err := bridge.QuickTx.Build(yaml, utxos, params, 0,
 
 # Building Transactions (Go)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/go/transactions/
+Source: https://pages.bloxbean.com/mesmo/go/transactions/
 
 This guide walks the full life of a transaction: describe it in [TxPlan YAML](../../reference/txplan/), build it offline, sign it with the right keys, and submit it with your own HTTP client. The YAML shapes for every intent — staking, governance, pools, minting, Plutus — are cataloged in the [TxPlan reference](../../reference/txplan/#intent-catalog--verified-shapes); this page shows how to drive them from Go.
 
@@ -1767,7 +1767,7 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 # Providers & Evaluators (Go)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/go/providers/
+Source: https://pages.bloxbean.com/mesmo/go/providers/
 
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences for feeding `QuickTx.BuildWith` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `QuickTx.Build` directly.
 
@@ -1861,7 +1861,7 @@ Every provider/evaluator request is bounded by a 60-second HTTP client timeout; 
 
 # Troubleshooting (Go)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/go/troubleshooting/
+Source: https://pages.bloxbean.com/mesmo/go/troubleshooting/
 
 ## How the native library is found
 
@@ -1946,7 +1946,7 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 
 # Cardano Client Lib for Rust
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/rust/
+Source: https://pages.bloxbean.com/mesmo/rust/
 
 The `cardano-client-lib` crate (imported as `ccl`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libccl`, a GraalVM native-image build of CCL fetched automatically at build time.
 
@@ -2079,7 +2079,7 @@ cargo run --example evaluator --features providers
 
 # Rust API Reference
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/rust/api/
+Source: https://pages.bloxbean.com/mesmo/rust/api/
 
 ```rust
 use ccl::{Bridge, Network, CclError, Result};
@@ -2297,7 +2297,7 @@ let plutus = bridge.quicktx().build(&yaml, &utxos, &params,
 
 # Building Transactions (Rust)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/rust/transactions/
+Source: https://pages.bloxbean.com/mesmo/rust/transactions/
 
 This guide walks the full life of a transaction: describe it in [TxPlan YAML](../../reference/txplan/), build it offline, sign it with the right keys, and submit it with your own HTTP client. The YAML shapes for every intent — staking, governance, pools, minting, Plutus — are cataloged in the [TxPlan reference](../../reference/txplan/#intent-catalog--verified-shapes); this page shows how to drive them from Rust.
 
@@ -2482,7 +2482,7 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 # Providers & Evaluators (Rust)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/rust/providers/
+Source: https://pages.bloxbean.com/mesmo/rust/providers/
 
 The native library is offline by design — it never makes a network call. The optional `providers` module contains small HTTP conveniences for feeding `quicktx().build_with` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need it: call `quicktx().build` directly and skip the feature.
 
@@ -2584,7 +2584,7 @@ HTTP failures surface as `CclError { code: CCL_ERROR_GENERAL, message: "<context
 
 # Troubleshooting (Rust)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/rust/troubleshooting/
+Source: https://pages.bloxbean.com/mesmo/rust/troubleshooting/
 
 ## How the native library is obtained
 
@@ -2662,7 +2662,7 @@ cargo build
 
 # Cardano Client Lib for Python
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/python/
+Source: https://pages.bloxbean.com/mesmo/python/
 
 The `ccl` Python package (distribution name: `cardano-client-lib`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Python as a native library. No JVM, no C extension: pure `ctypes` over `libccl`, a GraalVM native-image build of CCL.
 
@@ -2780,7 +2780,7 @@ Runnable examples live in [`wrappers/python/examples/`](../../wrappers/python/ex
 
 # Python API Reference
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/python/api/
+Source: https://pages.bloxbean.com/mesmo/python/api/
 
 ```python
 from ccl import CclLib, Network, CclError, CclClosedError
@@ -2992,7 +2992,7 @@ plutus_result = lib.quicktx.build(yaml, utxos, params,
 
 # Building Transactions (Python)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/python/transactions/
+Source: https://pages.bloxbean.com/mesmo/python/transactions/
 
 This guide walks the full life of a transaction: describe it in [TxPlan YAML](../../reference/txplan/), build it offline, sign it with the right keys, and submit it with your own HTTP client. The YAML shapes for every intent — staking, governance, pools, minting, Plutus — are cataloged in the [TxPlan reference](../../reference/txplan/#intent-catalog--verified-shapes); this page shows how to drive them from Python.
 
@@ -3174,7 +3174,7 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 # Providers & Evaluators (Python)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/python/providers/
+Source: https://pages.bloxbean.com/mesmo/python/providers/
 
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences (stdlib `urllib`, no extra dependencies) for feeding `quicktx.build_with` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `quicktx.build` directly.
 
@@ -3257,7 +3257,7 @@ Provider GETs are bounded at 30 seconds and evaluator POSTs at 60 seconds; a hun
 
 # Troubleshooting (Python)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/python/troubleshooting/
+Source: https://pages.bloxbean.com/mesmo/python/troubleshooting/
 
 ## How the native library is found
 
@@ -3339,7 +3339,7 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 
 # QuickTx — TxPlan (YAML) Transaction Builder
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/reference/txplan/
+Source: https://pages.bloxbean.com/mesmo/reference/txplan/
 
 QuickTx builds unsigned Cardano transactions **fully offline** from a CCL
 [**TxPlan**](https://github.com/bloxbean/cardano-client-lib) — a YAML document describing what the
@@ -3354,7 +3354,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 - **Result**: a YAML document with `tx_cbor` (unsigned transaction), `tx_hash`, and `fee`.
 - **Fully offline**: the caller supplies UTXOs and protocol parameters — the native library makes no
   HTTP calls and never submits. (The native entry point has no provider mode; each wrapper offers a
-  `build_with` convenience that fetches the chain data from a [wrapper-side provider](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0011-wrapper-side-chain-data-providers.md) first.)
+  `build_with` convenience that fetches the chain data from a [wrapper-side provider](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0011-wrapper-side-chain-data-providers.md) first.)
 - **Client-side chain data**: UTXOs and protocol parameters are passed as JSON (the standard CCL
   `Utxo` / `ProtocolParams` models).
 
@@ -3449,7 +3449,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 
 > **Plutus script transactions** build fully offline with no extra input: when `exec_units_json` is
 > null, the native library computes the redeemers' **execution units** itself with the embedded
-> [Scalus](https://scalus.org) UPLC evaluator (see [ADR-0013](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0013-transaction-evaluators.md)).
+> [Scalus](https://scalus.org) UPLC evaluator (see [ADR-0013](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0013-transaction-evaluators.md)).
 > To supply your own units instead — from Ogmios, Blockfrost, Aiken, or any other evaluator — pass
 > `exec_units_json`, a JSON array of `[{mem, steps}]`, one per redeemer in transaction order; the
 > bridge then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
@@ -3915,7 +3915,7 @@ See each wrapper's `examples/transaction.*` for a complete build-and-sign progra
 
 # Platforms & Packages
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/reference/platforms/
+Source: https://pages.bloxbean.com/mesmo/reference/platforms/
 
 The native library (`libccl`) is a platform-specific binary built with GraalVM native-image. This page is the single answer to "does it run on my machine, and how big is it?".
 
@@ -3967,8 +3967,8 @@ Every wrapper resolves `libccl` in the same priority order:
 Needed only on unsupported platforms or for developing the bindings themselves — requires [Oracle GraalVM 25](https://www.graalvm.org/) (with `native-image`):
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal
 ./gradlew :core:nativeCompile     # → core/build/native/nativeCompile/libccl.*
 export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
@@ -3981,7 +3981,7 @@ Each language's *Troubleshooting* page covers the loader environment variables a
 
 # Caveats & Limitations
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/reference/limitations/
+Source: https://pages.bloxbean.com/mesmo/reference/limitations/
 
 An honest list — read this before building on the bindings. Items are marked **by design** (a deliberate architectural decision, see the [ADRs](../architecture/)) or **current limitation** (expected to improve).
 
@@ -4036,26 +4036,26 @@ macOS Intel and Windows ARM64 have no prebuilt library; Alpine Python installs f
 
 # Architecture (ADRs)
 
-Source: https://pages.bloxbean.com/cardano-client-bindings/reference/architecture/
+Source: https://pages.bloxbean.com/mesmo/reference/architecture/
 
-Significant decisions are recorded as [Architecture Decision Records](https://github.com/bloxbean/cardano-client-bindings/tree/develop/docs/adr) in the repository — the *why* behind choices that aren't obvious from the code. The short version:
+Significant decisions are recorded as [Architecture Decision Records](https://github.com/bloxbean/mesmo/tree/develop/docs/adr) in the repository — the *why* behind choices that aren't obvious from the code. The short version:
 
 | Decision | ADR |
 |---|---|
-| CCL compiled to a native shared library with a C ABI (GraalVM native-image); no JVM at runtime | [0001](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0001-native-shared-library-ffi.md) |
-| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libccl` | [0002](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
-| Four thin language wrappers over one uniform FFI | [0003](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0003-four-language-wrappers-uniform-ffi.md) |
-| Bun is the only supported JavaScript runtime | [0004](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0004-bun-only-javascript-runtime.md) |
-| Toolchain pinned to Oracle GraalVM 25.0.3 | [0005](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0005-oracle-graalvm-25.md) |
-| TxPlan (YAML) as the transaction format | [0006](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0006-txplan-yaml-transaction-format.md) |
-| Plutus exec units caller-suppliable (evolved by 0013's Scalus default) | [0007](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0007-caller-supplied-plutus-exec-units.md) |
-| Linux portability: glibc-2.17 baseline + `-march=compatibility`; musl as a separate artifact | [0008](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0008-linux-glibc-baseline-portability.md) |
-| Go pins all FFI to one dedicated OS thread (isolate thread-affinity) | [0010](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0010-go-isolate-thread-affinity.md) |
-| Chain-data providers live wrapper-side | [0011](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0011-wrapper-side-chain-data-providers.md) |
-| Native lib ships bundled in per-wrapper platform packages | [0012](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0012-native-lib-bundled-in-wrapper-packages.md) |
-| Evaluators: Scalus offline default in core, pluggable remote in wrappers | [0013](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0013-transaction-evaluators.md) |
-| Go distribution: purego + runtime library resolution | [0014](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0014-go-distribution-purego-runtime-resolution.md) |
-| No reference wrapper — all four kept at parity, enforced by CI | [0015](https://github.com/bloxbean/cardano-client-bindings/blob/develop/docs/adr/0015-no-reference-wrapper-parity.md) |
+| CCL compiled to a native shared library with a C ABI (GraalVM native-image); no JVM at runtime | [0001](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0001-native-shared-library-ffi.md) |
+| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libccl` | [0002](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
+| Four thin language wrappers over one uniform FFI | [0003](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0003-four-language-wrappers-uniform-ffi.md) |
+| Bun is the only supported JavaScript runtime | [0004](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0004-bun-only-javascript-runtime.md) |
+| Toolchain pinned to Oracle GraalVM 25.0.3 | [0005](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0005-oracle-graalvm-25.md) |
+| TxPlan (YAML) as the transaction format | [0006](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0006-txplan-yaml-transaction-format.md) |
+| Plutus exec units caller-suppliable (evolved by 0013's Scalus default) | [0007](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0007-caller-supplied-plutus-exec-units.md) |
+| Linux portability: glibc-2.17 baseline + `-march=compatibility`; musl as a separate artifact | [0008](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0008-linux-glibc-baseline-portability.md) |
+| Go pins all FFI to one dedicated OS thread (isolate thread-affinity) | [0010](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0010-go-isolate-thread-affinity.md) |
+| Chain-data providers live wrapper-side | [0011](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0011-wrapper-side-chain-data-providers.md) |
+| Native lib ships bundled in per-wrapper platform packages | [0012](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0012-native-lib-bundled-in-wrapper-packages.md) |
+| Evaluators: Scalus offline default in core, pluggable remote in wrappers | [0013](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0013-transaction-evaluators.md) |
+| Go distribution: purego + runtime library resolution | [0014](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0014-go-distribution-purego-runtime-resolution.md) |
+| No reference wrapper — all four kept at parity, enforced by CI | [0015](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0015-no-reference-wrapper-parity.md) |
 
 (ADR-0009 was withdrawn — a release-process workflow, not an architectural decision; the number stays reserved.)
 
