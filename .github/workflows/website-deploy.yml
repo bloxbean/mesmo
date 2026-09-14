@@ -36,9 +36,11 @@ jobs:
           npm ci
 
       - name: Build website
+        # Base path derived from the repository name, so GitHub Pages links survive a repo
+        # rename without touching the Astro config.
         run: |
           cd website
-          npm run build
+          DOCS_BASE="/${GITHUB_REPOSITORY#*/}" npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
