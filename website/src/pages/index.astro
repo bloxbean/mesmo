@@ -14,9 +14,9 @@ const F = (s: string) => `<span style="color:#5eead4">${s}</span>`;   // call
 const languages = [
   {
     id: 'js', name: 'JavaScript', dot: '#f7df1e', sub: 'Bun FFI', href: docs('/js/'),
-    install: 'bun add @bloxbean/cardano-client-lib',
+    install: 'bun add @bloxbean/mesmo',
     code: [
-      `${K('import')} { CclBridge, TESTNET } ${K('from')} ${S(`'@bloxbean/cardano-client-lib'`)};`,
+      `${K('import')} { CclBridge, TESTNET } ${K('from')} ${S(`'@bloxbean/mesmo'`)};`,
       ``,
       `${K('const')} bridge = ${K('new')} ${F('CclBridge')}();`,
       `${K('using')} account = bridge.accounts.${F('create')}(TESTNET);`,
@@ -27,7 +27,7 @@ const languages = [
   },
   {
     id: 'go', name: 'Go', dot: '#00add8', sub: 'purego · no cgo', href: docs('/go/'),
-    install: 'go get github.com/bloxbean/cardano-client-bindings/wrappers/go',
+    install: 'go get github.com/bloxbean/mesmo/wrappers/go',
     code: [
       `bridge, _ := ccl.${F('New')}()`,
       `${K('defer')} bridge.${F('Close')}()`,
@@ -40,8 +40,8 @@ const languages = [
     ].join('\n'),
   },
   {
-    id: 'rust', name: 'Rust', dot: '#f74c00', sub: 'cardano-client-lib crate', href: docs('/rust/'),
-    install: 'cargo add cardano-client-lib',
+    id: 'rust', name: 'Rust', dot: '#f74c00', sub: 'mesmo crate', href: docs('/rust/'),
+    install: 'cargo add mesmo',
     code: [
       `${K('let')} bridge = ccl::Bridge::${F('new')}()?;`,
       ``,
@@ -54,7 +54,7 @@ const languages = [
   },
   {
     id: 'python', name: 'Python', dot: '#4d9fdb', sub: 'ctypes', href: docs('/python/'),
-    install: 'pip install cardano-client-lib',
+    install: 'pip install mesmo',
     code: [
       `${K('from')} ccl ${K('import')} CclLib, Network`,
       ``,
@@ -87,7 +87,7 @@ const features = [
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cardano Client Bindings — Cardano's mature Java SDK as a native library for Python, Go, Rust & JavaScript</title>
+  <title>Mesmo — Cardano's mature Java SDK as a native library for Python, Go, Rust & JavaScript</title>
   <meta name="description" content="One mature Cardano codebase, exported to four language ecosystems. Offline key derivation, transaction building, signing, Plutus and governance from Python, Go, Rust, and JavaScript — with nothing extra to install." />
   <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -101,13 +101,13 @@ const features = [
     <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
       <a href={base + '/'} class="flex items-center gap-2.5 font-semibold text-white">
         <img src={`${base}/favicon.svg`} alt="" class="h-7 w-7" />
-        <span>Cardano Client Bindings</span>
+        <span>Mesmo</span>
       </a>
       <div class="flex items-center gap-6 text-sm text-text-muted">
         <a href={docs('/overview/')} class="transition hover:text-white">Docs</a>
         <a href={docs('/reference/txplan/')} class="hidden transition hover:text-white sm:block">TxPlan</a>
         <a href={docs('/ai/')} class="transition hover:text-white">AI</a>
-        <a href="https://github.com/bloxbean/cardano-client-bindings"
+        <a href="https://github.com/bloxbean/mesmo"
            class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white transition hover:border-white/25 hover:bg-white/10">GitHub</a>
       </div>
     </nav>
@@ -291,7 +291,7 @@ const features = [
             <span class="h-3 w-3 rounded-full bg-[#febc2e]"></span>
             <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
           </div>
-          <pre class="overflow-x-auto px-5 py-4 font-mono text-sm text-[#d4d4d8]"><code><span class="select-none text-text-muted">$ </span>curl -o CLAUDE.md https://pages.bloxbean.com/cardano-client-bindings/ai/starter-pack.md</code></pre>
+          <pre class="overflow-x-auto px-5 py-4 font-mono text-sm text-[#d4d4d8]"><code><span class="select-none text-text-muted">$ </span>curl -o CLAUDE.md https://pages.bloxbean.com/mesmo/ai/starter-pack.md</code></pre>
         </div>
         <a href={docs('/ai/')} class="mt-8 inline-block font-semibold text-brand-light transition hover:text-white">Set up your tool →</a>
       </div>
@@ -310,7 +310,7 @@ const features = [
         <a href={docs('/overview/')} class="transition hover:text-white">Documentation</a>
         <a href={docs('/reference/txplan/')} class="transition hover:text-white">TxPlan</a>
         <a href="https://github.com/bloxbean/cardano-client-lib" class="transition hover:text-white">Cardano Client Lib</a>
-        <a href="https://github.com/bloxbean/cardano-client-bindings" class="transition hover:text-white">GitHub</a>
+        <a href="https://github.com/bloxbean/mesmo" class="transition hover:text-white">GitHub</a>
       </div>
     </div>
   </footer>

@@ -10,7 +10,7 @@ Pick your language, install the package, and you're building transactions offlin
 ### JavaScript (Bun)
 
 ```bash
-bun add @bloxbean/cardano-client-lib
+bun add @bloxbean/mesmo
 ```
 
 Requires [Bun](https://bun.sh) 1.0+ — Node.js is [not supported](../reference/limitations/#javascript-runs-on-bun-only). The platform-specific native library arrives via `optionalDependencies`.
@@ -18,7 +18,7 @@ Requires [Bun](https://bun.sh) 1.0+ — Node.js is [not supported](../reference/
 ### Go
 
 ```bash
-go get github.com/bloxbean/cardano-client-bindings/wrappers/go
+go get github.com/bloxbean/mesmo/wrappers/go
 ```
 
 Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libccl` with purego and downloads it once on first use (then cached). Set `CCL_LIB_PATH` to use a local build instead.
@@ -27,7 +27,7 @@ Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libccl` with pureg
 
 ```toml
 [dependencies]
-ccl = { package = "cardano-client-lib", version = "0.1" }
+ccl = { package = "mesmo", version = "0.1" }
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -35,7 +35,7 @@ Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `
 ### Python
 
 ```bash
-pip install cardano-client-lib
+pip install mesmo
 ```
 
 Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`.

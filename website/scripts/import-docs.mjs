@@ -16,7 +16,7 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const DOCS_SRC = path.join(REPO_ROOT, 'docs');
 const CONTENT_OUT = path.resolve(__dirname, '../src/content/docs');
 
-const GITHUB_BLOB = 'https://github.com/bloxbean/cardano-client-bindings/blob/develop';
+const GITHUB_BLOB = 'https://github.com/bloxbean/mesmo/blob/develop';
 
 // source (repo-relative) → destination (content-relative). Directory slugs on
 // the site: docs/golang → /go/, README.md → the section index.

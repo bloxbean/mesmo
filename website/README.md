@@ -1,4 +1,4 @@
-# Cardano Client Bindings — docsite
+# Mesmo — docsite
 
 The project website and user documentation, built with [Astro](https://astro.build) + [Starlight](https://starlight.astro.build) (mirroring the [JuLC](https://github.com/bloxbean/julc) docsite setup).
 
@@ -7,7 +7,7 @@ The project website and user documentation, built with [Astro](https://astro.bui
 ```bash
 cd website
 npm install
-npm run dev        # http://localhost:4321/cardano-client-bindings/
+npm run dev        # http://localhost:4321/mesmo/
 npm run build      # → dist/
 ```
 
@@ -27,4 +27,4 @@ The `scripts/llms-integration.mjs` Astro integration publishes, at build time an
 
 ## Deployment
 
-`.github/workflows/website-deploy.yml` builds and publishes `website/dist` to GitHub Pages on a `dv*` tag (or manual dispatch), matching JuLC's flow. The site currently assumes the GitHub Pages project path (`https://pages.bloxbean.com/cardano-client-bindings`); when a custom domain is chosen, set it in `astro.config.mjs` (`SITE`, drop `BASE`), add a `public/CNAME`, and update the hard-coded URLs in the AI pages.
+`.github/workflows/website-deploy.yml` builds and publishes `website/dist` to GitHub Pages on a `dv*` tag (or manual dispatch), matching JuLC's flow. The site currently assumes the GitHub Pages project path (`https://pages.bloxbean.com/mesmo`); when a custom domain is chosen, set it in `astro.config.mjs` (`SITE`, drop `BASE`), add a `public/CNAME`, and update the hard-coded URLs in the AI pages.

@@ -3,7 +3,7 @@ title: Overview
 description: Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
 ---
 
-Cardano Client Bindings compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
+Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
 
 ## Where this fits in the ecosystem
 
@@ -21,7 +21,7 @@ The honest costs of this approach: a ~50 MB platform-specific native binary in y
 
 ## Why?
 
-Cardano Client Lib is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Cardano Client Bindings makes selected CCL modules available as a **native shared library with a C ABI**, so Python, Go, Rust, and JavaScript reuse CCL's exact, well-tested behavior — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
+Cardano Client Lib is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Mesmo makes selected CCL modules available as a **native shared library with a C ABI**, so Python, Go, Rust, and JavaScript reuse CCL's exact, well-tested behavior — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
 
 ## What's included
 
@@ -47,10 +47,10 @@ All four wrappers are first-class and kept at strict parity — same API groups,
 
 | Language | Guide | Package |
 |---|---|---|
-| JavaScript (Bun) | [docs](../js/) | `@bloxbean/cardano-client-lib` (npm) |
-| Go | [docs](../go/) | `github.com/bloxbean/cardano-client-bindings/wrappers/go` |
-| Rust | [docs](../rust/) | `cardano-client-lib` (crate, imported as `ccl`) |
-| Python | [docs](../python/) | `cardano-client-lib` (PyPI, imported as `ccl`) |
+| JavaScript (Bun) | [docs](../js/) | `@bloxbean/mesmo` (npm) |
+| Go | [docs](../go/) | `github.com/bloxbean/mesmo/wrappers/go` |
+| Rust | [docs](../rust/) | `mesmo` (crate, imported as `ccl`) |
+| Python | [docs](../python/) | `mesmo` (PyPI, imported as `ccl`) |
 
 ## How big is it?
 

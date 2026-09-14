@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOCS_ROOT = path.resolve(__dirname, '..');
 const CONTENT_ROOT = path.join(DOCS_ROOT, 'src/content/docs');
 
-const SITE = 'https://pages.bloxbean.com/cardano-client-bindings';
+const SITE = 'https://pages.bloxbean.com/mesmo';
 
 // Curated section order — mirrors the Astro sidebar in astro.config.mjs.
 // Missing files are skipped gracefully so a rename does not fail the build.
@@ -82,7 +82,7 @@ export async function generateLlmsFiles({ outDir, logger }) {
   }
 
   // llms.txt — curated index (llmstxt.org)
-  let index = `# Cardano Client Bindings
+  let index = `# Mesmo
 
 > Cardano Client Lib (CCL) compiled to a native shared library (libccl) with a C ABI,
 > plus four first-class language wrappers — Python, Go, Rust, and JavaScript (Bun) —
@@ -102,7 +102,7 @@ Key entry points for AI agents:
   }
 
   // llms-full.txt — full concatenation
-  let full = `# Cardano Client Bindings — full documentation\n\n> Generated from the docsite. One file, all pages, for AI ingestion.\n`;
+  let full = `# Mesmo — full documentation\n\n> Generated from the docsite. One file, all pages, for AI ingestion.\n`;
   for (const { title, docs } of sections) {
     for (const doc of docs) {
       full += `\n\n---\n\n# ${doc.title}\n\nSource: ${routeFor(doc.file)}\n\n${doc.body}\n`;

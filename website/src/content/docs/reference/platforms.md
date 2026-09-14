@@ -53,8 +53,8 @@ Every wrapper resolves `libccl` in the same priority order:
 Needed only on unsupported platforms or for developing the bindings themselves — requires [Oracle GraalVM 25](https://www.graalvm.org/) (with `native-image`):
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal
 ./gradlew :core:nativeCompile     # → core/build/native/nativeCompile/libccl.*
 export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
