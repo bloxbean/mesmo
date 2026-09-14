@@ -16,7 +16,7 @@
 //! # let sender = "addr_test1...";
 //! let bridge = Bridge::new()?;
 //! let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-//! let result = bridge.quicktx().build_with(yaml, &provider, sender, 0, None)?;
+//! let result = bridge.quicktx().build_with(yaml, &provider, &[sender], 0, None)?;
 //! # Ok::<(), ccl::CclError>(())
 //! ```
 
