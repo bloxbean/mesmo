@@ -50,10 +50,10 @@ def generateBuildInfo = tasks.register('generateBuildInfo') {
     inputs.property('version', nativeLibVersion)
     outputs.dir(generatedSrcDir)
     doLast {
-        def pkgDir = generatedSrcDir.get().dir('com/bloxbean/cardano/bridge').asFile
+        def pkgDir = generatedSrcDir.get().dir('com/bloxbean/cardano/mesmo').asFile
         pkgDir.mkdirs()
         new File(pkgDir, 'BuildInfo.java').text = """\
-package com.bloxbean.cardano.bridge;
+package com.bloxbean.cardano.mesmo;
 
 /** Generated at build time from the Gradle project version. Do not edit. */
 public final class BuildInfo {

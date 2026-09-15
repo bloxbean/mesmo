@@ -4,16 +4,16 @@
 //! (invalid + empty mnemonic, invalid CBOR).
 
 use mesmo::accounts::SigningRole;
-use mesmo::{Bridge, Network};
+use mesmo::{Mesmo, Network};
 use serde_json::Value;
 
-fn bridge() -> Bridge {
-    Bridge::new().expect("Failed to create bridge")
+fn lib() -> Mesmo {
+    Mesmo::new().expect("Failed to create lib")
 }
 
 /// Create a managed account; return its public info and the one-shot recovery phrase.
-fn create(bridge: &Bridge, network: Network) -> (Value, String) {
-    let acct = bridge
+fn create(lib: &Mesmo, network: Network) -> (Value, String) {
+    let acct = lib
         .accounts()
         .create(network)
         .expect("Failed to create account");
@@ -26,7 +26,7 @@ fn create(bridge: &Bridge, network: Network) -> (Value, String) {
 
 #[test]
 fn test_account_create_testnet() {
-    let b = bridge();
+    let b = lib();
     let (info, _phrase) = create(&b, mesmo::Network::Testnet);
     assert!(info["base_address"]
         .as_str()
@@ -37,7 +37,7 @@ fn test_account_create_testnet() {
 #[test]
 fn test_account_from_mnemonic_restores_all_addresses() {
     // Restoring from a mnemonic must reproduce the base, enterprise and stake addresses.
-    let b = bridge();
+    let b = lib();
     let (created, mnemonic) = create(&b, mesmo::Network::Mainnet);
 
     let acct = b
@@ -54,7 +54,7 @@ fn test_account_from_mnemonic_restores_all_addresses() {
 #[test]
 fn test_account_different_indices() {
     // Different address indices under the same mnemonic yield different base addresses.
-    let b = bridge();
+    let b = lib();
     let (_created, mnemonic) = create(&b, mesmo::Network::Mainnet);
 
     let info_at = |index: u32| -> Value {
@@ -71,7 +71,7 @@ fn test_account_different_indices() {
 #[test]
 fn test_derive_key_public_key_length() {
     // Public key is a 32-byte Ed25519 key -> 64 hex chars, via the stateless derivation utility.
-    let b = bridge();
+    let b = lib();
     let (_created, mnemonic) = create(&b, mesmo::Network::Mainnet);
 
     let key_json = b
@@ -86,7 +86,7 @@ fn test_derive_key_public_key_length() {
 
 #[test]
 fn test_account_from_invalid_mnemonic() {
-    let b = bridge();
+    let b = lib();
     let result = b.accounts().from_mnemonic(
         "invalid words that are not a valid mnemonic phrase at all",
         mesmo::Network::Mainnet,
@@ -98,14 +98,14 @@ fn test_account_from_invalid_mnemonic() {
 
 #[test]
 fn test_account_from_empty_mnemonic() {
-    let b = bridge();
+    let b = lib();
     let result = b.accounts().from_mnemonic("", mesmo::Network::Mainnet, 0, 0);
     assert!(result.is_err(), "expected error for empty mnemonic");
 }
 
 #[test]
 fn test_account_sign_tx_invalid_cbor() {
-    let b = bridge();
+    let b = lib();
     let (_created, mnemonic) = create(&b, mesmo::Network::Testnet);
 
     let acct = b

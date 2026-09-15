@@ -7,15 +7,15 @@
 // Bun's built-in fetch.
 //
 // A provider implements two async methods:
-//   utxos(address)      -> array of UTXO objects at the address (no selection — the bridge selects)
+//   utxos(address)      -> array of UTXO objects at the address (no selection — the lib selects)
 //   protocolParams()    -> protocol parameters object
 //
 // Use one directly, or via quicktx.buildWith:
 //
-//   import { MesmoBridge, BlockfrostProvider } from "@bloxbean/mesmo";
-//   const bridge = new MesmoBridge();
+//   import { Mesmo, BlockfrostProvider } from "@bloxbean/mesmo";
+//   const lib = new Mesmo();
 //   const provider = new BlockfrostProvider(projectId, { network: "preprod" }); // or new YaciProvider()
-//   const result = await bridge.quicktx.buildWith(txplanYaml, provider, senderAddress);
+//   const result = await lib.quicktx.buildWith(txplanYaml, provider, senderAddress);
 
 import { parse as losslessParse } from "lossless-json";
 

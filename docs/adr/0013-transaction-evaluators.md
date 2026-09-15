@@ -7,7 +7,7 @@
 ## Context
 
 Building a Plutus-script transaction needs each redeemer's **execution units** (`{mem, steps}`).
-[ADR-0007](0007-caller-supplied-plutus-exec-units.md) made these **caller-supplied**: the bridge wired
+[ADR-0007](0007-caller-supplied-plutus-exec-units.md) made these **caller-supplied**: Mesmo wired
 CCL's `StaticTransactionEvaluator` and stayed evaluator-agnostic, so the user had to obtain the units
 themselves (Ogmios, Blockfrost, Aiken, Scalus, …) and pass them in. That is correct but unfriendly —
 the common case ("just build my Plutus tx") requires an out-of-band evaluation step.
@@ -17,7 +17,7 @@ Two facts change the calculus:
 1. **Scalus can now run inside `libmesmo`.** Scalus's UPLC evaluator (`ScalusTransactionEvaluator`,
    Scala 3 + a secp256k1 JNI lib) **compiles into the GraalVM native image and computes real units**
    (proven end-to-end: a PoC built an always-succeeds mint with no supplied units and got
-   `mem=1400, steps=208100`, both on the JVM and over FFI against `libmesmo`). So the bridge can compute
+   `mem=1400, steps=208100`, both on the JVM and over FFI against `libmesmo`). So Mesmo can compute
    units **offline, in-process, with no network**.
 2. **We must not assume Scalus stays sufficient.** It is powerful today, but script/ledger evolution
    may outpace it. A **remote evaluator must always be available as a fallback** — and the obvious one
@@ -57,7 +57,7 @@ As with providers, a single backend may implement **both** interfaces: one `Bloc
 can be the `Provider` (utxos/params) *and* the `Evaluator` (evaluate) — separate interfaces, composable.
 
 Rust keeps the HTTP evaluator behind the existing `providers` feature (no HTTP dep in the offline core
-build). This ADR **evolves ADR-0007**: the bridge is no longer purely "caller-supplied / evaluator-
+build). This ADR **evolves ADR-0007**: Mesmo is no longer purely "caller-supplied / evaluator-
 agnostic" — it now ships a default (Scalus) and a pluggable remote path, while still accepting
 caller-supplied units.
 

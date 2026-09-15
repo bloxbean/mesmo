@@ -4,9 +4,9 @@ package mesmo
 // crosses the FFI boundary once at open (or never, for created accounts, until the one-shot
 // recovery-phrase export) instead of travelling with every operation.
 //
-// Every Account call runs on its Bridge's dedicated isolate thread via the same executor as all
-// other FFI (ADR-0010) — an Account adds no concurrency of its own, and a closed Bridge yields the
-// Bridge's normal closed error rather than a deadlock or a dangling-isolate call.
+// Every Account call runs on its Mesmo's dedicated isolate thread via the same executor as all
+// other FFI (ADR-0010) — an Account adds no concurrency of its own, and a closed Mesmo yields the
+// Mesmo's normal closed error rather than a deadlock or a dangling-isolate call.
 
 import (
 	"encoding/json"
@@ -26,9 +26,9 @@ const (
 	RoleCommitteeHot  SigningRole = 1 << 4
 )
 
-// AccountsApi is the managed-accounts namespace (bridge.Accounts).
+// AccountsApi is the managed-accounts namespace (lib.Accounts).
 type AccountsApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 // AccountPublicInfo is a managed account's public data — never contains the mnemonic or any private key.
@@ -63,7 +63,7 @@ type AccountPublicInfo struct {
 // would pin key material Java-side until process exit. The finalizer is fallback only;
 // reclamation timing is the GC's.
 type Account struct {
-	bridge *Bridge
+	lib *Mesmo
 	handle int64 // 0 after Close — never a valid handle
 }
 
@@ -74,14 +74,14 @@ func (a *AccountsApi) FromMnemonic(mnemonic string, network Network, accountInde
 		return nil, err
 	}
 	var handle int64
-	_, err := a.bridge.invoke(func() int32 {
-		return cclAccountOpenMnemonic(a.bridge.thread, int32(network), mnemonic,
+	_, err := a.lib.invoke(func() int32 {
+		return cclAccountOpenMnemonic(a.lib.thread, int32(network), mnemonic,
 			int32(accountIndex), int32(addressIndex), &handle)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return newAccount(a.bridge, handle), nil
+	return newAccount(a.lib, handle), nil
 }
 
 // Create creates a brand-new account (fresh 24-word mnemonic). No secret is returned here —
@@ -91,25 +91,25 @@ func (a *AccountsApi) Create(network Network) (*Account, error) {
 		return nil, err
 	}
 	var handle int64
-	_, err := a.bridge.invoke(func() int32 {
-		return cclAccountCreateHandle(a.bridge.thread, int32(network), &handle)
+	_, err := a.lib.invoke(func() int32 {
+		return cclAccountCreateHandle(a.lib.thread, int32(network), &handle)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return newAccount(a.bridge, handle), nil
+	return newAccount(a.lib, handle), nil
 }
 
 // newAccount wires the best-effort GC fallback: a dropped Account (no Close) is closed when
-// the collector reaps it. The finalizer runs on a GC goroutine, so it hops onto the bridge's
+// the collector reaps it. The finalizer runs on a GC goroutine, so it hops onto the lib's
 // serialized executor via run() — and reads no result (mesmo_account_close produces none; the
-// result slot belongs to whichever call is in flight). A closed bridge makes run() return an
+// result slot belongs to whichever call is in flight). A closed lib makes run() return an
 // error, which is deliberately ignored: the isolate died and took the registry with it.
-func newAccount(bridge *Bridge, handle int64) *Account {
-	acct := &Account{bridge: bridge, handle: handle}
+func newAccount(lib *Mesmo, handle int64) *Account {
+	acct := &Account{lib: lib, handle: handle}
 	runtime.SetFinalizer(acct, func(a *Account) {
 		if h := a.handle; h != 0 {
-			_ = a.bridge.run(func() { cclAccountCloseHandle(a.bridge.thread, h) })
+			_ = a.lib.run(func() { cclAccountCloseHandle(a.lib.thread, h) })
 		}
 	})
 	return acct
@@ -117,8 +117,8 @@ func newAccount(bridge *Bridge, handle int64) *Account {
 
 // Info returns the account's public data. Never contains secrets.
 func (a *Account) Info() (*AccountPublicInfo, error) {
-	result, err := a.bridge.invoke(func() int32 {
-		return cclAccountGetInfo(a.bridge.thread, a.handle)
+	result, err := a.lib.invoke(func() int32 {
+		return cclAccountGetInfo(a.lib.thread, a.handle)
 	})
 	if err != nil {
 		return nil, err
@@ -135,8 +135,8 @@ func (a *Account) Info() (*AccountPublicInfo, error) {
 // roles is a SigningRole combination, e.g. RolePayment|RoleStake for a stake-certificate
 // transaction. An empty mask is rejected — signing never silently uses every key.
 func (a *Account) SignTx(txCborHex string, roles SigningRole) (string, error) {
-	return a.bridge.invoke(func() int32 {
-		return cclAccountSignTxHandle(a.bridge.thread, a.handle, txCborHex, int32(roles))
+	return a.lib.invoke(func() int32 {
+		return cclAccountSignTxHandle(a.lib.thread, a.handle, txCborHex, int32(roles))
 	})
 }
 
@@ -151,14 +151,14 @@ func (a *Account) ExportRecoveryPhrase() (string, error) {
 	// failed delivery is retryable instead of orphaning the only copy of the phrase.
 	var phrase string
 	var callErr error
-	if rerr := a.bridge.run(func() {
+	if rerr := a.lib.run(func() {
 		var out *byte
-		if rc := cclAccountExportRecoveryPhrase(a.bridge.thread, a.handle, &out); rc != Success {
-			callErr = &MesmoError{Code: int(rc), Message: a.bridge.getError()}
+		if rc := cclAccountExportRecoveryPhrase(a.lib.thread, a.handle, &out); rc != Success {
+			callErr = &MesmoError{Code: int(rc), Message: a.lib.getError()}
 			return
 		}
 		phrase = goString(out)
-		cclFreeString(a.bridge.thread, out)
+		cclFreeString(a.lib.thread, out)
 	}); rerr != nil {
 		return "", rerr
 	}
@@ -173,8 +173,8 @@ func (a *Account) Close() error {
 	if handle == 0 {
 		return nil
 	}
-	_, err := a.bridge.invoke(func() int32 {
-		return cclAccountCloseHandle(a.bridge.thread, handle)
+	_, err := a.lib.invoke(func() int32 {
+		return cclAccountCloseHandle(a.lib.thread, handle)
 	})
 	return err
 }

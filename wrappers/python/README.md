@@ -36,7 +36,7 @@ else to set. Build one locally (needs `pip install build`):
 ./gradlew :wrappers:python:wheel     # -> wrappers/python/dist/mesmo-*.whl
 ```
 
-At load time the bindings look for the library in this order: an explicit `MesmoLib(lib_path=...)`,
+At load time the bindings look for the library in this order: an explicit `Mesmo(lib_path=...)`,
 the `MESMO_LIB_PATH` env var, then the bundled `mesmo/_libs/` copy.
 
 **Development — against a locally built library** (no wheel): point `MESMO_LIB_PATH` at a directory
@@ -77,9 +77,9 @@ The [`examples/`](examples/) directory contains:
 ## Quick start
 
 ```python
-from mesmo import MesmoLib, Network
+from mesmo import Mesmo, Network
 
-lib = MesmoLib()                      # loads libmesmo, starts a GraalVM isolate
+lib = Mesmo()                      # loads libmesmo, starts a GraalVM isolate
 try:
     with lib.accounts.create(Network.TESTNET) as account:  # managed handle (ADR-0016)
         print(account.info["base_address"])       # addr_test1...
@@ -90,7 +90,7 @@ finally:
 
 ## API namespaces
 
-A `MesmoLib` instance exposes these namespaces (all offline operations):
+A `Mesmo` instance exposes these namespaces (all offline operations):
 
 | Namespace | Examples |
 |-----------|----------|
@@ -140,20 +140,20 @@ See [`examples/03_build_and_sign_tx.py`](examples/03_build_and_sign_tx.py).
 those for you over HTTP (stdlib `urllib`), so the native library stays offline and provider-free:
 
 ```python
-from mesmo import MesmoLib, YaciProvider, BlockfrostProvider
+from mesmo import Mesmo, YaciProvider, BlockfrostProvider
 
-lib = MesmoLib()
+lib = Mesmo()
 provider = BlockfrostProvider(project_id, network="preprod")  # or YaciProvider()
 result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])
 ```
 
 Plug in any backend (Koios, Ogmios, …) by supplying an object with `utxos(address)` and
-`protocol_params()`. UTXO *selection* is handled inside the bridge — a provider only returns all
+`protocol_params()`. UTXO *selection* is handled inside Mesmo — a provider only returns all
 UTXOs at the address.
 
 ## Transaction evaluators (optional)
 
-A Plutus build needs each redeemer's execution units. The bridge computes them **offline** with
+A Plutus build needs each redeemer's execution units. Mesmo computes them **offline** with
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```python

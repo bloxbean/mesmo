@@ -4,8 +4,8 @@ import json
 class Script:
     """Script namespace for CCL operations."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def native_from_json(self, json_str):
         """Parse native script from JSON. Returns JSON string with policy_id, script_hash, cbor_hex."""

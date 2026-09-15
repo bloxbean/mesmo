@@ -4,11 +4,11 @@
 //! one-shot recovery-phrase export) instead of travelling with every operation.
 //!
 //! Ownership model (ADR-0016, as amended): an `Account` is an owned value — not a borrow of the
-//! [`crate::Bridge`] — holding shared, close-aware access to the bridge's isolate state.
-//! It can live in the same struct as its `Bridge`. Validity is enforced at runtime: any call after
-//! the account's `close()` — or after the `Bridge` itself is dropped — fails with a normal
+//! [`crate::Mesmo`] — holding shared, close-aware access to the lib's isolate state.
+//! It can live in the same struct as its `Mesmo`. Validity is enforced at runtime: any call after
+//! the account's `close()` — or after the `Mesmo` itself is dropped — fails with a normal
 //! [`MesmoError`] (`MESMO_ERROR_INVALID_HANDLE`, `-11`), never by touching a dead isolate. Like the
-//! `Bridge`, an `Account` is `!Send`.
+//! `Mesmo`, an `Account` is `!Send`.
 
 use std::cell::Cell;
 use std::ops::BitOr;
@@ -16,7 +16,7 @@ use std::rc::Rc;
 
 use serde_json::Value;
 
-use crate::{check_at, error_codes, ffi, to_cstring, Bridge, BridgeShared, MesmoError, Network, Result};
+use crate::{check_at, error_codes, ffi, to_cstring, Mesmo, MesmoShared, MesmoError, Network, Result};
 
 /// Typed signing roles. Combine with `|`; witnesses are applied in canonical order
 /// (payment, stake, DRep, committee cold, committee hot) regardless of combination order.
@@ -38,9 +38,9 @@ impl BitOr for SigningRole {
     }
 }
 
-/// Managed-accounts namespace, obtained via [`Bridge::accounts`](crate::Bridge::accounts).
+/// Managed-accounts namespace, obtained via [`Mesmo::accounts`](crate::Mesmo::accounts).
 pub struct AccountsApi<'a> {
-    pub(crate) bridge: &'a Bridge,
+    pub(crate) lib: &'a Mesmo,
 }
 
 impl<'a> AccountsApi<'a> {
@@ -55,7 +55,7 @@ impl<'a> AccountsApi<'a> {
     ) -> Result<Account> {
         let mnemonic_cs = to_cstring(mnemonic)?;
         let mut handle: i64 = 0;
-        let thread = self.bridge.shared.thread()?;
+        let thread = self.lib.shared.thread()?;
         let rc = unsafe {
             ffi::mesmo_account_open_mnemonic(
                 thread,
@@ -68,7 +68,7 @@ impl<'a> AccountsApi<'a> {
         };
         check_at(thread, rc)?;
         Ok(Account {
-            shared: Rc::clone(&self.bridge.shared),
+            shared: Rc::clone(&self.lib.shared),
             handle: Cell::new(handle),
         })
     }
@@ -79,11 +79,11 @@ impl<'a> AccountsApi<'a> {
     /// [`Account::export_recovery_phrase`].
     pub fn create(&self, network: Network) -> Result<Account> {
         let mut handle: i64 = 0;
-        let thread = self.bridge.shared.thread()?;
+        let thread = self.lib.shared.thread()?;
         let rc = unsafe { ffi::mesmo_account_create_handle(thread, network.into(), &mut handle) };
         check_at(thread, rc)?;
         Ok(Account {
-            shared: Rc::clone(&self.bridge.shared),
+            shared: Rc::clone(&self.lib.shared),
             handle: Cell::new(handle),
         })
     }
@@ -100,7 +100,7 @@ impl<'a> AccountsApi<'a> {
 /// Dropping the value closes the native handle (best-effort); [`close`](Account::close) is the
 /// explicit, idempotent form. The `Debug` representation never contains secret material.
 pub struct Account {
-    shared: Rc<BridgeShared>,
+    shared: Rc<MesmoShared>,
     // 0 after close — never a valid handle, so the native registry stays the single authority.
     handle: Cell<i64>,
 }

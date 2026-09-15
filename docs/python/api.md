@@ -1,25 +1,25 @@
 # Python API Reference
 
 ```python
-from mesmo import MesmoLib, Network, MesmoError, MesmoClosedError
+from mesmo import Mesmo, Network, MesmoError, MesmoClosedError
 ```
 
-All functionality hangs off a `MesmoLib` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
+All functionality hangs off a `Mesmo` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
 
-## MesmoLib
+## Mesmo
 
 ```python
-MesmoLib(lib_path=None)          # lib_path: directory containing libmesmo, overrides auto-resolution
+Mesmo(lib_path=None)          # lib_path: directory containing libmesmo, overrides auto-resolution
 lib.version() -> str
 lib.close() -> None            # idempotent
-# context manager: with MesmoLib() as lib: ...
+# context manager: with Mesmo() as lib: ...
 ```
 
 Constructing loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are attributes: `lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`, `lib.script`, `lib.quicktx`.
 
 **Lifecycle.** `close()` detaches all attached threads and tears down the isolate; it is idempotent and also runs on `__exit__`/`__del__`. Any call after `close()` raises `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable exception.
 
-**Threading.** One `MesmoLib` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
+**Threading.** One `Mesmo` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
 
 ## Networks
 
@@ -43,7 +43,7 @@ Every method that derives keys or signs requires a `network` argument. Omitting 
 | `OSError` | Native library could not be loaded. |
 | `RuntimeError` | Isolate creation failure or wrapper/native version mismatch. |
 
-Error codes on `MesmoError.code` (also available as `MesmoLib.MESMO_ERROR_*` constants):
+Error codes on `MesmoError.code` (also available as `Mesmo.MESMO_ERROR_*` constants):
 
 | Constant | Code | Meaning |
 |---|---|---|

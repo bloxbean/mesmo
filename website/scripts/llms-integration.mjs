@@ -20,7 +20,7 @@ const SERVED_FILES = ['/llms.txt', '/llms-full.txt', '/ai/starter-pack.md', '/ai
 export default function llmsIntegration() {
   let base = '/';
   return {
-    name: 'ccl-llms-txt',
+    name: 'mesmo-llms-txt',
     hooks: {
       'astro:config:done': ({ config }) => {
         base = config.base ?? '/';
@@ -37,7 +37,7 @@ export default function llmsIntegration() {
       },
 
       'astro:server:setup': async ({ server, logger }) => {
-        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ccl-llms-'));
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mesmo-llms-'));
         const silent = { info: () => {}, error: (m) => logger.error(m) };
         const servedPaths = new Set(
           SERVED_FILES.map((p) => path.posix.join(base, p)),

@@ -31,7 +31,7 @@ func TestAccountCreateTestnet(t *testing.T) {
 func TestAccountFromMnemonicRestoresAllAddresses(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestAccountFromMnemonicDifferentIndices(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
 	infoAt := func(index int) *AccountPublicInfo {
-		acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, index)
+		acct, err := lib.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, index)
 		if err != nil {
 			t.Fatalf("FromMnemonic(0,%d) failed: %v", index, err)
 		}
@@ -76,18 +76,18 @@ func TestAccountFromMnemonicDifferentIndices(t *testing.T) {
 // --- Negative / Error Tests ---
 
 func TestAccountFromInvalidMnemonic(t *testing.T) {
-	_, err := bridge.Accounts.FromMnemonic("invalid words that are not a valid mnemonic phrase at all", Mainnet, 0, 0)
+	_, err := lib.Accounts.FromMnemonic("invalid words that are not a valid mnemonic phrase at all", Mainnet, 0, 0)
 	assertMesmoError(t, "FromMnemonic(invalid)", err)
 }
 
 func TestAccountFromEmptyMnemonic(t *testing.T) {
-	_, err := bridge.Accounts.FromMnemonic("", Mainnet, 0, 0)
+	_, err := lib.Accounts.FromMnemonic("", Mainnet, 0, 0)
 	assertMesmoError(t, "FromMnemonic(empty)", err)
 }
 
 func TestAccountSignTxInvalidCbor(t *testing.T) {
 	created := createTestAccount(t, Testnet)
-	acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(created.Mnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}

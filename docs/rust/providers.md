@@ -36,7 +36,7 @@ impl Default for YaciProvider;  // = new(DEFAULT_URL)
 
 ```rust
 let provider = YaciProvider::default();
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ### BlockfrostProvider
@@ -54,7 +54,7 @@ impl BlockfrostProvider {
 
 ```rust
 let provider = BlockfrostProvider::new(&std::env::var("BF_PROJECT_ID")?, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Evaluators
@@ -81,7 +81,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```rust
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 

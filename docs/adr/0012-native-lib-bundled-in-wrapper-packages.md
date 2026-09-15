@@ -34,7 +34,7 @@ fallback**, not the primary path.
 
 Each wrapper resolves the library in this priority order:
 
-1. an explicit path passed in code (e.g. `MesmoLib(lib_path=...)`);
+1. an explicit path passed in code (e.g. `Mesmo(lib_path=...)`);
 2. the `MESMO_LIB_PATH` environment variable (local development);
 3. the copy **bundled inside the installed package**;
 4. the bare filename, letting the OS loader search its default paths.
@@ -46,7 +46,7 @@ Per-wrapper mechanism (each is a separate delivery, but all follow the rule abov
   binary is platform-specific. The binary is never committed — it is staged at wheel-build time
   (`:wrappers:python:wheel`) and CI proves the built wheel installs into a clean venv and loads with no env
   vars.
-- **JavaScript — npm (implemented).** `MesmoBridge` resolves the lib with the same priority order and loads a
+- **JavaScript — npm (implemented).** `Mesmo` resolves the lib with the same priority order and loads a
   copy bundled under the package's `libs/`. `:wrappers:js:pack` stages the lib and runs `npm pack`; CI proves
   the tarball installs into a clean project and loads with no env vars. The binary is gitignored (staged at
   pack time). For *publishing*, a single npm package can't be per-platform, so the release step will ship
@@ -68,7 +68,7 @@ matrix, `auditwheel repair` to relabel the Linux wheel `manylinux_2_28_x86_64` (
 
 ## Consequences
 
-- `pip install ccl` (and eventually the npm/crates equivalents) works with **no `MESMO_LIB_PATH`**, on a fresh
+- `pip install mesmo` (and eventually the npm/crates equivalents) works with **no `MESMO_LIB_PATH`**, on a fresh
   machine — the adoption blocker is removed, one wrapper at a time.
 - Packages get **large** (tens of MB) and are **per-platform**; releasing means a build matrix producing one
   artifact per OS/arch, and users on an unsupported platform fall back to source/`MESMO_LIB_PATH`.

@@ -10,21 +10,21 @@ from pathlib import Path
 FIXTURES = Path(__file__).parent / "../../../test-fixtures/plutus-mint-scalus"
 
 
-def test_plutus_mint_falls_back_to_scalus(ccl):
+def test_plutus_mint_falls_back_to_scalus(mesmo):
     yaml = (FIXTURES / "mint.yaml").read_text()
     utxos = json.loads((FIXTURES / "utxos.json").read_text())
     # Params include cost models (Scalus needs them to run the UPLC machine).
     params = json.loads((FIXTURES / "protocol-params.json").read_text())
 
     # exec_units omitted → Scalus computes them offline by evaluating the validator in libmesmo.
-    result = ccl.quicktx.build(yaml, utxos, params)
+    result = mesmo.quicktx.build(yaml, utxos, params)
 
     assert result.get("tx_cbor"), "expected a built transaction"
     assert result.get("tx_hash")
     assert int(result["fee"]) > 0
 
 
-def test_build_with_uses_supplied_evaluator(ccl):
+def test_build_with_uses_supplied_evaluator(mesmo):
     """A wrapper-side Evaluator (here a fake) overrides the Scalus default via the two-pass flow."""
     yaml = (FIXTURES / "mint.yaml").read_text()
     utxos = json.loads((FIXTURES / "utxos.json").read_text())
@@ -47,10 +47,10 @@ def test_build_with_uses_supplied_evaluator(ccl):
             # Larger than Scalus's units (but within budget) so the resulting fee visibly differs.
             return [{"mem": 500000, "steps": 250000000}]
 
-    scalus_fee = int(ccl.quicktx.build(yaml, utxos, params)["fee"])
+    scalus_fee = int(mesmo.quicktx.build(yaml, utxos, params)["fee"])
 
     evaluator = _FakeEvaluator()
-    result = ccl.quicktx.build_with(yaml, _FakeProvider(), [sender], evaluator=evaluator)
+    result = mesmo.quicktx.build_with(yaml, _FakeProvider(), [sender], evaluator=evaluator)
 
     assert evaluator.draft_cbor, "evaluator should be consulted with the draft transaction"
     assert result["tx_cbor"]

@@ -17,7 +17,7 @@ The native library is **fetched automatically at build time** — no separate do
 ## Installing
 
 ```bash
-cargo add cardano-client-lib          # published as cardano-client-lib, imported as `ccl`
+cargo add cardano-client-lib          # published as cardano-client-lib, imported as `mesmo`
 ```
 
 `build.rs` sources `libmesmo.*` for your target — in priority order: `MESMO_LIB_PATH` (a dir), the
@@ -57,23 +57,23 @@ The [`examples/`](examples/) directory contains:
 ## Quick start
 
 ```rust
-use mesmo::{Bridge, Network};
+use mesmo::{Mesmo, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bridge = Bridge::new()?; // loads libmesmo, starts a GraalVM isolate
+    let lib = Mesmo::new()?; // loads libmesmo, starts a GraalVM isolate
 
     // Managed account handle (ADR-0016): info is public data only.
-    let account = bridge.accounts().create(Network::Testnet)?;
+    let account = lib.accounts().create(Network::Testnet)?;
     println!("{}", account.info()?["base_address"]); // addr_test1...
     println!("{}", account.export_recovery_phrase()?); // 24-word phrase — one-shot
     Ok(())
-} // Bridge's Drop tears down the isolate
+} // Mesmo's Drop tears down the isolate
 ```
 
 ## API surface
 
-A `Bridge` exposes namespaced accessors (all offline operations):
-`bridge.accounts()`, `.address()`, `.crypto()`, `.tx()`, `.plutus()`, `.script()`,
+A `Mesmo` exposes namespaced accessors (all offline operations):
+`lib.accounts()`, `.address()`, `.crypto()`, `.tx()`, `.plutus()`, `.script()`,
 `.quicktx()`.
 
 Most methods return `Result<String>` where the `String` is JSON — parse it with
@@ -84,7 +84,7 @@ Transactions are defined as a [TxPlan](https://github.com/bloxbean/cardano-clien
 (as `serde_json::Value`):
 
 ```rust
-let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params)?; // -> TxResult { tx_cbor, tx_hash, fee }
+let result = lib.quicktx().build(&yaml, &utxos, &protocol_params)?; // -> TxResult { tx_cbor, tx_hash, fee }
 ```
 
 Methods that need a network take the `Network` enum — `Network::Mainnet` or `Network::Testnet` — so a transposed argument is a compile error rather than a
@@ -93,7 +93,7 @@ key silently derived on the wrong network. Errors are `mesmo::MesmoError`.
 > **`Network` is not Cardano's on-chain network id.** Its discriminants are CCL's own enum ordinals
 > (`Mainnet = 0`, `Testnet = 1`). Cardano's on-chain network id is the
 > other way round — **mainnet = 1, testnet = 0** — so an account created with `Network::Mainnet` has
-> an address whose `network_id` is `1`. The `network_id` field returned by `bridge.address().info()`
+> an address whose `network_id` is `1`. The `network_id` field returned by `lib.address().info()`
 > is that genuine on-chain value, not an ordinal from this enum.
 
 ## Chain-data providers (optional)
@@ -103,7 +103,7 @@ optional HTTP helpers (via `ureq`) that fetch those for you, keeping the native 
 provider-free:
 
 ```toml
-# Published as `cardano-client-lib`; imported as `ccl` (see below).
+# Published as `cardano-client-lib`; imported as `mesmo` (see below).
 cardano-client-lib = { version = "0.1", features = ["providers"] }
 ```
 
@@ -111,20 +111,20 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 use mesmo::providers::BlockfrostProvider; // or YaciProvider
 
 let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `ChainDataProvider` trait (`utxos`,
-`protocol_params`). UTXO *selection* is handled inside the bridge — a provider only returns all
+`protocol_params`). UTXO *selection* is handled inside Mesmo — a provider only returns all
 UTXOs at the address.
 
 ## Transaction evaluators (optional)
 
-A Plutus build needs each redeemer's execution units. The bridge computes them **offline** with
+A Plutus build needs each redeemer's execution units. Mesmo computes them **offline** with
 Scalus when you supply none — so a script build just works, no evaluation step (pass `None`):
 
 ```rust
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?; // Scalus computes the units
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?; // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -136,7 +136,7 @@ lives here in the wrapper (also behind the `providers` feature):
 use mesmo::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new("proj_id", "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, Some(&evaluator))?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender], 0, Some(&evaluator))?;
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `TransactionEvaluator` trait (`evaluate`). To

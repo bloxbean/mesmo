@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from mesmo import SigningRole
-from mesmo._ffi import MesmoLib, MesmoError
+from mesmo._ffi import Mesmo, MesmoError
 from mesmo.network import Network
 from tests.devkit_helper import DevKitHelper
 
@@ -162,7 +162,7 @@ def devkit():
 
 @pytest.fixture(scope="module")
 def mesmo_lib():
-    lib = MesmoLib()
+    lib = Mesmo()
     yield lib
     lib.close()
 
@@ -517,7 +517,7 @@ def test_aiken_mint_accepts(mesmo_lib, devkit):
 def test_aiken_mint_rejects(mesmo_lib, devkit):
     """Negative validation: redeemer 0 makes the same validator evaluate to false, so phase-2
     validation fails and the node must reject the tx. Exec units are supplied manually — the
-    bridge's StaticTransactionEvaluator stamps them without running the script, which is exactly
+    lib's StaticTransactionEvaluator stamps them without running the script, which is exactly
     what lets a validation-failing tx reach the node.
     """
     pp = _reset_and_fund(devkit)

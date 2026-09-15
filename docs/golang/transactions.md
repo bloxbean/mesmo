@@ -7,9 +7,9 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```go
-bridge, err := mesmo.New()
+lib, err := mesmo.New()
 if err != nil { log.Fatal(err) }
-defer bridge.Close()
+defer lib.Close()
 
 provider := mesmo.NewYaciProvider("")   // or a BlockfrostProvider, or your own
 
@@ -28,11 +28,11 @@ transaction:
 `, sender, receiver)
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
-// (or bridge.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
+// (or lib.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
+acct, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
 signed, err := acct.SignTx(result.TxCbor, mesmo.RolePayment)
 
@@ -72,7 +72,7 @@ transaction:
           stake_address: %s
 `, sender, account.StakeAddress)
 
-reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
+reg, err := lib.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
 signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 // submit signedReg; wait for inclusion before the next step
 
@@ -87,7 +87,7 @@ transaction:
           pool_id: pool1...
 `, sender, account.StakeAddress)
 
-deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
+deleg, err := lib.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
 signedDeleg, err := acct.SignTx(deleg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
@@ -96,7 +96,7 @@ signedDeleg, err := acct.SignTx(deleg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 The DRep credential comes from the governance API:
 
 ```go
-drep, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "drep")
+drep, err := lib.Crypto.DeriveKey(mnemonic, 0, 0, "drep")
 
 drepYaml := fmt.Sprintf(`
 version: 1.0
@@ -111,7 +111,7 @@ transaction:
           anchor_hash: %s
 `, sender, drep.PublicKeyHash, anchorHash)
 
-reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
+reg, err := lib.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
 signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleDRep)
 ```
 
@@ -135,7 +135,7 @@ transaction:
           script_type: 0
 `, sender, receiver)
 
-mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
+mint, err := lib.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
 signedMint, err := acct.SignTx(mint.TxCbor, mesmo.RolePayment)
 ```
 
@@ -146,20 +146,20 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
+result, err := lib.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
 ```
 
 To cost against a real node instead, pass an evaluator — `BuildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```go
 evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
+result, err := lib.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
 ```
 
 Or supply units yourself with the offline `Build`:
 
 ```go
-result, err := bridge.QuickTx.Build(plutusMintYaml, utxos, params, 0,
+result, err := lib.QuickTx.Build(plutusMintYaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```
 

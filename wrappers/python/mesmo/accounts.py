@@ -33,8 +33,8 @@ class Account:
     only; do not rely on it. The ``repr`` never contains secret material.
     """
 
-    def __init__(self, bridge, handle):
-        self._b = bridge
+    def __init__(self, lib, handle):
+        self._b = lib
         self._handle = handle
         self._info = None
 
@@ -120,8 +120,8 @@ class Account:
 class Accounts:
     """Managed-accounts namespace (``lib.accounts``)."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def from_mnemonic(self, mnemonic, network, account_index=0, address_index=0):
         """Open an account from a mnemonic at fixed derivation indices; returns :class:`Account`.

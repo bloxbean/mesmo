@@ -11,22 +11,22 @@ import (
 // A known valid transaction CBOR hex (built from Java tests)
 const sampleTxCbor = "84a300d901028182582073198b7ad003862b9798106b88fbccfca464b1a38afb34958275c4a7d7d8d002010181825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc1a001e8480021a00029810a0f5f6"
 
-var bridge *Bridge
+var lib *Mesmo
 
 func TestMain(m *testing.M) {
 	var err error
-	bridge, err = New()
+	lib, err = New()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create bridge: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create lib: %v\n", err)
 		os.Exit(1)
 	}
 	code := m.Run()
-	bridge.Close()
+	lib.Close()
 	os.Exit(code)
 }
 
 func TestVersion(t *testing.T) {
-	version, err := bridge.Version()
+	version, err := lib.Version()
 	if err != nil {
 		t.Fatalf("Version() failed: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestAccountCreate(t *testing.T) {
 func TestAccountFromMnemonic(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	restored, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
+	restored, err := lib.Accounts.FromMnemonic(created.Mnemonic, Mainnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestAccountFromMnemonic(t *testing.T) {
 func TestAccountGetKeys(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	key, err := bridge.Crypto.DeriveKey(created.Mnemonic, 0, 0, "payment")
+	key, err := lib.Crypto.DeriveKey(created.Mnemonic, 0, 0, "payment")
 	if err != nil {
 		t.Fatalf("Crypto.DeriveKey() failed: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestAccountDRepID(t *testing.T) {
 func TestAccountSignTx(t *testing.T) {
 	created := createTestAccount(t, Testnet)
 
-	acct, err := bridge.Accounts.FromMnemonic(created.Mnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(created.Mnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestAccountSignTx(t *testing.T) {
 func TestAddressToFromBytes(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	hexBytes, err := bridge.Address.ToBytes(created.BaseAddress)
+	hexBytes, err := lib.Address.ToBytes(created.BaseAddress)
 	if err != nil {
 		t.Fatalf("Address.ToBytes() failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestAddressToFromBytes(t *testing.T) {
 		t.Error("hex bytes should not be empty")
 	}
 
-	restored, err := bridge.Address.FromBytes(hexBytes)
+	restored, err := lib.Address.FromBytes(hexBytes)
 	if err != nil {
 		t.Fatalf("Address.FromBytes() failed: %v", err)
 	}
@@ -129,11 +129,11 @@ func TestAddressToFromBytes(t *testing.T) {
 func TestAddressValidate(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	if !bridge.Address.Validate(created.BaseAddress) {
+	if !lib.Address.Validate(created.BaseAddress) {
 		t.Error("valid address should pass validation")
 	}
 
-	if bridge.Address.Validate("invalid_address") {
+	if lib.Address.Validate("invalid_address") {
 		t.Error("invalid address should fail validation")
 	}
 }
@@ -141,7 +141,7 @@ func TestAddressValidate(t *testing.T) {
 func TestAddressInfo(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	info, err := bridge.Address.Info(created.BaseAddress)
+	info, err := lib.Address.Info(created.BaseAddress)
 	if err != nil {
 		t.Fatalf("Address.Info() failed: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAddressInfo(t *testing.T) {
 }
 
 func TestCryptoBlake2b256(t *testing.T) {
-	hash, err := bridge.Crypto.Blake2b256("48656c6c6f")
+	hash, err := lib.Crypto.Blake2b256("48656c6c6f")
 	if err != nil {
 		t.Fatalf("Crypto.Blake2b256() failed: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestCryptoBlake2b256(t *testing.T) {
 }
 
 func TestCryptoBlake2b224(t *testing.T) {
-	hash, err := bridge.Crypto.Blake2b224("48656c6c6f")
+	hash, err := lib.Crypto.Blake2b224("48656c6c6f")
 	if err != nil {
 		t.Fatalf("Crypto.Blake2b224() failed: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestCryptoBlake2b224(t *testing.T) {
 }
 
 func TestCryptoMnemonic(t *testing.T) {
-	mnemonic, err := bridge.Crypto.GenerateMnemonic(24)
+	mnemonic, err := lib.Crypto.GenerateMnemonic(24)
 	if err != nil {
 		t.Fatalf("Crypto.GenerateMnemonic() failed: %v", err)
 	}
@@ -184,11 +184,11 @@ func TestCryptoMnemonic(t *testing.T) {
 		t.Errorf("expected 24 words, got %d", len(words))
 	}
 
-	if !bridge.Crypto.ValidateMnemonic(mnemonic) {
+	if !lib.Crypto.ValidateMnemonic(mnemonic) {
 		t.Error("generated mnemonic should be valid")
 	}
 
-	if bridge.Crypto.ValidateMnemonic("invalid mnemonic") {
+	if lib.Crypto.ValidateMnemonic("invalid mnemonic") {
 		t.Error("invalid mnemonic should fail validation")
 	}
 }
@@ -196,7 +196,7 @@ func TestCryptoMnemonic(t *testing.T) {
 func TestCryptoSign(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	key, err := bridge.Crypto.DeriveKey(created.Mnemonic, 0, 0, "payment")
+	key, err := lib.Crypto.DeriveKey(created.Mnemonic, 0, 0, "payment")
 	if err != nil {
 		t.Fatalf("Crypto.DeriveKey() failed: %v", err)
 	}
@@ -204,28 +204,28 @@ func TestCryptoSign(t *testing.T) {
 	// Round-trip regression pin: the whole extended key must sign AND verify against
 	// the key's own public key; half of it (a clamped scalar, not a seed) must not.
 	messageHex := "68656c6c6f"
-	sig, err := bridge.Crypto.Sign(messageHex, key.PrivateKey)
+	sig, err := lib.Crypto.Sign(messageHex, key.PrivateKey)
 	if err != nil {
 		t.Fatalf("Crypto.Sign() failed: %v", err)
 	}
 	if len(sig) != 128 {
 		t.Errorf("expected 128 hex chars signature, got %d", len(sig))
 	}
-	if !bridge.Crypto.Verify(sig, messageHex, key.PublicKey) {
+	if !lib.Crypto.Verify(sig, messageHex, key.PublicKey) {
 		t.Error("extended-key signature must verify against the derived public key")
 	}
 
-	wrong, err := bridge.Crypto.Sign(messageHex, key.PrivateKey[:64])
+	wrong, err := lib.Crypto.Sign(messageHex, key.PrivateKey[:64])
 	if err != nil {
 		t.Fatalf("Crypto.Sign(seed form) failed: %v", err)
 	}
-	if bridge.Crypto.Verify(wrong, messageHex, key.PublicKey) {
+	if lib.Crypto.Verify(wrong, messageHex, key.PublicKey) {
 		t.Error("half an extended key treated as a seed signs under a different keypair — must not verify")
 	}
 }
 
 func TestTxHash(t *testing.T) {
-	hash, err := bridge.Tx.Hash(sampleTxCbor)
+	hash, err := lib.Tx.Hash(sampleTxCbor)
 	if err != nil {
 		t.Fatalf("Tx.Hash() failed: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestTxHash(t *testing.T) {
 }
 
 func TestTxToJson(t *testing.T) {
-	jsonStr, err := bridge.Tx.ToJson(sampleTxCbor)
+	jsonStr, err := lib.Tx.ToJson(sampleTxCbor)
 	if err != nil {
 		t.Fatalf("Tx.ToJson() failed: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestTxToJson(t *testing.T) {
 }
 
 func TestTxDeserialize(t *testing.T) {
-	jsonStr, err := bridge.Tx.Deserialize(sampleTxCbor)
+	jsonStr, err := lib.Tx.Deserialize(sampleTxCbor)
 	if err != nil {
 		t.Fatalf("Tx.Deserialize() failed: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestTxDeserialize(t *testing.T) {
 }
 
 func TestPlutusDataHash(t *testing.T) {
-	hash, err := bridge.Plutus.DataHash("182a")
+	hash, err := lib.Plutus.DataHash("182a")
 	if err != nil {
 		t.Fatalf("Plutus.DataHash() failed: %v", err)
 	}
@@ -283,13 +283,13 @@ func TestPlutusDataHash(t *testing.T) {
 func TestScriptNativeFromJson(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	addrInfo, err := bridge.Address.Info(created.BaseAddress)
+	addrInfo, err := lib.Address.Info(created.BaseAddress)
 	if err != nil {
 		t.Fatalf("Address.Info() failed: %v", err)
 	}
 
 	scriptJSON := fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, addrInfo.PaymentCredentialHash)
-	result, err := bridge.Script.NativeFromJson(scriptJSON)
+	result, err := lib.Script.NativeFromJson(scriptJSON)
 	if err != nil {
 		t.Fatalf("Script.NativeFromJson() failed: %v", err)
 	}
@@ -312,13 +312,13 @@ func TestScriptNativeFromJson(t *testing.T) {
 func TestScriptHash(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	addrInfo, err := bridge.Address.Info(created.BaseAddress)
+	addrInfo, err := lib.Address.Info(created.BaseAddress)
 	if err != nil {
 		t.Fatalf("Address.Info() failed: %v", err)
 	}
 
 	scriptJSON := fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, addrInfo.PaymentCredentialHash)
-	result, err := bridge.Script.NativeFromJson(scriptJSON)
+	result, err := lib.Script.NativeFromJson(scriptJSON)
 	if err != nil {
 		t.Fatalf("Script.NativeFromJson() failed: %v", err)
 	}
@@ -327,7 +327,7 @@ func TestScriptHash(t *testing.T) {
 	json.Unmarshal([]byte(result), &parsed)
 	cborHex := parsed["cbor_hex"].(string)
 
-	hash, err := bridge.Script.Hash(cborHex, 0)
+	hash, err := lib.Script.Hash(cborHex, 0)
 	if err != nil {
 		t.Fatalf("Script.Hash() failed: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestScriptHash(t *testing.T) {
 func TestGovDrepKey(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	key, err := bridge.Crypto.DeriveKey(created.Mnemonic, 0, 0, "drep")
+	key, err := lib.Crypto.DeriveKey(created.Mnemonic, 0, 0, "drep")
 	if err != nil {
 		t.Fatalf("Crypto.DeriveKey(drep) failed: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestGovDrepKey(t *testing.T) {
 func TestGovCommitteeColdKey(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	key, err := bridge.Crypto.DeriveKey(created.Mnemonic, 0, 0, "committee_cold")
+	key, err := lib.Crypto.DeriveKey(created.Mnemonic, 0, 0, "committee_cold")
 	if err != nil {
 		t.Fatalf("Crypto.DeriveKey(committee_cold) failed: %v", err)
 	}
@@ -369,7 +369,7 @@ func TestGovCommitteeColdKey(t *testing.T) {
 func TestGovCommitteeHotKey(t *testing.T) {
 	created := createTestAccount(t, Mainnet)
 
-	key, err := bridge.Crypto.DeriveKey(created.Mnemonic, 0, 0, "committee_hot")
+	key, err := lib.Crypto.DeriveKey(created.Mnemonic, 0, 0, "committee_hot")
 	if err != nil {
 		t.Fatalf("Crypto.DeriveKey(committee_hot) failed: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestWalletCreate(t *testing.T) {
 func TestWalletFromMnemonic(t *testing.T) {
 	wallet := createTestAccount(t, Mainnet)
 
-	restored, err := bridge.Accounts.FromMnemonic(wallet.Mnemonic, Mainnet, 0, 0)
+	restored, err := lib.Accounts.FromMnemonic(wallet.Mnemonic, Mainnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic() failed: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestWalletGetAddress(t *testing.T) {
 
 	// Address enumeration is one managed handle per CIP-1852 payment leaf.
 	addrAt := func(index int) string {
-		acct, err := bridge.Accounts.FromMnemonic(wallet.Mnemonic, Mainnet, 0, index)
+		acct, err := lib.Accounts.FromMnemonic(wallet.Mnemonic, Mainnet, 0, index)
 		if err != nil {
 			t.Fatalf("Accounts.FromMnemonic(index %d) failed: %v", index, err)
 		}
@@ -539,7 +539,7 @@ func TestQuickTxSimplePayment(t *testing.T) {
 	receiver := createTestAccount(t, Testnet)
 
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "5000000")
-	result, err := bridge.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
+	result, err := lib.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
 	if err != nil {
 		t.Fatalf("Build() failed: %v", err)
 	}
@@ -569,7 +569,7 @@ transaction:
               quantity: "3000000"
 `, sender.BaseAddress, r1.BaseAddress, r2.BaseAddress)
 
-	result, err := bridge.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
+	result, err := lib.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
 	if err != nil {
 		t.Fatalf("Build() failed: %v", err)
 	}
@@ -596,7 +596,7 @@ transaction:
               quantity: ${amount}
 `, receiver.BaseAddress, sender.BaseAddress)
 
-	result, err := bridge.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
+	result, err := lib.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 100_000_000), testProtocolParams(), 0)
 	if err != nil {
 		t.Fatalf("Build() failed: %v", err)
 	}
@@ -608,7 +608,7 @@ func TestQuickTxInsufficientFunds(t *testing.T) {
 	receiver := createTestAccount(t, Testnet)
 
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "200000000")
-	_, err := bridge.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 1_000_000), testProtocolParams(), 0)
+	_, err := lib.QuickTx.Build(yaml, makeUtxos(sender.BaseAddress, 1_000_000), testProtocolParams(), 0)
 	if err == nil {
 		t.Fatal("expected insufficient funds error")
 	}
@@ -628,7 +628,7 @@ type testAccount struct {
 
 func createTestAccount(t *testing.T, network Network) testAccount {
 	t.Helper()
-	acct, err := bridge.Accounts.Create(network)
+	acct, err := lib.Accounts.Create(network)
 	if err != nil {
 		t.Fatalf("Accounts.Create() failed: %v", err)
 	}
@@ -649,14 +649,14 @@ func createTestAccount(t *testing.T, network Network) testAccount {
 func TestDeriveKeyCip105Bech32Encodings(t *testing.T) {
 	// Governance registration (cardano-cli / GovTool) takes verification keys in CIP-105
 	// bech32 form; the deleted gov API returned them and derive_key must too.
-	mnemonic, err := bridge.Crypto.GenerateMnemonic(24)
+	mnemonic, err := lib.Crypto.GenerateMnemonic(24)
 	if err != nil {
 		t.Fatalf("GenerateMnemonic: %v", err)
 	}
 	for role, prefix := range map[string]string{
 		"drep": "drep", "committee_cold": "cc_cold", "committee_hot": "cc_hot",
 	} {
-		key, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, role)
+		key, err := lib.Crypto.DeriveKey(mnemonic, 0, 0, role)
 		if err != nil {
 			t.Fatalf("DeriveKey(%s): %v", role, err)
 		}
@@ -667,7 +667,7 @@ func TestDeriveKeyCip105Bech32Encodings(t *testing.T) {
 			t.Errorf("%s: expected %s_vkh1 prefix, got %q", role, prefix, key.Bech32VerificationKeyHash)
 		}
 	}
-	payment, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+	payment, err := lib.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
 	if err != nil {
 		t.Fatalf("DeriveKey(payment): %v", err)
 	}

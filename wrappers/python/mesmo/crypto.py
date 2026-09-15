@@ -3,8 +3,8 @@ import json
 class Crypto:
     """Crypto namespace for CCL operations."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def blake2b_256(self, data_hex):
         """Compute Blake2b-256 hash. Returns hex string."""
@@ -24,8 +24,8 @@ class Crypto:
     def validate_mnemonic(self, mnemonic):
         """Validate a mnemonic phrase. Returns True if valid."""
         rc = self._b._lib.mesmo_crypto_validate_mnemonic(self._b._thread, self._b._encode(mnemonic))
-        from mesmo._ffi import MesmoLib
-        return rc == MesmoLib.MESMO_SUCCESS
+        from mesmo._ffi import Mesmo
+        return rc == Mesmo.MESMO_SUCCESS
 
     def sign(self, message_hex, sk_hex):
         """Sign message with a secret key; returns signature hex.
@@ -42,8 +42,8 @@ class Crypto:
         rc = self._b._lib.mesmo_crypto_verify(
             self._b._thread, self._b._encode(signature_hex),
             self._b._encode(message_hex), self._b._encode(pk_hex))
-        from mesmo._ffi import MesmoLib
-        return rc == MesmoLib.MESMO_SUCCESS
+        from mesmo._ffi import Mesmo
+        return rc == Mesmo.MESMO_SUCCESS
 
     def derive_key(self, mnemonic, account_index=0, address_index=0, role="payment"):
         """Stateless CIP-1852 key derivation — the explicit "raw key material" utility.

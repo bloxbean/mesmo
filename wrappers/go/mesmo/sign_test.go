@@ -24,7 +24,7 @@ func TestSignTxWithStakeKey(t *testing.T) {
 		"amount":       []map[string]interface{}{{"unit": "lovelace", "quantity": "2000000000"}},
 	}}
 
-	built, err := bridge.QuickTx.Build(string(yamlBytes), utxos, testProtocolParams(), 1)
+	built, err := lib.QuickTx.Build(string(yamlBytes), utxos, testProtocolParams(), 1)
 	if err != nil {
 		t.Fatalf("build stake registration: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestSignTxWithStakeKey(t *testing.T) {
 
 // An unknown role bit is rejected by the typed mask.
 func TestSignTxRejectsUnknownRole(t *testing.T) {
-	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic: %v", err)
 	}
@@ -72,7 +72,7 @@ func rolesFromKeys(t *testing.T, keys []string) SigningRole {
 // intentSignAt signs with the fixture mnemonic through a managed handle at the given address index.
 func intentSignAt(t *testing.T, addressIndex int, txCbor string, keys ...string) string {
 	t.Helper()
-	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, addressIndex)
+	acct, err := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, addressIndex)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic: %v", err)
 	}

@@ -3,7 +3,7 @@
 Both behaviours these tests pin down used to end the *process*, not the test — GraalVM aborts, which
 Python cannot catch — so each test here is one that could not previously fail politely.
 
-Each test builds its own MesmoLib rather than using the shared `ccl` fixture: they close it, and one
+Each test builds its own Mesmo rather than using the shared `mesmo` fixture: they close it, and one
 attaches extra threads to its isolate.
 """
 
@@ -14,18 +14,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from mesmo import MesmoClosedError, MesmoLib, Network
+from mesmo import MesmoClosedError, Mesmo, Network
 
 
 def test_shared_instance_is_usable_from_many_threads():
-    """One MesmoLib, many threads.
+    """One Mesmo, many threads.
 
     A GraalVM IsolateThread belongs to the OS thread that created it. This class used to hand the
     creating thread's handle to every caller, so any threaded server (Flask/FastAPI/gunicorn) would
     eventually die with "Must either be at a safepoint or in native mode" — a fatal VM error, not an
-    exception. Each thread now attaches its own handle (see MesmoLib._thread).
+    exception. Each thread now attaches its own handle (see Mesmo._thread).
     """
-    with MesmoLib() as lib:
+    with Mesmo() as lib:
 
         def work(_):
             with lib.accounts.create(Network.TESTNET) as acct:
@@ -47,7 +47,7 @@ def test_calls_after_close_raise_instead_of_aborting():
     the native side and GraalVM killed the process ("Failed to enter the specified IsolateThread
     context"). Uncatchable, and no traceback pointed at the call.
     """
-    lib = MesmoLib()
+    lib = Mesmo()
     lib.close()
 
     with pytest.raises(MesmoClosedError):
@@ -58,7 +58,7 @@ def test_calls_after_close_raise_instead_of_aborting():
 
 
 def test_close_is_idempotent():
-    lib = MesmoLib()
+    lib = Mesmo()
     lib.close()
     lib.close()  # must not tear the isolate down twice
 
@@ -67,10 +67,10 @@ def test_failed_load_raises_cleanly():
     """A library that won't load must surface the OSError, not an AttributeError from __del__.
 
     __init__ raised before the isolate fields existed, so __del__ -> close() tripped over the
-    half-built object and printed "'MesmoLib' object has no attribute '_thread'" on top of the real
+    half-built object and printed "'Mesmo' object has no attribute '_thread'" on top of the real
     error — the first thing a newcomer with a bad MESMO_LIB_PATH ever saw.
 
-    This has to run in a subprocess with the library-path variables stripped. Pointing MesmoLib at a
+    This has to run in a subprocess with the library-path variables stripped. Pointing Mesmo at a
     nonexistent directory is not enough on its own: macOS's dyld searches DYLD_LIBRARY_PATH for the
     *leaf name* of a dylib even when it was given an absolute path, so with DYLD_LIBRARY_PATH set —
     which is exactly what the Gradle test task does — "/nonexistent/libmesmo.dylib" cheerfully
@@ -78,9 +78,9 @@ def test_failed_load_raises_cleanly():
     containing a slash, so the bug was macOS-only and invisible locally.)
     """
     code = (
-        "from mesmo import MesmoLib\n"
+        "from mesmo import Mesmo\n"
         "try:\n"
-        "    MesmoLib(lib_path='/nonexistent-ccl-dir')\n"
+        "    Mesmo(lib_path='/nonexistent-mesmo-dir')\n"
         "except OSError as e:\n"
         "    print('OSERROR:', str(e).splitlines()[0])\n"
         "else:\n"
@@ -108,8 +108,8 @@ def test_use_after_close_does_not_kill_the_interpreter():
     check it exits cleanly.
     """
     code = (
-        "from mesmo import MesmoLib, MesmoClosedError\n"
-        "lib = MesmoLib()\n"
+        "from mesmo import Mesmo, MesmoClosedError\n"
+        "lib = Mesmo()\n"
         "lib.close()\n"
         "try:\n"
         "    lib.accounts.create(1)\n"

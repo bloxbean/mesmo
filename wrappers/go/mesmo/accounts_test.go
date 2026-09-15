@@ -26,7 +26,7 @@ transaction:
           stake_address: %s
 `, info.BaseAddress, info.StakeAddress)
 	utxos := makeUtxos(info.BaseAddress, 2_000_000_000)
-	result, err := bridge.QuickTx.Build(yaml, utxos, testProtocolParams(), 1)
+	result, err := lib.QuickTx.Build(yaml, utxos, testProtocolParams(), 1)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -43,7 +43,7 @@ func handleErrCode(t *testing.T, err error) int {
 }
 
 func TestManagedAccountInfoMatchesPinnedDerivation(t *testing.T) {
-	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestManagedAccountInfoMatchesPinnedDerivation(t *testing.T) {
 }
 
 func TestManagedAccountSignDeterminismAndRoles(t *testing.T) {
-	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestManagedAccountSignDeterminismAndRoles(t *testing.T) {
 }
 
 func TestManagedAccountEmptyMaskRejected(t *testing.T) {
-	acct, _ := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, _ := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	defer acct.Close()
 	info, _ := acct.Info()
 	if _, err := acct.SignTx(unsignedStakeReg(t, info), 0); err == nil {
@@ -118,7 +118,7 @@ func TestManagedAccountEmptyMaskRejected(t *testing.T) {
 }
 
 func TestManagedAccountLifecycle(t *testing.T) {
-	acct, _ := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, _ := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	if err := acct.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestManagedAccountLifecycle(t *testing.T) {
 }
 
 func TestManagedAccountCreateExportOnceRestore(t *testing.T) {
-	acct, err := bridge.Accounts.Create(Testnet)
+	acct, err := lib.Accounts.Create(Testnet)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestManagedAccountCreateExportOnceRestore(t *testing.T) {
 		t.Fatalf("expected 24 words, got %d", len(strings.Fields(phrase)))
 	}
 
-	restored, err := bridge.Accounts.FromMnemonic(phrase, Testnet, 0, 0)
+	restored, err := lib.Accounts.FromMnemonic(phrase, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("restore: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestManagedAccountCreateExportOnceRestore(t *testing.T) {
 }
 
 func TestManagedAccountStringNeverContainsSecrets(t *testing.T) {
-	acct, _ := bridge.Accounts.Create(Testnet)
+	acct, _ := lib.Accounts.Create(Testnet)
 	defer acct.Close()
 	phrase, _ := acct.ExportRecoveryPhrase()
 	s := acct.String()
@@ -182,10 +182,10 @@ func TestManagedAccountStringNeverContainsSecrets(t *testing.T) {
 	}
 }
 
-// Concurrent Account use from many goroutines must serialize safely onto the Bridge's dedicated
+// Concurrent Account use from many goroutines must serialize safely onto the Mesmo's dedicated
 // isolate thread (ADR-0010) — correct results, no data race (run with -race in CI).
 func TestManagedAccountConcurrentUseSerializes(t *testing.T) {
-	acct, _ := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, _ := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	defer acct.Close()
 	want, _ := acct.Info()
 
@@ -216,7 +216,7 @@ func TestManagedAccountConcurrentUseSerializes(t *testing.T) {
 // pin key material Java-side until process exit. Deterministic Close remains the contract —
 // this pins only that leaks are eventually narrowed, per ADR-0016's fallback-protection note.
 func TestDroppedAccountIsReclaimedByGC(t *testing.T) {
-	acct, err := bridge.Accounts.Create(Testnet)
+	acct, err := lib.Accounts.Create(Testnet)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -226,8 +226,8 @@ func TestDroppedAccountIsReclaimedByGC(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		runtime.GC()
-		_, err := bridge.invoke(func() int32 {
-			return cclAccountGetInfo(bridge.thread, handle)
+		_, err := lib.invoke(func() int32 {
+			return cclAccountGetInfo(lib.thread, handle)
 		})
 		var ce *MesmoError
 		if errors.As(err, &ce) && ce.Code == ErrInvalidHandle {

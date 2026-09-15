@@ -44,10 +44,10 @@ but there is no standalone "C wrapper" product.
 
 ## 2. Development — Build, CI & Distribution
 
-- [x] `P0` ~~Fix the Go wrapper's thread affinity on Linux x86_64.~~ **Done** — all FFI calls now run on a single dedicated OS thread that owns the isolate for the `Bridge`'s lifetime (`runtime.LockOSThread` + a channel-served executor goroutine in `wrappers/go/mesmo/mesmo.go`). This keeps the executing OS thread and the GraalVM `IsolateThread` in sync, eliminating the Linux "yellow zone" `StackOverflowError`. Linux Go CI is blocking again and green.
+- [x] `P0` ~~Fix the Go wrapper's thread affinity on Linux x86_64.~~ **Done** — all FFI calls now run on a single dedicated OS thread that owns the isolate for the `Mesmo`'s lifetime (`runtime.LockOSThread` + a channel-served executor goroutine in `wrappers/go/mesmo/mesmo.go`). This keeps the executing OS thread and the GraalVM `IsolateThread` in sync, eliminating the Linux "yellow zone" `StackOverflowError`. Linux Go CI is blocking again and green.
 - [x] `P0` ~~Add a **Windows** native build (`libmesmo.dll`) to CI and the release pipeline.~~ **Done** — CI has a `windows-latest` job that builds `libmesmo.dll` (`:core:nativeCompile`) and runs the JVM tests; `release.yml` produces a `windows-x86_64` artifact (DLL + `libmesmo.lib` import library + headers). Verified green on CI.
 - [x] `P1` ~~Add **Windows wrapper test coverage** to CI (Python/Rust/JS/Go).~~ **Done (PR #35)** — the `windows` CI job now runs all four wrapper test suites (green on `windows-latest`). Fixes: the `test` gradle tasks no longer shell out via `bash` on Windows (invoke `python`/`go`/`cargo` directly; `cmd /c` for JS's `&&` chain — a bare `bash` resolves to WSL there); the Go wrapper loads `libmesmo.dll` via `syscall.LoadLibrary` since `purego.Dlopen` is Unix-only (`ffi_windows.go`); Python `os.add_dll_directory` for DLL sibling deps; Rust `build.rs` stages GraalVM's `libmesmo.lib` import lib as `mesmo.lib`; and the Rust step runs under **PowerShell** so rustc uses the MSVC linker instead of git-bash's coreutils `link.exe`. (The old cgo blocker is gone — Go is purego.) Windows covers the offline/unit paths; DevKit integration stays on the Linux job.
-- [x] `P0` ~~Bundle or auto-fetch the native lib per wrapper so users no longer hand-set `MESMO_LIB_PATH` / `DYLD_LIBRARY_PATH` / `LD_LIBRARY_PATH`~~ **Done (all four wrappers)** — *decided; see [ADR-0012](docs/adr/0012-native-lib-bundled-in-wrapper-packages.md).* **Python + JS + Rust: done.** Python — `MesmoLib` loads a `libmesmo.*` bundled inside the package (`mesmo/_libs/`), falling back to `MESMO_LIB_PATH` for local dev; `./gradlew :wrappers:python:wheel` builds a platform-tagged `py3-none-<platform>` wheel that ships the matching lib, so `pip install` needs no env vars (verified: install in a clean venv → `import mesmo; MesmoLib()` works). JS — `MesmoBridge` uses the same resolution order and loads a lib bundled in the package (`libs/`); `./gradlew :wrappers:js:pack` builds an npm tarball shipping the matching lib, so `npm install` needs no env vars (verified: install the tarball in a clean project → `new MesmoBridge()` loads with no `MESMO_LIB_PATH`). Rust — `build.rs` sources `libmesmo.*` (`MESMO_LIB_PATH` / in-tree / GitHub-release download), stages it into `OUT_DIR`, rewrites the macOS install name to `@rpath`, and sets an `rpath`, so `cargo add cardano-client-lib` + build needs no env vars (crates.io can't host the binary, so it's fetched at build time). All three are guarded in CI (build package → clean install/run → load with env unset). **Go: done too** — a pure-Go loader (purego, no cgo) resolves `libmesmo` at runtime (`MESMO_LIB_PATH` → per-version cache → GitHub-release download), no install hook needed; see [ADR-0014](docs/adr/0014-go-distribution-purego-runtime-resolution.md). So **all four wrappers now load with no env vars.** _Remaining: the CI job to build+publish the per-platform wheels/packages from the release artifacts (PyPI/npm/crates) — tracked in the Publish item below (#15/#16 staged)._
+- [x] `P0` ~~Bundle or auto-fetch the native lib per wrapper so users no longer hand-set `MESMO_LIB_PATH` / `DYLD_LIBRARY_PATH` / `LD_LIBRARY_PATH`~~ **Done (all four wrappers)** — *decided; see [ADR-0012](docs/adr/0012-native-lib-bundled-in-wrapper-packages.md).* **Python + JS + Rust: done.** Python — `Mesmo` loads a `libmesmo.*` bundled inside the package (`mesmo/_libs/`), falling back to `MESMO_LIB_PATH` for local dev; `./gradlew :wrappers:python:wheel` builds a platform-tagged `py3-none-<platform>` wheel that ships the matching lib, so `pip install` needs no env vars (verified: install in a clean venv → `import mesmo; Mesmo()` works). JS — `Mesmo` uses the same resolution order and loads a lib bundled in the package (`libs/`); `./gradlew :wrappers:js:pack` builds an npm tarball shipping the matching lib, so `npm install` needs no env vars (verified: install the tarball in a clean project → `new Mesmo()` loads with no `MESMO_LIB_PATH`). Rust — `build.rs` sources `libmesmo.*` (`MESMO_LIB_PATH` / in-tree / GitHub-release download), stages it into `OUT_DIR`, rewrites the macOS install name to `@rpath`, and sets an `rpath`, so `cargo add cardano-client-lib` + build needs no env vars (crates.io can't host the binary, so it's fetched at build time). All three are guarded in CI (build package → clean install/run → load with env unset). **Go: done too** — a pure-Go loader (purego, no cgo) resolves `libmesmo` at runtime (`MESMO_LIB_PATH` → per-version cache → GitHub-release download), no install hook needed; see [ADR-0014](docs/adr/0014-go-distribution-purego-runtime-resolution.md). So **all four wrappers now load with no env vars.** _Remaining: the CI job to build+publish the per-platform wheels/packages from the release artifacts (PyPI/npm/crates) — tracked in the Publish item below (#15/#16 staged)._
 - [x] `P1` **Investigate static linking** — *decided + done; see [ADR-0008](docs/adr/0008-linux-glibc-baseline-portability.md).* **Finding:** `native-image` **cannot** emit a static library (`.a`) — oracle/graal#3053 is still open on GraalVM 25 — and musl's run-anywhere property applies only to static *executables*, not shared libraries. So a fully-static, no-`.so` distribution that keeps the in-process FFI is not possible without re-architecting to a static musl executable behind IPC (rejected as too invasive). **Decision + done: distro/glibc independence via a glibc-baseline build.** Building the Linux `.so` in `manylinux_2_28` yields a lib that requires only **`GLIBC_2.17`** — verified green in CI, and proven to load + run a real key-derivation on `centos:7` (glibc 2.17). Rolled out: `portable-linux-lib.yml` guards it on every PR/develop (objdump floor + centos:7 run), and `release.yml` ships the Linux artifact from the same container. Runs on RHEL/CentOS 7+, Amazon Linux 2, Ubuntu 18.04+, Debian 9+. _Follow-ups both **done**: linux-arm64 baseline build (same manylinux baseline on `ubuntu-24.04-arm`); and the **musl/Alpine variant** — shipped as `linux-musl-x86_64` via `--libc=musl` (PR #28), see the musl item below._
 - [x] `P1` ~~Add **linux-arm64** and **macos-x86_64** to the build/release matrix.~~ **Done** — `release.yml` now ships five native artifacts: `linux-x86_64`, `linux-aarch64`, `macos-aarch64`, `macos-x86_64`, `windows-x86_64`. The `linux-aarch64` lib is built to the same glibc-2.17 baseline (`manylinux_2_28_aarch64` on `ubuntu-24.04-arm`) and `portable-linux-lib.yml` now verifies **both** arches (objdump floor + a real run on `centos:7` aarch64). `macos-x86_64` (Intel) builds on `macos-13`; both macOS arches now run the full wrapper suite in `ci.yml`. _(Intel Macs previously had **no** working build — an arm64 `.dylib` can't load into an x86_64 process, so this unblocks them, not just adds a convenience.)_ _Update: `macos-x86_64` (Intel) was later **dropped** (PR #27 — Oracle GraalVM ends Intel-Mac support, and its 25.1 line ships no Intel build) and `linux-musl-x86_64` **added** (PR #28). The release now ships **5**: `linux-x86_64`, `linux-aarch64`, `linux-musl-x86_64`, `macos-aarch64`, `windows-x86_64`._ Remaining arch gap: `windows-arm64` (immature GraalVM support).
 - [x] `P1` ~~Add **musl / Alpine Linux** native builds.~~ **Done (x86_64, PR #28).** `linux-musl-x86_64` is built with native-image `--libc=musl` (a musl toolchain: `musl-gcc` + a musl-linked `zlib`), so it loads + runs on Alpine / musl-based images that the glibc-baseline `.so` can't. `musl-alpine.yml` guards it on every PR/develop (build → assert musl-linkage → a functional isolate run inside Alpine → Go/Rust wrapper auto-selection), and `release.yml` ships it. The **Go + Rust loaders auto-select** the musl artifact (Go: runtime detection via the musl dynamic loader; Rust: `CARGO_CFG_TARGET_ENV == "musl"`). **aarch64 musl is deferred** — GraalVM's `--libc=musl` hardcodes `x86_64-linux-musl-gcc` and doesn't support aarch64 (see [ADR-0008](docs/adr/0008-linux-glibc-baseline-portability.md)).
@@ -64,10 +64,10 @@ but there is no standalone "C wrapper" product.
 
 ## 2b. Plutus script evaluation — pluggable evaluators
 
-The bridge builds Plutus script transactions offline by accepting the redeemers' **execution
+Mesmo builds Plutus script transactions offline by accepting the redeemers' **execution
 units** (mem + CPU steps) as a fourth caller-supplied input to `mesmo_quicktx_build` — exactly like
 UTXOs and protocol parameters. Internally it wires CCL's `StaticTransactionEvaluator`, so the
-bridge never runs the script; the caller computes the units with whatever evaluator they prefer.
+Mesmo never runs the script; the caller computes the units with whatever evaluator they prefer.
 This is shipped and tested (`QuickTxApiTest.plutusMint*`).
 
 - [~] `P1` **Evaluator abstraction + examples (pick-and-choose).** Give users a clear, per-language
@@ -78,7 +78,7 @@ This is shipped and tested (`QuickTxApiTest.plutusMint*`).
   - **Aiken** UPLC evaluator (offline; e.g. `aiken-java-binding` server-side, or a wrapper-native
     binding) — remains
   - **Scalus** UPLC evaluator (offline, JVM/Scala) — ✓ **done** (in-core default)
-  The bridge stays evaluator-agnostic (it only consumes `[{mem, steps}]`); these are thin,
+  Mesmo stays evaluator-agnostic (it only consumes `[{mem, steps}]`); these are thin,
   swappable client-side helpers + docs showing the two-pass flow (build → evaluate → rebuild with
   units). Cover Python, Go, Rust, JS.
   **Status:** the two-tier evaluator design shipped (see [ADR-0013](docs/adr/0013-transaction-evaluators.md)):
@@ -89,7 +89,7 @@ This is shipped and tested (`QuickTxApiTest.plutusMint*`).
 - [ ] `P2` **Self-contained offline evaluation spike — `aiken-java-binding` inside the GraalVM
   native image.** If the Aiken Rust UPLC evaluator can be loaded via JNI from within `libmesmo`
   (the blockers: the binding extracts its `.so` from the classpath jar at runtime — absent in a
-  native image — plus JNI config and per-platform Rust binaries), the bridge could run scripts
+  native image — plus JNI config and per-platform Rust binaries), Mesmo could run scripts
   itself and callers would supply *nothing* extra. Prove feasibility before committing.
 
 ## 2c. Chain-data provider helpers — make the API easy in all 4 languages
@@ -124,7 +124,7 @@ untouched and the helpers are optional and swappable. This is the sibling of §2
   result   = quicktx.build(yaml, utxos, pp)        # unchanged offline core call
   ```
   Notes:
-  - **No UTXO *selection* needed** — the bridge already selects internally (it hands all sender
+  - **No UTXO *selection* needed** — Mesmo already selects internally (it hands all sender
     UTXOs to `QuickTxBuilder`/`StaticUtxoSupplier`). The helper only needs "UTXOs at address X".
   - Define a small provider interface per language (`utxos(addr)`, `protocol_params()`), ship at
     least one concrete impl (Blockfrost-style + Yaci DevKit, which the integration tests already
@@ -154,7 +154,7 @@ untouched and the helpers are optional and swappable. This is the sibling of §2
 - [ ] `P2` Generated API reference per language (Sphinx / rustdoc / godoc / JSDoc or TypeDoc).
 - [ ] `P2` Add project-meta docs: `CONTRIBUTING.md`, `CHANGELOG.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, and GitHub issue/PR templates.
 - [ ] `P2` Expand the 7-line `devkit.md` into a proper Yaci DevKit integration-testing guide.
-- [ ] `P2` Add an **end-to-end "build → sign → submit" example** per language. The bridge is offline-only, so users get stuck at broadcasting; show submitting the signed CBOR with the language's own HTTP client (e.g. Go `net/http`).
+- [ ] `P2` Add an **end-to-end "build → sign → submit" example** per language. Mesmo is offline-only, so users get stuck at broadcasting; show submitting the signed CBOR with the language's own HTTP client (e.g. Go `net/http`).
 - [ ] `P2` Add CI status + DevKit-integration badges to the README so the working round trips are visible at a glance.
 
 ## 5. Website
@@ -164,25 +164,25 @@ untouched and the helpers are optional and swappable. This is the sibling of §2
 
 ## 6. Upstream CCL — New Modules to Evaluate
 
-Surfaced by scanning upstream CCL. The bridge now targets **0.8.0-pre4**, so all of these are
+Surfaced by scanning upstream CCL. Mesmo now targets **0.8.0-pre4**, so all of these are
 available as a current dependency — no further upgrade needed.
 
-### CIP modules (already a bridge dependency)
+### CIP modules (already a Mesmo dependency)
 
 - [ ] `P2` **CIP-30 data signing** — wrap `DataSignature` / `CIP30DataSigner` (COSE_Sign1 `signData` create + verify). Offline. Complements existing CIP-8 message signing with the wallet/dApp data-signature format.
-- [ ] `P2` **CIP-27 royalty metadata** — wrap royalty metadata construction/parsing for NFTs. Offline; complements the bridge's existing CIP-25 support.
+- [ ] `P2` **CIP-27 royalty metadata** — wrap royalty metadata construction/parsing for NFTs. Offline; complements Mesmo's existing CIP-25 support.
 
 ### Now available on CCL 0.8.0-pre4
 
-- [x] `P1` ~~**Upgrade CCL 0.7.2 → 0.8.0**~~ **Done** — the bridge is on `0.8.0-pre4` (the TxPlan refactor). The QuickTx wrapper was rewritten to TxPlan YAML; the 0.8.0 unified `Tx`/`ScriptTx` + `DepositMode` are exercised by the intent E2E suite. Re-pin to the stable `0.8.0` when it releases.
+- [x] `P1` ~~**Upgrade CCL 0.7.2 → 0.8.0**~~ **Done** — Mesmo is on `0.8.0-pre4` (the TxPlan refactor). The QuickTx wrapper was rewritten to TxPlan YAML; the 0.8.0 unified `Tx`/`ScriptTx` + `DepositMode` are exercised by the intent E2E suite. Re-pin to the stable `0.8.0` when it releases.
 - [ ] `P2` **`plutus-aiken` blueprint handling** — expose runtime CIP-57 blueprint parsing and apply-params-to-script (parameterized validators). Offline. (The compile-time `@MetadataType` annotation processor is build-time Java codegen and is **not** FFI-able, so it is out of scope for the wrappers.)
-- [ ] `P2` **`txflow` multi-step orchestration** — evaluate exposing the offline flow-composition parts. Caveat: confirmation tracking is online/stateful and fits the bridge's stateless-FFI model awkwardly; wrap only the pure-composition surface, if any.
+- [ ] `P2` **`txflow` multi-step orchestration** — evaluate exposing the offline flow-composition parts. Caveat: confirmation tracking is online/stateful and fits Mesmo's stateless-FFI model awkwardly; wrap only the pure-composition surface, if any.
 - [ ] `P2` **CIP-102 royalty datum (v2)** — inline royalty datum on UTXOs; extends CIP-27. Offline datum (de)serialization.
 - [ ] `P2` **`crypto-ext` VRF/KES** — niche (block-producer / consensus simulation, experimental). Offline. Only if devnet simulation becomes a goal.
 
 ## 7. Maintenance — Existing Wrappers (audit, likely already covered)
 
-- [ ] `P2` Audit governance key derivation parity (`DRepKey`, `CommitteeColdKey`, `CommitteeHotKey`, gov-action IDs) — the bridge already exposes these; confirm nothing new in CCL is missing.
+- [ ] `P2` Audit governance key derivation parity (`DRepKey`, `CommitteeColdKey`, `CommitteeHotKey`, gov-action IDs) — Mesmo already exposes these; confirm nothing new in CCL is missing.
 - [ ] `P2` Audit QuickTx deposit handling against CCL's `DepositMode` (AUTO / CHANGE_OUTPUT / ANY_OUTPUT / NEW_UTXO_SELECTION) when on 0.8.0.
 
 ---
@@ -260,7 +260,7 @@ are the same complaint in all four languages:
 
 - **Verified data structures** (`verified-structures`: Merkle Patricia Forestry,
   Jellyfish Merkle Tree, RocksDB/RDBMS backends) — out of scope. They require
-  persistent, stateful storage backends, which is incompatible with the bridge's
+  persistent, stateful storage backends, which is incompatible with Mesmo's
   stateless, side-effect-free FFI model. The pure-compute proof core could be
   reconsidered only if there is explicit demand for Merkle-proof APIs.
 

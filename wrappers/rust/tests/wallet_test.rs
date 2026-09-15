@@ -2,15 +2,15 @@
 //! address is one CIP-1852 payment leaf — one handle per leaf. The mainnet create / restore /
 //! enumeration paths live in integration_test.rs; this adds the testnet stake-address prefix case.
 
-use mesmo::Bridge;
+use mesmo::Mesmo;
 
-fn bridge() -> Bridge {
-    Bridge::new().expect("Failed to create bridge")
+fn lib() -> Mesmo {
+    Mesmo::new().expect("Failed to create lib")
 }
 
 #[test]
 fn test_wallet_create_testnet() {
-    let b = bridge();
+    let b = lib();
     let acct = b
         .accounts()
         .create(mesmo::Network::Testnet)

@@ -6,12 +6,12 @@
 
 ## Context
 
-The bridge originally defined transactions with a **bespoke JSON operations spec**, parsed by
+Mesmo originally defined transactions with a **bespoke JSON operations spec**, parsed by
 hand-written mappers (~1,500 LOC) into CCL `Tx`/`ScriptTx`, plus large per-language fluent builders
 (~10k LOC) whose only job was to emit that JSON. CCL `0.8.0-pre4` ships **TxPlan** — a first-class YAML
 transaction format that deserializes into CCL's own `AbstractTx` objects and builds offline to CBOR.
 
-The bridge is new and pre-1.0 with, as far as we know, **no production consumers yet**, so we were free
+Mesmo is new and pre-1.0 with, as far as we know, **no production consumers yet**, so we were free
 to replace the transaction format outright rather than evolve it — and doing so now, before adoption, is
 the point at which it costs nothing.
 

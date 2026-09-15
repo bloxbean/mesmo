@@ -240,43 +240,43 @@
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxSpec",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxSpec",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxSpec$Validity",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxSpec$Validity",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxOperation",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxOperation",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxOperation$MintAsset",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxOperation$MintAsset",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxItemSpec",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxItemSpec",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.ProviderConfig",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.ProviderConfig",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "com.bloxbean.cardano.bridge.api.quicktx.TxOperation$ReferenceInput",
+    "name": "com.bloxbean.cardano.mesmo.api.quicktx.TxOperation$ReferenceInput",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
     "allDeclaredFields": true

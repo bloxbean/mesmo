@@ -29,7 +29,7 @@ will:
   [ADR-0013](0013-transaction-evaluators.md) — execution units are no longer passed here.)
   The offline core imports no networking; the provider is duck-typed/interface-typed and only the
   convenience method touches it.
-- Do **no UTxO selection** in the helper — the bridge selects internally (it hands all of the
+- Do **no UTxO selection** in the helper — Mesmo selects internally (it hands all of the
   sender's UTxOs to CCL). A provider only answers "all UTxOs at address X".
 - Use each language's own HTTP client and **add no mandatory dependency** to the offline core: Python
   `urllib` (stdlib), Go `net/http` (stdlib), JS Bun `fetch` (built-in), Rust `ureq` **behind an

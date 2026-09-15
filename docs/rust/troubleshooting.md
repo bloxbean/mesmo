@@ -18,7 +18,7 @@ Environment variables (build-time):
 |---|---|
 | `MESMO_LIB_PATH` | Use a local library instead of the in-tree/download paths |
 | `MESMO_LIB_VERSION` | Override the pinned release tag to download |
-| `MESMO_SKIP_VERSION_CHECK` | (runtime) Skip the crate ↔ native-lib version compatibility check in `Bridge::new()` |
+| `MESMO_SKIP_VERSION_CHECK` | (runtime) Skip the crate ↔ native-lib version compatibility check in `Mesmo::new()` |
 
 ## Common errors
 
@@ -30,13 +30,13 @@ The first build needs network access to GitHub releases (the ~50 MB library can'
 
 No prebuilt artifact exists for your target (see matrix below — notably macOS Intel and non-x86_64 musl). Build the library from source (below) and set `MESMO_LIB_PATH`.
 
-### Version mismatch from `Bridge::new()`
+### Version mismatch from `Mesmo::new()`
 
 The crate and the native library must match on base semver. This usually means `MESMO_LIB_PATH` points at a stale local build, or `MESMO_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `Bridge` cannot be sent between threads safely (compile error)
+### `Mesmo` cannot be sent between threads safely (compile error)
 
-Deliberate. The GraalVM isolate thread inside `Bridge` is bound to the OS thread that created it — moving it would corrupt the VM, so `Bridge` is `!Send`/`!Sync` and the compiler stops you. Create one `Bridge` per thread (e.g. in a `thread_local!`, or construct inside each worker).
+Deliberate. The GraalVM isolate thread inside `Mesmo` is bound to the OS thread that created it — moving it would corrupt the VM, so `Mesmo` is `!Send`/`!Sync` and the compiler stops you. Create one `Mesmo` per thread (e.g. in a `thread_local!`, or construct inside each worker).
 
 ### `CCL Error -10: ...` from `quicktx().build`
 
@@ -48,7 +48,7 @@ Deliberate. The GraalVM isolate thread inside `Bridge` is bound to the OS thread
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library or for development against the bridge itself:
+Needed only on platforms without a prebuilt library or for development against Mesmo itself:
 
 ```bash
 git clone https://github.com/bloxbean/mesmo

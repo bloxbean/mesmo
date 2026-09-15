@@ -27,7 +27,7 @@ Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libmesmo` with pur
 
 ```toml
 [dependencies]
-ccl = { package = "mesmo", version = "0.1" }
+mesmo = { package = "mesmo", version = "0.1" }
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -45,9 +45,9 @@ Python 3.8+. Platform wheels bundle the native library; the only dependency is `
 Create an account and build a payment, fully offline (Python shown — the [other guides](../overview/#the-four-wrappers) have the same example idiomatically):
 
 ```python
-from mesmo import MesmoLib, Network
+from mesmo import Mesmo, Network
 
-with MesmoLib() as lib, lib.accounts.create(Network.TESTNET) as account:
+with Mesmo() as lib, lib.accounts.create(Network.TESTNET) as account:
     address = account.info["base_address"]
     print(address)                   # addr_test1... (info is public data — never the mnemonic)
 

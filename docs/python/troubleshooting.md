@@ -2,7 +2,7 @@
 
 ## How the native library is found
 
-`MesmoLib(lib_path=None)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
+`Mesmo(lib_path=None)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
 
 1. The explicit `lib_path` constructor argument (a directory).
 2. The `MESMO_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
@@ -32,7 +32,7 @@ The wrapper and the native library must match on base semver. This appears when 
 
 ### `MesmoClosedError`
 
-Something called the instance after `close()` (or after its `with` block ended). This exception is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole interpreter. Keep calls inside the instance's lifetime, or create a new `MesmoLib`.
+Something called the instance after `close()` (or after its `with` block ended). This exception is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole interpreter. Keep calls inside the instance's lifetime, or create a new `Mesmo`.
 
 ### `TypeError` / `ValueError` about `network`
 
@@ -52,7 +52,7 @@ Known limitation of the current native library (GraalVM reflection configuration
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library (macOS Intel) or for development against the bridge itself:
+Needed only on platforms without a prebuilt library (macOS Intel) or for development against Mesmo itself:
 
 ```bash
 git clone https://github.com/bloxbean/mesmo

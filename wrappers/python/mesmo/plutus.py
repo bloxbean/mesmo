@@ -4,8 +4,8 @@ import json
 class Plutus:
     """Plutus namespace for CCL operations."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def data_hash(self, datum_cbor_hex):
         """Compute datum hash from CBOR hex. Returns hex string."""

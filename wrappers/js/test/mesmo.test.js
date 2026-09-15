@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
-import { MesmoBridge, MesmoError, MAINNET, TESTNET, normalizeCostModels } from '../src/index.js';
+import { Mesmo, MesmoError, MAINNET, TESTNET, normalizeCostModels } from '../src/index.js';
 
 // A known valid transaction CBOR hex (built from Java tests)
 const SAMPLE_TX_CBOR = '84a300d901028182582073198b7ad003862b9798106b88fbccfca464b1a38afb34958275c4a7d7d8d002010181825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc1a001e8480021a00029810a0f5f6';
 
 // Create a managed account; return its public info plus the one-shot recovery phrase.
-function createManaged(bridge, network) {
-    const acct = bridge.accounts.create(network);
+function createManaged(lib, network) {
+    const acct = lib.accounts.create(network);
     const info = acct.info;
     const mnemonic = acct.exportRecoveryPhrase();
     acct.close();
@@ -14,61 +14,61 @@ function createManaged(bridge, network) {
 }
 
 describe('Mesmo', () => {
-    let bridge;
+    let lib;
 
     beforeAll(() => {
-        bridge = new MesmoBridge();
+        lib = new Mesmo();
     });
 
     afterAll(() => {
-        bridge.close();
+        lib.close();
     });
 
     it('should return version', () => {
-        const version = bridge.version();
+        const version = lib.version();
         expect(version).toBe('0.1.0');
     });
 
     // --- Account ---
 
     it('should create mainnet account', () => {
-        const account = createManaged(bridge, MAINNET);
+        const account = createManaged(lib, MAINNET);
         expect(account.base_address).toStartWith('addr1');
         expect(account.mnemonic.split(' ').length).toBe(24);
     });
 
     it('should create testnet account', () => {
-        const account = createManaged(bridge, TESTNET);
+        const account = createManaged(lib, TESTNET);
         expect(account.base_address).toStartWith('addr_test1');
     });
 
     it('should restore account from mnemonic', () => {
-        const created = createManaged(bridge, MAINNET);
-        using restored = bridge.accounts.fromMnemonic(created.mnemonic, MAINNET);
+        const created = createManaged(lib, MAINNET);
+        using restored = lib.accounts.fromMnemonic(created.mnemonic, MAINNET);
         expect(restored.info.base_address).toBe(created.base_address);
         expect(restored.info.enterprise_address).toBe(created.enterprise_address);
     });
 
     it('should get public key', () => {
-        const account = createManaged(bridge, MAINNET);
-        const pubKey = bridge.crypto.deriveKey(account.mnemonic).public_key;
+        const account = createManaged(lib, MAINNET);
+        const pubKey = lib.crypto.deriveKey(account.mnemonic).public_key;
         expect(pubKey.length).toBe(64); // 32 bytes hex
     });
 
     it('should get private key', () => {
-        const account = createManaged(bridge, MAINNET);
-        const privKey = bridge.crypto.deriveKey(account.mnemonic).private_key;
+        const account = createManaged(lib, MAINNET);
+        const privKey = lib.crypto.deriveKey(account.mnemonic).private_key;
         expect(privKey.length).toBe(128); // 64 bytes extended BIP32-ED25519
     });
 
     it('should get DRep ID', () => {
-        const account = createManaged(bridge, MAINNET);
+        const account = createManaged(lib, MAINNET);
         expect(account.drep_id).toStartWith('drep1');
     });
 
     it('should sign transaction with mnemonic', () => {
-        const account = createManaged(bridge, TESTNET);
-        using acct = bridge.accounts.fromMnemonic(account.mnemonic, TESTNET);
+        const account = createManaged(lib, TESTNET);
+        using acct = lib.accounts.fromMnemonic(account.mnemonic, TESTNET);
         const signed = acct.signTx(SAMPLE_TX_CBOR);
         expect(signed.length).toBeGreaterThan(SAMPLE_TX_CBOR.length);
     });
@@ -82,114 +82,114 @@ describe('Mesmo', () => {
 
     it('MAINNET (ordinal 0) yields an address whose on-chain network_id is 1', () => {
         expect(MAINNET).toBe(0);
-        const account = createManaged(bridge, MAINNET);
-        expect(bridge.address.info(account.base_address).network_id).toBe(1);
+        const account = createManaged(lib, MAINNET);
+        expect(lib.address.info(account.base_address).network_id).toBe(1);
         expect(account.base_address).toStartWith('addr1');
     });
 
     it('TESTNET (ordinal 1) yields an address whose on-chain network_id is 0', () => {
         expect(TESTNET).toBe(1);
-        const account = createManaged(bridge, TESTNET);
-        expect(bridge.address.info(account.base_address).network_id).toBe(0);
+        const account = createManaged(lib, TESTNET);
+        expect(lib.address.info(account.base_address).network_id).toBe(0);
         expect(account.base_address).toStartWith('addr_test1');
     });
 
     it('should reject an out-of-range network with a JS error, not an opaque native one', () => {
-        expect(() => bridge.accounts.create(99)).toThrow(RangeError);
-        expect(() => bridge.accounts.create(-1)).toThrow(RangeError);
-        expect(() => bridge.accounts.create('mainnet')).toThrow(RangeError);
-        expect(() => bridge.accounts.fromMnemonic('x', 4)).toThrow(RangeError);
+        expect(() => lib.accounts.create(99)).toThrow(RangeError);
+        expect(() => lib.accounts.create(-1)).toThrow(RangeError);
+        expect(() => lib.accounts.create('mainnet')).toThrow(RangeError);
+        expect(() => lib.accounts.fromMnemonic('x', 4)).toThrow(RangeError);
     });
 
     it('should require an explicit network (no mainnet default)', () => {
-        expect(() => bridge.accounts.create()).toThrow(TypeError);
-        expect(() => bridge.accounts.fromMnemonic('x')).toThrow(TypeError);
+        expect(() => lib.accounts.create()).toThrow(TypeError);
+        expect(() => lib.accounts.fromMnemonic('x')).toThrow(TypeError);
     });
 
     // --- Address ---
 
     it('should validate addresses', () => {
-        const account = createManaged(bridge, MAINNET);
-        expect(bridge.address.validate(account.base_address)).toBe(true);
-        expect(bridge.address.validate('invalid_address')).toBe(false);
+        const account = createManaged(lib, MAINNET);
+        expect(lib.address.validate(account.base_address)).toBe(true);
+        expect(lib.address.validate('invalid_address')).toBe(false);
     });
 
     it('should get address info', () => {
-        const account = createManaged(bridge, MAINNET);
-        const info = bridge.address.info(account.base_address);
+        const account = createManaged(lib, MAINNET);
+        const info = lib.address.info(account.base_address);
         expect(info.type).toBe('Base');
         expect(info.network_id).toBe(1);
     });
 
     it('should convert address to/from bytes', () => {
-        const account = createManaged(bridge, MAINNET);
-        const hexBytes = bridge.address.toBytes(account.base_address);
+        const account = createManaged(lib, MAINNET);
+        const hexBytes = lib.address.toBytes(account.base_address);
         expect(hexBytes.length).toBeGreaterThan(0);
-        const restored = bridge.address.fromBytes(hexBytes);
+        const restored = lib.address.fromBytes(hexBytes);
         expect(restored).toBe(account.base_address);
     });
 
     // --- Crypto ---
 
     it('should compute blake2b-256', () => {
-        const hash = bridge.crypto.blake2b256('48656c6c6f');
+        const hash = lib.crypto.blake2b256('48656c6c6f');
         expect(hash.length).toBe(64);
     });
 
     it('should compute blake2b-224', () => {
-        const hash = bridge.crypto.blake2b224('48656c6c6f');
+        const hash = lib.crypto.blake2b224('48656c6c6f');
         expect(hash.length).toBe(56);
     });
 
     it('should generate and validate mnemonic', () => {
-        const mnemonic = bridge.crypto.generateMnemonic(24);
+        const mnemonic = lib.crypto.generateMnemonic(24);
         expect(mnemonic.split(' ').length).toBe(24);
-        expect(bridge.crypto.validateMnemonic(mnemonic)).toBe(true);
-        expect(bridge.crypto.validateMnemonic('invalid mnemonic')).toBe(false);
+        expect(lib.crypto.validateMnemonic(mnemonic)).toBe(true);
+        expect(lib.crypto.validateMnemonic('invalid mnemonic')).toBe(false);
     });
 
     it('should generate 12-word mnemonic', () => {
-        const mnemonic = bridge.crypto.generateMnemonic(12);
+        const mnemonic = lib.crypto.generateMnemonic(12);
         expect(mnemonic.split(' ').length).toBe(12);
     });
 
     it('should sign with 32-byte key', () => {
-        const account = createManaged(bridge, MAINNET);
-        const key = bridge.crypto.deriveKey(account.mnemonic);
+        const account = createManaged(lib, MAINNET);
+        const key = lib.crypto.deriveKey(account.mnemonic);
         // Round-trip regression pin: the whole extended key must sign AND verify against
         // the key's own public_key; half of it (a clamped scalar, not a seed) must not.
 
         const messageHex = '68656c6c6f';
-        const signature = bridge.crypto.sign(messageHex, key.private_key);
+        const signature = lib.crypto.sign(messageHex, key.private_key);
         expect(signature.length).toBe(128); // 64 bytes
-        expect(bridge.crypto.verify(signature, messageHex, key.public_key)).toBe(true);
+        expect(lib.crypto.verify(signature, messageHex, key.public_key)).toBe(true);
 
-        const wrong = bridge.crypto.sign(messageHex, key.private_key.substring(0, 64));
-        expect(bridge.crypto.verify(wrong, messageHex, key.public_key)).toBe(false);
+        const wrong = lib.crypto.sign(messageHex, key.private_key.substring(0, 64));
+        expect(lib.crypto.verify(wrong, messageHex, key.public_key)).toBe(false);
     });
 
     it('should reject wrong signature in verify', () => {
-        const account = createManaged(bridge, MAINNET);
-        const pubKey = bridge.crypto.deriveKey(account.mnemonic).public_key;
+        const account = createManaged(lib, MAINNET);
+        const pubKey = lib.crypto.deriveKey(account.mnemonic).public_key;
         const fakeSig = '00'.repeat(64);
-        expect(bridge.crypto.verify(fakeSig, '68656c6c6f', pubKey)).toBe(false);
+        expect(lib.crypto.verify(fakeSig, '68656c6c6f', pubKey)).toBe(false);
     });
 
     // --- Transaction ---
 
     it('should compute tx hash', () => {
-        const hash = bridge.tx.hash(SAMPLE_TX_CBOR);
+        const hash = lib.tx.hash(SAMPLE_TX_CBOR);
         expect(hash.length).toBe(64);
         expect(hash).toBe('7af07f974db1d004305d29670d04faeef0e9670e8cf95e4b54a06f668eed8de4');
     });
 
     it('should convert tx to JSON', () => {
-        const json = bridge.tx.toJson(SAMPLE_TX_CBOR);
+        const json = lib.tx.toJson(SAMPLE_TX_CBOR);
         expect(json).toStartWith('{');
     });
 
     it('should deserialize tx', () => {
-        const result = bridge.tx.deserialize(SAMPLE_TX_CBOR);
+        const result = lib.tx.deserialize(SAMPLE_TX_CBOR);
         expect(result.body).toBeDefined();
         expect(result.body.inputs).toBeDefined();
     });
@@ -197,7 +197,7 @@ describe('Mesmo', () => {
     // --- Plutus ---
 
     it('should hash plutus data', () => {
-        const hash = bridge.plutus.dataHash('182a');
+        const hash = lib.plutus.dataHash('182a');
         expect(hash.length).toBe(64);
         expect(hash).toBe('9e1199a988ba72ffd6e9c269cadb3b53b5f360ff99f112d9b2ee30c4d74ad88b');
     });
@@ -205,12 +205,12 @@ describe('Mesmo', () => {
     // --- Script ---
 
     it('should parse native script from JSON', () => {
-        const account = createManaged(bridge, MAINNET);
-        const info = bridge.address.info(account.base_address);
+        const account = createManaged(lib, MAINNET);
+        const info = lib.address.info(account.base_address);
         const keyHash = info.payment_credential_hash;
 
         const scriptJson = JSON.stringify({ type: 'sig', keyHash });
-        const result = JSON.parse(bridge.script.nativeFromJson(scriptJson));
+        const result = JSON.parse(lib.script.nativeFromJson(scriptJson));
         expect(result.policy_id).toBeDefined();
         expect(result.script_hash).toBeDefined();
         expect(result.cbor_hex).toBeDefined();
@@ -218,21 +218,21 @@ describe('Mesmo', () => {
     });
 
     it('should hash script', () => {
-        const account = createManaged(bridge, MAINNET);
-        const info = bridge.address.info(account.base_address);
+        const account = createManaged(lib, MAINNET);
+        const info = lib.address.info(account.base_address);
         const keyHash = info.payment_credential_hash;
 
         const scriptJson = JSON.stringify({ type: 'sig', keyHash });
-        const parsed = JSON.parse(bridge.script.nativeFromJson(scriptJson));
+        const parsed = JSON.parse(lib.script.nativeFromJson(scriptJson));
 
-        const hash = bridge.script.hash(parsed.cbor_hex, 0);
+        const hash = lib.script.hash(parsed.cbor_hex, 0);
         expect(hash.length).toBe(56);
     });
 
     // --- Governance ---
 
     it('should expose governance identifiers in account info', () => {
-        const account = createManaged(bridge, MAINNET);
+        const account = createManaged(lib, MAINNET);
         expect(account.drep_id).toStartWith('drep1');
         expect(account.committee_cold_id).toStartWith('cc_cold1');
         expect(account.committee_hot_id).toStartWith('cc_hot1');
@@ -241,45 +241,45 @@ describe('Mesmo', () => {
     });
 
     it('should derive governance keys with the stateless utility', () => {
-        const account = createManaged(bridge, MAINNET);
-        const cold = bridge.crypto.deriveKey(account.mnemonic, 0, 0, 'committee_cold');
+        const account = createManaged(lib, MAINNET);
+        const cold = lib.crypto.deriveKey(account.mnemonic, 0, 0, 'committee_cold');
         expect(cold.public_key_hash).toBe(account.committee_cold_credential);
         expect(cold.bech32_verification_key).toStartWith('cc_cold_vk1');
         expect(cold.bech32_verification_key_hash).toStartWith('cc_cold_vkh1');
-        const drep = bridge.crypto.deriveKey(account.mnemonic, 0, 0, 'drep');
+        const drep = lib.crypto.deriveKey(account.mnemonic, 0, 0, 'drep');
         expect(drep.public_key.length).toBe(64);
         expect(drep.path).toBe("m/1852'/1815'/0'/3/0");
         expect(drep.bech32_verification_key).toStartWith('drep_vk1');
         // Non-governance roles carry no CIP-105 encodings by design.
-        expect(bridge.crypto.deriveKey(account.mnemonic).bech32_verification_key).toBeUndefined();
+        expect(lib.crypto.deriveKey(account.mnemonic).bech32_verification_key).toBeUndefined();
     });
 
     // --- Wallet ---
 
     it('should create wallet', () => {
-        const wallet = createManaged(bridge, MAINNET);
+        const wallet = createManaged(lib, MAINNET);
         expect(wallet.mnemonic).toBeDefined();
         expect(wallet.mnemonic.split(' ').length).toBe(24);
     });
 
     it('should restore wallet from mnemonic', () => {
-        const wallet = createManaged(bridge, MAINNET);
-        using restoredAcct = bridge.accounts.fromMnemonic(wallet.mnemonic, MAINNET);
+        const wallet = createManaged(lib, MAINNET);
+        using restoredAcct = lib.accounts.fromMnemonic(wallet.mnemonic, MAINNET);
         const restored = restoredAcct.info;
         expect(restored.stake_address).toBe(wallet.stake_address);
     });
 
     it('should get wallet address', () => {
-        const wallet = createManaged(bridge, MAINNET);
-        using a0 = bridge.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 0);
+        const wallet = createManaged(lib, MAINNET);
+        using a0 = lib.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 0);
         const address = a0.info.base_address;
         expect(address).toStartWith('addr1');
     });
 
     it('should get different wallet addresses at different indices', () => {
-        const wallet = createManaged(bridge, MAINNET);
-        using a0 = bridge.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 0);
-        using a1 = bridge.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 1);
+        const wallet = createManaged(lib, MAINNET);
+        using a0 = lib.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 0);
+        using a1 = lib.accounts.fromMnemonic(wallet.mnemonic, MAINNET, 0, 1);
         const addr0 = a0.info.base_address;
         const addr1 = a1.info.base_address;
         expect(addr0).not.toBe(addr1);
@@ -369,16 +369,16 @@ transaction:
     }
 
     it('should build a simple payment from TxPlan YAML', () => {
-        const sender = createManaged(bridge, TESTNET);
-        const receiver = createManaged(bridge, TESTNET);
+        const sender = createManaged(lib, TESTNET);
+        const receiver = createManaged(lib, TESTNET);
         const yaml = paymentYaml(sender.base_address, receiver.base_address, '5000000');
-        assertBuilt(bridge.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
+        assertBuilt(lib.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
     });
 
     it('should build multiple payments', () => {
-        const sender = createManaged(bridge, TESTNET);
-        const r1 = createManaged(bridge, TESTNET);
-        const r2 = createManaged(bridge, TESTNET);
+        const sender = createManaged(lib, TESTNET);
+        const r1 = createManaged(lib, TESTNET);
+        const r2 = createManaged(lib, TESTNET);
         const yaml = `
 version: 1.0
 transaction:
@@ -396,12 +396,12 @@ transaction:
             - unit: lovelace
               quantity: "3000000"
 `;
-        assertBuilt(bridge.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
+        assertBuilt(lib.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
     });
 
     it('should substitute variables', () => {
-        const sender = createManaged(bridge, TESTNET);
-        const receiver = createManaged(bridge, TESTNET);
+        const sender = createManaged(lib, TESTNET);
+        const receiver = createManaged(lib, TESTNET);
         const yaml = `
 version: 1.0
 variables:
@@ -417,76 +417,76 @@ transaction:
             - unit: lovelace
               quantity: \${amount}
 `;
-        assertBuilt(bridge.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
+        assertBuilt(lib.quicktx.build(yaml, makeUtxos(sender.base_address), PROTOCOL_PARAMS));
     });
 
     it('should throw on insufficient funds', () => {
-        const sender = createManaged(bridge, TESTNET);
-        const receiver = createManaged(bridge, TESTNET);
+        const sender = createManaged(lib, TESTNET);
+        const receiver = createManaged(lib, TESTNET);
         const yaml = paymentYaml(sender.base_address, receiver.base_address, '200000000');
-        expect(() => bridge.quicktx.build(yaml, makeUtxos(sender.base_address, 1_000_000), PROTOCOL_PARAMS)).toThrow();
+        expect(() => lib.quicktx.build(yaml, makeUtxos(sender.base_address, 1_000_000), PROTOCOL_PARAMS)).toThrow();
     });
 
     // --- Negative / Error Tests ---
 
     it('should throw on invalid mnemonic restore', () => {
         expect(() => {
-            bridge.accounts.fromMnemonic('invalid words that are not a valid mnemonic phrase at all', MAINNET);
+            lib.accounts.fromMnemonic('invalid words that are not a valid mnemonic phrase at all', MAINNET);
         }).toThrow();
     });
 
     it('should throw on empty mnemonic restore', () => {
         expect(() => {
-            bridge.accounts.fromMnemonic('', MAINNET);
+            lib.accounts.fromMnemonic('', MAINNET);
         }).toThrow();
     });
 
     it('should throw on invalid address info', () => {
         expect(() => {
-            bridge.address.info('not_a_valid_address');
+            lib.address.info('not_a_valid_address');
         }).toThrow();
     });
 
     it('should throw on malformed tx CBOR hash', () => {
         expect(() => {
-            bridge.tx.hash('deadbeef');
+            lib.tx.hash('deadbeef');
         }).toThrow();
     });
 
     it('should throw on invalid hex in tx hash', () => {
         expect(() => {
-            bridge.tx.hash('not_hex!');
+            lib.tx.hash('not_hex!');
         }).toThrow();
     });
 
     it('should throw on malformed tx deserialize', () => {
         expect(() => {
-            bridge.tx.deserialize('deadbeef');
+            lib.tx.deserialize('deadbeef');
         }).toThrow();
     });
 
     it('should throw on invalid plutus data hash', () => {
         expect(() => {
-            bridge.plutus.dataHash('zzzz');
+            lib.plutus.dataHash('zzzz');
         }).toThrow();
     });
 
     it('should throw on sign tx with invalid CBOR', () => {
-        const account = createManaged(bridge, TESTNET);
+        const account = createManaged(lib, TESTNET);
         expect(() => {
-            using acct = bridge.accounts.fromMnemonic(account.mnemonic, TESTNET);
+            using acct = lib.accounts.fromMnemonic(account.mnemonic, TESTNET);
             acct.signTx('deadbeef');
         }).toThrow();
     });
 
     it('should throw on blake2b with invalid hex', () => {
         expect(() => {
-            bridge.crypto.blake2b256('not_valid_hex!');
+            lib.crypto.blake2b256('not_valid_hex!');
         }).toThrow();
     });
 
     it('should reject invalid mnemonic validation', () => {
-        expect(bridge.crypto.validateMnemonic('zzz xxx yyy www vvv uuu ttt sss rrr qqq ppp ooo')).toBe(false);
+        expect(lib.crypto.validateMnemonic('zzz xxx yyy www vvv uuu ttt sss rrr qqq ppp ooo')).toBe(false);
     });
 });
 

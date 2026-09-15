@@ -14,15 +14,15 @@ import (
 )
 
 func main() {
-	bridge, err := mesmo.New()
+	lib, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close()
+	defer lib.Close()
 
 	// 1. Create a brand-new testnet account (managed handle; the recovery phrase is
 	//    exported once, deliberately — it is never part of the account's Info).
-	account, err := bridge.Accounts.Create(mesmo.Testnet)
+	account, err := lib.Accounts.Create(mesmo.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func main() {
 	fmt.Println("  mnemonic    :", mnemonic)
 
 	// 2. Restore the same account from its phrase — the address must match.
-	restored, err := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
+	restored, err := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func main() {
 
 	// 3. Raw key material, when interop genuinely needs it, comes from the stateless
 	//    derivation utility — handles never expose key bytes.
-	key, _ := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+	key, _ := lib.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
 	fmt.Println("  private key (extended, hex):", key.PrivateKey)
 	fmt.Println("  public key (hex)           :", key.PublicKey)
 }

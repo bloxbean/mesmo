@@ -21,48 +21,48 @@ def test_members_are_mesmo_ordinals():
     assert (Network.MAINNET, Network.TESTNET) == (0, 1)
 
 
-def test_mainnet_derives_an_address_whose_onchain_network_id_is_one(ccl):
+def test_mainnet_derives_an_address_whose_onchain_network_id_is_one(mesmo):
     """Network.MAINNET is 0 — but the address it produces reports on-chain network_id 1."""
-    with ccl.accounts.create(Network.MAINNET) as acct:
+    with mesmo.accounts.create(Network.MAINNET) as acct:
         base_address = acct.info["base_address"]
 
     assert int(Network.MAINNET) == 0
     assert base_address.startswith("addr1")
-    assert ccl.address.info(base_address)["network_id"] == 1
+    assert mesmo.address.info(base_address)["network_id"] == 1
 
 
-def test_testnet_derives_an_address_whose_onchain_network_id_is_zero(ccl):
+def test_testnet_derives_an_address_whose_onchain_network_id_is_zero(mesmo):
     """Network.TESTNET is 1 — but the address it produces reports on-chain network_id 0."""
-    with ccl.accounts.create(Network.TESTNET) as acct:
+    with mesmo.accounts.create(Network.TESTNET) as acct:
         base_address = acct.info["base_address"]
 
     assert int(Network.TESTNET) == 1
     assert base_address.startswith("addr_test1")
-    assert ccl.address.info(base_address)["network_id"] == 0
+    assert mesmo.address.info(base_address)["network_id"] == 0
 
 
-def test_plain_ints_still_work(ccl):
+def test_plain_ints_still_work(mesmo):
     """IntEnum keeps the native call wire-compatible: an int of 0 or 1 is still accepted."""
-    with ccl.accounts.create(Network.TESTNET) as created:
+    with mesmo.accounts.create(Network.TESTNET) as created:
         base_address = created.info["base_address"]
         mnemonic = created.export_recovery_phrase()
 
-    with ccl.accounts.from_mnemonic(mnemonic, 1) as from_int:
+    with mesmo.accounts.from_mnemonic(mnemonic, 1) as from_int:
         assert from_int.info["base_address"] == base_address
 
 
 @pytest.mark.parametrize("bad", [2, 3, 4, -1, 99])
-def test_out_of_range_network_raises_valueerror(ccl, bad):
+def test_out_of_range_network_raises_valueerror(mesmo, bad):
     """Caught at the boundary, not deep inside the native library."""
     with pytest.raises(ValueError, match="Network"):
-        ccl.accounts.create(bad)
+        mesmo.accounts.create(bad)
 
 
-def test_network_is_required_and_never_defaults_to_mainnet(ccl):
+def test_network_is_required_and_never_defaults_to_mainnet(mesmo):
     """No default. Account creation used to silently mint a *mainnet* account."""
     with pytest.raises(TypeError):
-        ccl.accounts.create()
+        mesmo.accounts.create()
 
-    mnemonic = ccl.crypto.generate_mnemonic(24)
+    mnemonic = mesmo.crypto.generate_mnemonic(24)
     with pytest.raises(TypeError):
-        ccl.accounts.from_mnemonic(mnemonic)
+        mesmo.accounts.from_mnemonic(mnemonic)

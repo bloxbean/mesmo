@@ -24,10 +24,10 @@ Requires Go 1.21+. No C toolchain, no `CGO_ENABLED`. On first use the native lib
 Override the downloaded version with `MESMO_LIB_VERSION`. Resolution is fail-hard: a bad
 download errors rather than silently using a stale library.
 
-> **Threading:** all FFI calls run on a single dedicated OS thread that the `Bridge`
-> pins for its lifetime, so a `Bridge` is safe to share across goroutines and is immune
+> **Threading:** all FFI calls run on a single dedicated OS thread that the `Mesmo`
+> pins for its lifetime, so a `Mesmo` is safe to share across goroutines and is immune
 > to Go's goroutine/OS-thread migration (which otherwise crashes the GraalVM isolate on
-> Linux x86_64). Calls are serialized; create multiple `Bridge` instances if you need
+> Linux x86_64). Calls are serialized; create multiple `Mesmo` instances if you need
 > concurrent isolate work.
 
 ## Running the examples
@@ -60,13 +60,13 @@ import (
 )
 
 func main() {
-	bridge, err := mesmo.New() // loads libmesmo, starts a GraalVM isolate
+	lib, err := mesmo.New() // loads libmesmo, starts a GraalVM isolate
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close() // tears down the isolate
+	defer lib.Close() // tears down the isolate
 
-	account, err := bridge.Accounts.Create(mesmo.Testnet) // managed handle (ADR-0016)
+	account, err := lib.Accounts.Create(mesmo.Testnet) // managed handle (ADR-0016)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,9 +80,9 @@ func main() {
 
 ## API namespaces
 
-A `*Bridge` exposes these namespaces (all offline operations):
-`bridge.Accounts`, `bridge.Address`, `bridge.Crypto`, `bridge.Tx`, `bridge.Plutus`,
-`bridge.Script`, `bridge.QuickTx`.
+A `*Mesmo` exposes these namespaces (all offline operations):
+`lib.Accounts`, `lib.Address`, `lib.Crypto`, `lib.Tx`, `lib.Plutus`,
+`lib.Script`, `lib.QuickTx`.
 
 Networks are the `mesmo.Network` type: `mesmo.Mainnet` or `mesmo.Testnet`.
 
@@ -95,7 +95,7 @@ Networks are the `mesmo.Network` type: `mesmo.Mainnet` or `mesmo.Testnet`.
 Errors are returned as a `*mesmo.MesmoError`.
 
 Transactions are built from a [TxPlan](https://github.com/bloxbean/cardano-client-lib)
-**YAML** document via `bridge.QuickTx.Build(yaml, utxos, protocolParams)`, fully offline —
+**YAML** document via `lib.QuickTx.Build(yaml, utxos, protocolParams)`, fully offline —
 you supply the UTXOs and protocol parameters. See
 [`examples/transaction`](examples/transaction/main.go).
 
@@ -106,20 +106,20 @@ for you over HTTP (stdlib `net/http`), so the native library stays offline and p
 
 ```go
 provider, _ := mesmo.NewBlockfrostProvider(projectID, "preprod") // or mesmo.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 Plug in any backend (Koios, Ogmios, …) by implementing the `mesmo.ChainDataProvider` interface
-(`Utxos(address)`, `ProtocolParams()`). UTXO *selection* is handled inside the bridge — a provider
+(`Utxos(address)`, `ProtocolParams()`). UTXO *selection* is handled inside Mesmo — a provider
 only returns all UTXOs at the address.
 
 ## Transaction evaluators (optional)
 
-A Plutus build needs each redeemer's execution units. The bridge computes them **offline** with
+A Plutus build needs each redeemer's execution units. Mesmo computes them **offline** with
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0) // Scalus computes the units
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0) // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -129,7 +129,7 @@ here in the wrapper:
 
 ```go
 evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0, evaluator)
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0, evaluator)
 ```
 
 Plug in any evaluator (Ogmios, …) by implementing the `mesmo.TransactionEvaluator` interface

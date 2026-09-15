@@ -4,8 +4,8 @@ import json
 class Transaction:
     """Transaction (tx) namespace for CCL operations."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def hash(self, tx_cbor_hex):
         """Get transaction hash (blake2b-256 of body). Returns hex string."""

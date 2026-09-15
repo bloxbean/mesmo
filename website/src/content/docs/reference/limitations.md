@@ -32,8 +32,8 @@ Plutus transactions build fully offline: when you supply no execution units, the
 
 ## Threading models differ per language
 
-- **Python**: one `MesmoLib` may be shared across threads — each OS thread attaches to the isolate lazily.
-- **Go**: all native calls are **serialized** onto one dedicated OS thread per `Bridge` (GraalVM isolates are thread-affine and goroutines migrate). Correctness over raw concurrency; use multiple `Bridge` instances for parallelism.
+- **Python**: one `Mesmo` may be shared across threads — each OS thread attaches to the isolate lazily.
+- **Go**: all native calls are **serialized** onto one dedicated OS thread per `Mesmo` (GraalVM isolates are thread-affine and goroutines migrate). Correctness over raw concurrency; use multiple `Mesmo` instances for parallelism.
 - After `close()`, calls fail with a catchable error (e.g. Python's `MesmoClosedError`) — this guards against passing a stale isolate handle to the native side, which would abort the whole process.
 
 ## Format & versioning caveats

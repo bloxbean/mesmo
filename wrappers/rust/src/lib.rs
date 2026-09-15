@@ -105,19 +105,19 @@ fn to_cstring(s: &str) -> Result<CString> {
     })
 }
 
-/// Close-aware view of the bridge's isolate thread, shared with owned [`accounts::Account`]s.
-pub(crate) struct BridgeShared {
+/// Close-aware view of the lib's isolate thread, shared with owned [`accounts::Account`]s.
+pub(crate) struct MesmoShared {
     pub(crate) thread: std::cell::Cell<*mut ffi::graal_isolatethread_t>,
 }
 
-impl BridgeShared {
-    /// The live isolate thread, or a typed error once the Bridge has been dropped.
+impl MesmoShared {
+    /// The live isolate thread, or a typed error once the Mesmo has been dropped.
     pub(crate) fn thread(&self) -> Result<*mut ffi::graal_isolatethread_t> {
         let t = self.thread.get();
         if t.is_null() {
             return Err(MesmoError {
                 code: error_codes::MESMO_ERROR_INVALID_HANDLE,
-                message: "Bridge is closed; this Account's handle is no longer valid".to_string(),
+                message: "Mesmo is closed; this Account's handle is no longer valid".to_string(),
             });
         }
         Ok(t)
@@ -159,24 +159,24 @@ pub(crate) fn check_at(thread: *mut ffi::graal_isolatethread_t, rc: i32) -> Resu
 ///
 /// # Threading
 ///
-/// A `Bridge` is **thread-affine**: it must be used from the thread that created it. It is therefore
+/// A `Mesmo` is **thread-affine**: it must be used from the thread that created it. It is therefore
 /// neither `Send` nor `Sync`, and the compiler will stop you from moving one across threads. To use
-/// the library from several threads, **create one `Bridge` per thread**.
+/// the library from several threads, **create one `Mesmo` per thread**.
 ///
-/// This is not a conservative choice; it is what the native library requires. A `Bridge` holds a
+/// This is not a conservative choice; it is what the native library requires. A `Mesmo` holds a
 /// `graal_isolatethread_t*`, and that handle belongs to the OS thread that created it — it carries
 /// that thread's stack bounds and the VM's thread-local state, including the result/error slots the
 /// wrapper reads back after each call. Handing it to another thread corrupts the VM.
 /// (The *isolate* — the heap — can be shared; the isolate **thread** cannot. Conflating the two is
-/// what made the previous `unsafe impl Send for Bridge` unsound: it let safe code do exactly this,
+/// what made the previous `unsafe impl Send for Mesmo` unsound: it let safe code do exactly this,
 /// with no `unsafe` block anywhere in sight, and it appeared to work right up until it didn't.)
 ///
-/// Moving a `Bridge` to another thread does not compile — and must keep not compiling:
+/// Moving a `Mesmo` to another thread does not compile — and must keep not compiling:
 ///
 /// ```compile_fail
-/// let bridge = mesmo::Bridge::new().unwrap();
+/// let lib = mesmo::Mesmo::new().unwrap();
 /// std::thread::spawn(move || {
-///     let _ = bridge.version(); // error: `*mut c_void` cannot be sent between threads safely
+///     let _ = lib.version(); // error: `*mut c_void` cannot be sent between threads safely
 /// });
 /// ```
 ///
@@ -185,29 +185,29 @@ pub(crate) fn check_at(thread: *mut ffi::graal_isolatethread_t, rc: i32) -> Resu
 /// ```no_run
 /// let handles: Vec<_> = (0..4)
 ///     .map(|_| std::thread::spawn(|| {
-///         let bridge = mesmo::Bridge::new()?;   // each thread owns its own isolate
-///         bridge.version()
+///         let lib = mesmo::Mesmo::new()?;   // each thread owns its own isolate
+///         lib.version()
 ///     }))
 ///     .collect();
 /// # Ok::<(), mesmo::MesmoError>(())
 /// ```
-pub struct Bridge {
+pub struct Mesmo {
     #[allow(dead_code)]
     isolate: *mut ffi::graal_isolate_t,
-    // The single home of the isolate-thread pointer, shared with owned Accounts (Rc: the Bridge
+    // The single home of the isolate-thread pointer, shared with owned Accounts (Rc: the Mesmo
     // is !Send, so no atomics needed). Drop takes the pointer out of the cell (nulling it) before
     // tearing the isolate down, hard-invalidating every outstanding Account in the same act:
     // their calls then fail with a normal MesmoError instead of touching a dead isolate. Keeping
-    // exactly one copy means no future close/reset path can desync Bridge and Accounts.
-    pub(crate) shared: std::rc::Rc<BridgeShared>,
+    // exactly one copy means no future close/reset path can desync Mesmo and Accounts.
+    pub(crate) shared: std::rc::Rc<MesmoShared>,
     // Raw pointers are already !Send + !Sync, so no negative impl is needed — but that is a load-
     // bearing property of this type, not an accident, and removing this field must not silently
     // make it Send again.
     _not_send: PhantomData<*const ()>,
 }
 
-impl Bridge {
-    /// Create a new Bridge instance with a GraalVM isolate.
+impl Mesmo {
+    /// Create a new Mesmo instance with a GraalVM isolate.
     pub fn new() -> Result<Self> {
         let mut isolate: *mut ffi::graal_isolate_t = ptr::null_mut();
         let mut thread: *mut ffi::graal_isolatethread_t = ptr::null_mut();
@@ -223,13 +223,13 @@ impl Bridge {
             });
         }
 
-        let bridge = Bridge {
+        let lib = Mesmo {
             isolate,
-            shared: std::rc::Rc::new(BridgeShared { thread: std::cell::Cell::new(thread) }),
+            shared: std::rc::Rc::new(MesmoShared { thread: std::cell::Cell::new(thread) }),
             _not_send: PhantomData,
         };
-        bridge.check_version()?;
-        Ok(bridge)
+        lib.check_version()?;
+        Ok(lib)
     }
 
     /// Fail fast on a native-lib / wrapper version skew rather than surfacing it later as a confusing
@@ -256,9 +256,9 @@ impl Bridge {
         Ok(())
     }
 
-    /// The live isolate thread. Infallible for the Bridge's own methods: while a `&Bridge`
+    /// The live isolate thread. Infallible for the Mesmo's own methods: while a `&Mesmo`
     /// exists, `Drop` cannot have run, so the cell is non-null by construction. (Accounts, which
-    /// can outlive the Bridge, go through the fallible [`BridgeShared::thread`] instead.)
+    /// can outlive the Mesmo, go through the fallible [`MesmoShared::thread`] instead.)
     fn thread(&self) -> *mut ffi::graal_isolatethread_t {
         self.shared.thread.get()
     }
@@ -275,41 +275,41 @@ impl Bridge {
 
     /// Get the address namespace API.
     pub fn address(&self) -> AddressApi<'_> {
-        AddressApi { bridge: self }
+        AddressApi { lib: self }
     }
 
     /// Get the crypto namespace API.
     pub fn crypto(&self) -> CryptoApi<'_> {
-        CryptoApi { bridge: self }
+        CryptoApi { lib: self }
     }
 
     /// Get the transaction namespace API.
     pub fn tx(&self) -> TxApi<'_> {
-        TxApi { bridge: self }
+        TxApi { lib: self }
     }
 
     /// Get the plutus namespace API.
     pub fn plutus(&self) -> PlutusApi<'_> {
-        PlutusApi { bridge: self }
+        PlutusApi { lib: self }
     }
 
     /// Get the script namespace API.
     pub fn script(&self) -> ScriptApi<'_> {
-        ScriptApi { bridge: self }
+        ScriptApi { lib: self }
     }
 
     /// Managed accounts (ADR-0016): open once, hold an owned Account, sign with typed roles.
     pub fn accounts(&self) -> accounts::AccountsApi<'_> {
-        accounts::AccountsApi { bridge: self }
+        accounts::AccountsApi { lib: self }
     }
 
     /// Get the quicktx namespace API.
     pub fn quicktx(&self) -> QuickTxApi<'_> {
-        QuickTxApi { bridge: self }
+        QuickTxApi { lib: self }
     }
 }
 
-impl Drop for Bridge {
+impl Drop for Mesmo {
     fn drop(&mut self) {
         // Take the pointer out of the cell (nulling it) before the isolate dies: outstanding
         // Accounts are invalidated in the same act — their calls become typed errors, never
@@ -326,14 +326,14 @@ impl Drop for Bridge {
 // --- AddressApi ---
 
 pub struct AddressApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> AddressApi<'a> {
     pub fn info(&self, bech32: &str) -> Result<String> {
         let cs = to_cstring(bech32)?;
-        let rc = unsafe { ffi::mesmo_address_info(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_address_info(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn validate(&self, bech32: &str) -> bool {
@@ -341,45 +341,45 @@ impl<'a> AddressApi<'a> {
             Ok(s) => s,
             Err(_) => return false,
         };
-        let rc = unsafe { ffi::mesmo_address_validate(self.bridge.thread(), cs.as_ptr()) };
+        let rc = unsafe { ffi::mesmo_address_validate(self.lib.thread(), cs.as_ptr()) };
         rc == error_codes::MESMO_SUCCESS
     }
 
     pub fn to_bytes(&self, bech32: &str) -> Result<String> {
         let cs = to_cstring(bech32)?;
-        let rc = unsafe { ffi::mesmo_address_to_bytes(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_address_to_bytes(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn from_bytes(&self, hex_bytes: &str) -> Result<String> {
         let cs = to_cstring(hex_bytes)?;
-        let rc = unsafe { ffi::mesmo_address_from_bytes(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_address_from_bytes(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 }
 
 // --- CryptoApi ---
 
 pub struct CryptoApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> CryptoApi<'a> {
     pub fn blake2b_256(&self, data_hex: &str) -> Result<String> {
         let cs = to_cstring(data_hex)?;
-        let rc = unsafe { ffi::mesmo_crypto_blake2b_256(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_crypto_blake2b_256(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn blake2b_224(&self, data_hex: &str) -> Result<String> {
         let cs = to_cstring(data_hex)?;
-        let rc = unsafe { ffi::mesmo_crypto_blake2b_224(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_crypto_blake2b_224(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn generate_mnemonic(&self, word_count: i32) -> Result<String> {
-        let rc = unsafe { ffi::mesmo_crypto_generate_mnemonic(self.bridge.thread(), word_count) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_crypto_generate_mnemonic(self.lib.thread(), word_count) };
+        self.lib.check(rc)
     }
 
     pub fn validate_mnemonic(&self, mnemonic: &str) -> bool {
@@ -387,7 +387,7 @@ impl<'a> CryptoApi<'a> {
             Ok(s) => s,
             Err(_) => return false,
         };
-        let rc = unsafe { ffi::mesmo_crypto_validate_mnemonic(self.bridge.thread(), cs.as_ptr()) };
+        let rc = unsafe { ffi::mesmo_crypto_validate_mnemonic(self.lib.thread(), cs.as_ptr()) };
         rc == error_codes::MESMO_SUCCESS
     }
 
@@ -396,8 +396,8 @@ impl<'a> CryptoApi<'a> {
     pub fn sign(&self, message_hex: &str, sk_hex: &str) -> Result<String> {
         let cs_msg = to_cstring(message_hex)?;
         let cs_sk = to_cstring(sk_hex)?;
-        let rc = unsafe { ffi::mesmo_crypto_sign(self.bridge.thread(), cs_msg.as_ptr(), cs_sk.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_crypto_sign(self.lib.thread(), cs_msg.as_ptr(), cs_sk.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn verify(&self, signature_hex: &str, message_hex: &str, pk_hex: &str) -> bool {
@@ -414,7 +414,7 @@ impl<'a> CryptoApi<'a> {
             Err(_) => return false,
         };
         let rc = unsafe {
-            ffi::mesmo_crypto_verify(self.bridge.thread(), cs_sig.as_ptr(), cs_msg.as_ptr(), cs_pk.as_ptr())
+            ffi::mesmo_crypto_verify(self.lib.thread(), cs_sig.as_ptr(), cs_msg.as_ptr(), cs_pk.as_ptr())
         };
         rc == error_codes::MESMO_SUCCESS
     }
@@ -438,101 +438,101 @@ impl<'a> CryptoApi<'a> {
         let cs_role = to_cstring(role)?;
         let rc = unsafe {
             ffi::mesmo_crypto_derive_key(
-                self.bridge.thread(),
+                self.lib.thread(),
                 cs_mnemonic.as_ptr(),
                 account_index,
                 address_index,
                 cs_role.as_ptr(),
             )
         };
-        self.bridge.check(rc)
+        self.lib.check(rc)
     }
 }
 
 // --- TxApi ---
 
 pub struct TxApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> TxApi<'a> {
     pub fn hash(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_tx_hash(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_tx_hash(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn sign_with_secret_key(&self, tx_cbor_hex: &str, sk_cbor_hex: &str) -> Result<String> {
         let cs_tx = to_cstring(tx_cbor_hex)?;
         let cs_sk = to_cstring(sk_cbor_hex)?;
         let rc = unsafe {
-            ffi::mesmo_tx_sign_with_secret_key(self.bridge.thread(), cs_tx.as_ptr(), cs_sk.as_ptr())
+            ffi::mesmo_tx_sign_with_secret_key(self.lib.thread(), cs_tx.as_ptr(), cs_sk.as_ptr())
         };
-        self.bridge.check(rc)
+        self.lib.check(rc)
     }
 
     pub fn to_json(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_tx_to_json(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_tx_to_json(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn from_json(&self, tx_json: &str) -> Result<String> {
         let cs = to_cstring(tx_json)?;
-        let rc = unsafe { ffi::mesmo_tx_from_json(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_tx_from_json(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn deserialize(&self, tx_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(tx_cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_tx_deserialize(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_tx_deserialize(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 }
 
 // --- PlutusApi ---
 
 pub struct PlutusApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> PlutusApi<'a> {
     pub fn data_hash(&self, datum_cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(datum_cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_plutus_data_hash(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_plutus_data_hash(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn data_to_json(&self, cbor_hex: &str) -> Result<String> {
         let cs = to_cstring(cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_plutus_data_to_json(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_plutus_data_to_json(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn data_from_json(&self, json: &str) -> Result<String> {
         let cs = to_cstring(json)?;
-        let rc = unsafe { ffi::mesmo_plutus_data_from_json(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_plutus_data_from_json(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 }
 
 // --- ScriptApi ---
 
 pub struct ScriptApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> ScriptApi<'a> {
     pub fn native_from_json(&self, json: &str) -> Result<String> {
         let cs = to_cstring(json)?;
-        let rc = unsafe { ffi::mesmo_script_native_from_json(self.bridge.thread(), cs.as_ptr()) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_script_native_from_json(self.lib.thread(), cs.as_ptr()) };
+        self.lib.check(rc)
     }
 
     pub fn hash(&self, script_cbor_hex: &str, script_type: i32) -> Result<String> {
         let cs = to_cstring(script_cbor_hex)?;
-        let rc = unsafe { ffi::mesmo_script_hash(self.bridge.thread(), cs.as_ptr(), script_type) };
-        self.bridge.check(rc)
+        let rc = unsafe { ffi::mesmo_script_hash(self.lib.thread(), cs.as_ptr(), script_type) };
+        self.lib.check(rc)
     }
 }
 
@@ -548,7 +548,7 @@ pub struct TxResult {
 
 /// QuickTx namespace API.
 pub struct QuickTxApi<'a> {
-    bridge: &'a Bridge,
+    lib: &'a Mesmo,
 }
 
 impl<'a> QuickTxApi<'a> {
@@ -560,7 +560,7 @@ impl<'a> QuickTxApi<'a> {
     ///
     /// For Plutus script transactions, pass the redeemers' execution units as `exec_units` — a JSON
     /// array of `{mem, steps}` (one per redeemer, in transaction order). Compute them with any
-    /// evaluator (Ogmios, Blockfrost, Aiken, Scalus); the bridge does not run the script. Pass
+    /// evaluator (Ogmios, Blockfrost, Aiken, Scalus); the lib does not run the script. Pass
     /// `None` for non-script transactions.
     ///
     /// `additional_signers` budgets vkey witnesses for fee estimation, beyond those the input
@@ -605,7 +605,7 @@ impl<'a> QuickTxApi<'a> {
 
         let rc = unsafe {
             ffi::mesmo_quicktx_build(
-                self.bridge.thread(),
+                self.lib.thread(),
                 yaml_cs.as_ptr(),
                 utxos_cs.as_ptr(),
                 pp_cs.as_ptr(),
@@ -614,7 +614,7 @@ impl<'a> QuickTxApi<'a> {
             )
         };
         // The build result is a YAML document.
-        let result = self.bridge.check(rc)?;
+        let result = self.lib.check(rc)?;
         serde_yaml::from_str(&result).map_err(|e| MesmoError {
             code: error_codes::MESMO_ERROR_SERIALIZATION,
             message: format!("Failed to parse tx result: {}", e),

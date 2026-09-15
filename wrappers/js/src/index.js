@@ -78,14 +78,14 @@ export class MesmoError extends Error {
 }
 
 /**
- * Thrown when a MesmoBridge is used after close().
+ * Thrown when a Mesmo instance is used after close().
  *
  * Without it the stale isolate handle reaches the native library and GraalVM aborts the whole
  * process — uncatchable, with no JS stack trace.
  */
 export class MesmoClosedError extends Error {
   constructor() {
-    super('MesmoBridge is closed; create a new one (or move the call inside its `using`/try block)');
+    super('Mesmo is closed; create a new one (or move the call inside its `using`/try block)');
     this.name = 'MesmoClosedError';
   }
 }
@@ -221,7 +221,7 @@ const EXPECTED_LIB_VERSION = '0.1.0';
 function baseVersion(v) {
   return v.split(/[-+]/, 1)[0].trim();
 }
-export class MesmoBridge {
+export class Mesmo {
   constructor(libPath) {
     const libFile = resolveLibFile(libPath);
 
@@ -320,10 +320,10 @@ export class MesmoBridge {
    * close() tears the isolate down; passing its stale handle back to the native side makes GraalVM
    * abort the *process* ("Failed to enter the specified IsolateThread context") — not a JS
    * exception, so try/catch cannot see it and no stack points at the offending call. Any stray async
-   * callback racing the `finally { bridge.close() }` that the examples teach would kill the process.
+   * callback racing the `finally { lib.close() }` that the examples teach would kill the process.
    * Throwing a real Error here turns that into something catchable and debuggable.
    *
-   * @throws {MesmoClosedError} if the bridge has been closed
+   * @throws {MesmoClosedError} if the lib has been closed
    */
   get _thread() {
     if (this._threadPtr === null) {
@@ -373,7 +373,7 @@ export class MesmoBridge {
     }
   }
 
-  /** Enables `using bridge = new MesmoBridge()` — closes automatically at end of scope. */
+  /** Enables `using lib = new Mesmo()` — closes automatically at end of scope. */
   [Symbol.dispose]() {
     this.close();
   }
@@ -400,7 +400,7 @@ export class MesmoBridge {
 // --- Namespace API classes ---
 
 class AddressApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   /**
    * Decode a bech32 address.
@@ -430,7 +430,7 @@ class AddressApi {
 }
 
 class CryptoApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   blake2b256(dataHex) {
     return this._b._check(this._b._lib.mesmo_crypto_blake2b_256(this._b._thread, cstr(dataHex)));
@@ -476,7 +476,7 @@ class CryptoApi {
 }
 
 class TxApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   hash(txCborHex) {
     return this._b._check(this._b._lib.mesmo_tx_hash(this._b._thread, cstr(txCborHex)));
@@ -500,7 +500,7 @@ class TxApi {
 }
 
 class PlutusApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   dataHash(datumCborHex) {
     return this._b._check(this._b._lib.mesmo_plutus_data_hash(this._b._thread, cstr(datumCborHex)));
@@ -516,7 +516,7 @@ class PlutusApi {
 }
 
 class ScriptApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   nativeFromJson(json) {
     return this._b._check(this._b._lib.mesmo_script_native_from_json(this._b._thread, cstr(json)));
@@ -528,8 +528,8 @@ class ScriptApi {
 }
 
 export class QuickTxApi {
-  constructor(bridge) {
-    this._b = bridge;
+  constructor(lib) {
+    this._b = lib;
   }
 
   /**
@@ -540,7 +540,7 @@ export class QuickTxApi {
    * @param {object} protocolParams - protocol parameters (CCL ProtocolParams model).
    * @param {Array<{mem: (number|string), steps: (number|string)}>} [execUnits] - optional redeemer
    *   execution units (one per redeemer, in transaction order) for Plutus script transactions.
-   *   Compute these with any evaluator (Ogmios, Blockfrost, Aiken, Scalus); the bridge does not run
+   *   Compute these with any evaluator (Ogmios, Blockfrost, Aiken, Scalus); the lib does not run
    *   the script.
    * @param {number} [additionalSigners=0] - vkey witnesses the fee must budget beyond those implied
    *   by the input UTXOs (one per sender). You know how many keys will sign: 0 for a plain payment,
@@ -573,7 +573,7 @@ export class QuickTxApi {
    * Convenience: fetch chain data from a provider and build, in one call.
    *
    * Composes `provider.utxos(sender)` + `provider.protocolParams()` with {@link QuickTxApi#build}.
-   * The bridge stays offline — this only moves the optional HTTP fetch into wrapper code. See
+   * The lib stays offline — this only moves the optional HTTP fetch into wrapper code. See
    * `src/providers.js` for available providers (Yaci DevKit, Blockfrost) or supply your own object
    * with `utxos(address)` and `protocolParams()`.
    *
@@ -624,12 +624,12 @@ export class QuickTxApi {
 // Best-effort GC fallback (ADR-0016 "wrapper finalizers are fallback protection"): a dropped
 // Account's native registry entry pins key material until process exit. Deterministic close()
 // or `using` remains the contract — this only narrows the leak. The callback must not touch
-// the read-once result slot (it ignores the return code) and must skip closed bridges: the raw
+// the read-once result slot (it ignores the return code) and must skip closed instances: the raw
 // _threadPtr guard is deliberate, the throwing _thread getter would be wrong in a finalizer.
-const accountFinalizer = new FinalizationRegistry(({ bridge, handle }) => {
-  if (bridge._threadPtr !== null && handle) {
+const accountFinalizer = new FinalizationRegistry(({ lib, handle }) => {
+  if (lib._threadPtr !== null && handle) {
     try {
-      bridge._lib.mesmo_account_close(bridge._threadPtr, handle);
+      lib._lib.mesmo_account_close(lib._threadPtr, handle);
     } catch {
       // best-effort only
     }
@@ -637,11 +637,11 @@ const accountFinalizer = new FinalizationRegistry(({ bridge, handle }) => {
 });
 
 export class Account {
-  constructor(bridge, handle) {
-    this._b = bridge;
+  constructor(lib, handle) {
+    this._b = lib;
     this._handle = handle;
     this._info = null;
-    accountFinalizer.register(this, { bridge, handle }, this);
+    accountFinalizer.register(this, { lib, handle }, this);
   }
 
   /**
@@ -712,10 +712,10 @@ export class Account {
   }
 }
 
-/** Managed-accounts namespace (`bridge.accounts`, ADR-0016). */
+/** Managed-accounts namespace (`lib.accounts`, ADR-0016). */
 export class AccountsApi {
-  constructor(bridge) {
-    this._b = bridge;
+  constructor(lib) {
+    this._b = lib;
   }
 
   /**

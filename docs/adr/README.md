@@ -25,7 +25,7 @@ stays reserved).
 | ADR | Title | Status | Decided |
 |-----|-------|--------|---------|
 | [0001](0001-native-shared-library-ffi.md) | Native shared library via GraalVM native-image + C FFI | Accepted | 2026-02-11 |
-| [0002](0002-offline-stateless-no-provider.md) | Offline, stateless bridge — caller-supplied chain data, no HTTP provider in libmesmo | Accepted | 2026-02-11 |
+| [0002](0002-offline-stateless-no-provider.md) | Offline, stateless Mesmo — caller-supplied chain data, no HTTP provider in libmesmo | Accepted | 2026-02-11 |
 | [0003](0003-four-language-wrappers-uniform-ffi.md) | One FFI, four language wrappers — uniform thin contract with explicit inputs | Accepted | 2026-02-11 |
 | [0004](0004-bun-only-javascript-runtime.md) | Bun is the only supported JavaScript runtime | Accepted | 2026-02-11 |
 | [0005](0005-oracle-graalvm-25.md) | Standardize on Oracle GraalVM 25.0.3 | Accepted | 2026-06-10 |

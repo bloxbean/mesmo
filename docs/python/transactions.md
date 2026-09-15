@@ -7,10 +7,10 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```python
-from mesmo import MesmoLib, Network, SigningRole, YaciProvider
+from mesmo import Mesmo, Network, SigningRole, YaciProvider
 import urllib.request
 
-with MesmoLib() as lib:
+with Mesmo() as lib:
     provider = YaciProvider()   # or BlockfrostProvider, or your own
 
     # 1. Describe — TxPlan YAML (see the intent catalog)

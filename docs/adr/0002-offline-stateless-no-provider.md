@@ -1,4 +1,4 @@
-# ADR-0002: Offline, stateless bridge — caller-supplied chain data, no HTTP provider in libmesmo
+# ADR-0002: Offline, stateless Mesmo — caller-supplied chain data, no HTTP provider in libmesmo
 
 - **Status:** Accepted
 - **Date:** 2026-02-11

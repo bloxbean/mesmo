@@ -2,16 +2,16 @@
 //! (wrappers/python/tests/test_crypto.py). Covers exact Blake2b vectors, the 12-word mnemonic path,
 //! and the negative / error cases (invalid hex, invalid signing key).
 
-use mesmo::Bridge;
+use mesmo::Mesmo;
 
-fn bridge() -> Bridge {
-    Bridge::new().expect("Failed to create bridge")
+fn lib() -> Mesmo {
+    Mesmo::new().expect("Failed to create lib")
 }
 
 #[test]
 fn test_crypto_blake2b_256_known_vector() {
     // Blake2b-256 of "Hello" (0x48656c6c6f).
-    let b = bridge();
+    let b = lib();
     let hash = b.crypto().blake2b_256("48656c6c6f").expect("Failed to hash");
     assert_eq!(
         hash,
@@ -22,7 +22,7 @@ fn test_crypto_blake2b_256_known_vector() {
 #[test]
 fn test_crypto_blake2b_224_known_vector() {
     // Blake2b-224 of "Hello" (0x48656c6c6f).
-    let b = bridge();
+    let b = lib();
     let hash = b.crypto().blake2b_224("48656c6c6f").expect("Failed to hash");
     assert_eq!(
         hash,
@@ -32,7 +32,7 @@ fn test_crypto_blake2b_224_known_vector() {
 
 #[test]
 fn test_crypto_generate_12_word_mnemonic() {
-    let b = bridge();
+    let b = lib();
     let mnemonic = b
         .crypto()
         .generate_mnemonic(12)
@@ -43,7 +43,7 @@ fn test_crypto_generate_12_word_mnemonic() {
 
 #[test]
 fn test_crypto_invalid_mnemonic_rejected() {
-    let b = bridge();
+    let b = lib();
     assert!(!b.crypto().validate_mnemonic("not a valid mnemonic"));
 }
 
@@ -51,14 +51,14 @@ fn test_crypto_invalid_mnemonic_rejected() {
 
 #[test]
 fn test_crypto_blake2b_256_invalid_hex() {
-    let b = bridge();
+    let b = lib();
     let result = b.crypto().blake2b_256("not_valid_hex!");
     assert!(result.is_err(), "expected error for invalid hex input");
 }
 
 #[test]
 fn test_crypto_sign_invalid_key() {
-    let b = bridge();
+    let b = lib();
     let bad_key = "zz".repeat(32);
     let result = b.crypto().sign("68656c6c6f", &bad_key);
     assert!(result.is_err(), "expected error signing with invalid key");

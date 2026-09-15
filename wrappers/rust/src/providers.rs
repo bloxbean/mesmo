@@ -10,13 +10,13 @@
 //! [`QuickTxApi::build_with`](crate::QuickTxApi::build_with):
 //!
 //! ```no_run
-//! use mesmo::Bridge;
+//! use mesmo::Mesmo;
 //! use mesmo::providers::BlockfrostProvider;
 //! # let yaml = "version: 1.0";
 //! # let sender = "addr_test1...";
-//! let bridge = Bridge::new()?;
+//! let lib = Mesmo::new()?;
 //! let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-//! let result = bridge.quicktx().build_with(yaml, &provider, &[sender], 0, None)?;
+//! let result = lib.quicktx().build_with(yaml, &provider, &[sender], 0, None)?;
 //! # Ok::<(), mesmo::MesmoError>(())
 //! ```
 
@@ -65,7 +65,7 @@ fn hex_decode(s: &str) -> Result<Vec<u8>> {
 /// Fetches the chain data [`QuickTxApi::build`](crate::QuickTxApi::build) needs. Implement to plug in
 /// any backend (Blockfrost, Koios, Ogmios, Yaci DevKit, ...).
 pub trait ChainDataProvider {
-    /// All UTXOs at `address` (no selection — the bridge selects internally), as a JSON array.
+    /// All UTXOs at `address` (no selection — the lib selects internally), as a JSON array.
     fn utxos(&self, address: &str) -> Result<Value>;
     /// Current protocol parameters, as a JSON object.
     fn protocol_params(&self) -> Result<Value>;
@@ -182,7 +182,7 @@ impl ChainDataProvider for BlockfrostProvider {
 }
 
 /// Computes a Plutus transaction's redeemer execution units. Implement to plug in any evaluator
-/// (Blockfrost, Ogmios, ...). The bridge computes them offline with Scalus when you supply none
+/// (Blockfrost, Ogmios, ...). The lib computes them offline with Scalus when you supply none
 /// (ADR-0013); an evaluator lets you use a remote one instead. HTTP is a wrapper concern — libmesmo
 /// never makes network calls (ADR-0002).
 pub trait TransactionEvaluator {

@@ -1,4 +1,4 @@
-// Unit tests for how MesmoBridge locates the native library. These exercise only the path-resolution
+// Unit tests for how Mesmo locates the native library. These exercise only the path-resolution
 // logic (resolveLibFile is a pure function), so they run without loading libmesmo.
 import { test, expect, afterEach } from "bun:test";
 import path from "path";

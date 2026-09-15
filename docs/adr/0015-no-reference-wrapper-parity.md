@@ -6,7 +6,7 @@
 
 ## Context
 
-The bridge exposes one native library (`libmesmo`) through four wrappers — Python, Go, Rust, and
+Mesmo exposes one native library (`libmesmo`) through four wrappers — Python, Go, Rust, and
 JavaScript (Bun) ([ADR-0003](0003-four-language-wrappers-uniform-ffi.md)). As the FFI surface grows,
 the wrappers can **drift**: one wrapper gains a new `@CEntryPoint` or capability that the others lack.
 
@@ -28,8 +28,8 @@ completeness, not a hierarchy.
   all four run the same build → sign → submit scenarios against a live DevKit in `integration-tests.yml`.
 - **Backed by a contributor checklist** for the manual parts (below).
 
-Explicitly **out of scope:** identical *code*. Each wrapper stays idiomatic — `MesmoLib` (Python) /
-`Bridge` (Go, Rust) / `MesmoBridge` (JS), `snake_case` vs `camelCase`, per-language error types — and
+Explicitly **out of scope:** identical *code*. Each wrapper stays idiomatic — `Mesmo` (Python) /
+`Mesmo` (Go, Rust) / `Mesmo` (JS), `snake_case` vs `camelCase`, per-language error types — and
 some tests are legitimately wrapper-specific (the library loaders, the version-skew check, JS's
 cost-model normalization, musl detection). Parity means the same *capabilities and coverage*, not the
 same source.

@@ -76,7 +76,7 @@ def test_build_with_composes_fetch_and_build():
         def protocol_params(self):
             return sentinel_pp
 
-    qt = QuickTx(bridge=None)
+    qt = QuickTx(lib=None)
     calls = []
     qt.build = lambda y, u, p, e=None, additional_signers=0: (
         calls.append((y, u, p, e, additional_signers)), {"tx_cbor": "DRAFT"})[1]
@@ -116,7 +116,7 @@ def test_build_with_merges_and_dedupes_utxos_across_senders():
         def protocol_params(self):
             return {"min_fee_a": 44}
 
-    qt = QuickTx(bridge=None)
+    qt = QuickTx(lib=None)
     calls = []
     qt.build = lambda y, u, p, e=None, additional_signers=0: (
         calls.append(u), {"tx_cbor": "DRAFT"})[1]

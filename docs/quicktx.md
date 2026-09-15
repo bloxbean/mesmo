@@ -101,7 +101,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 | `native_script` | Attach a native script |
 | `script_collect_from` / `script_minting` / `validator` | Plutus script operations |
 
-> The exact YAML fields for each intent come from CCL's TxPlan serialization. This bridge passes the
+> The exact YAML fields for each intent come from CCL's TxPlan serialization. This Mesmo passes the
 > YAML through unchanged, so the authoritative field reference is the CCL `quicktx` module
 > (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre4`). Known-good shapes for every intent
 > are cataloged in [Intent catalog — verified shapes](#intent-catalog--verified-shapes) below.
@@ -111,7 +111,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 > [Scalus](https://scalus.org) UPLC evaluator (see [ADR-0013](adr/0013-transaction-evaluators.md)).
 > To supply your own units instead — from Ogmios, Blockfrost, Aiken, or any other evaluator — pass
 > `exec_units_json`, a JSON array of `[{mem, steps}]`, one per redeemer in transaction order; the
-> bridge then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
+> Mesmo then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
 > Explicit units always take precedence over the Scalus default.
 
 > **Witness budgeting is caller-supplied.** `additional_signers` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate (`payment`+`stake` signing), `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
@@ -225,7 +225,7 @@ transaction:
 
 A script intent goes under `scripts:` (the validator) with the operation in `intents:`. Execution
 units are optional — omitted, the embedded Scalus evaluator computes them offline; this example
-supplies them explicitly, in which case the bridge stamps them on without running the script.
+supplies them explicitly, in which case Mesmo stamps them on without running the script.
 
 ```yaml
 version: 1.0
@@ -519,9 +519,9 @@ submit it yourself.
 ### Python
 
 ```python
-from mesmo import MesmoLib, Network, SigningRole
+from mesmo import Mesmo, Network, SigningRole
 
-lib = MesmoLib()
+lib = Mesmo()
 # additional_signers: witnesses beyond the input-implied payment key(s) — here 1 (a stake cert)
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params, additional_signers=1)
 with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
@@ -531,22 +531,22 @@ with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
 ### JavaScript (Bun)
 
 ```javascript
-import { MesmoBridge, TESTNET, SigningRole } from '@bloxbean/mesmo';
+import { Mesmo, TESTNET, SigningRole } from '@bloxbean/mesmo';
 
-const bridge = new MesmoBridge();
-const result = bridge.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
-using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+const lib = new Mesmo();
+const result = lib.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
+using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);
 const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 ```
 
 ### Go
 
 ```go
-bridge, _ := mesmo.New()
-defer bridge.Close()
+lib, _ := mesmo.New()
+defer lib.Close()
 
-result, _ := bridge.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
+result, _ := lib.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
+acct, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
 signed, _ := acct.SignTx(result.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
@@ -554,12 +554,12 @@ signed, _ := acct.SignTx(result.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ### Rust
 
 ```rust
-let bridge = mesmo::Bridge::new().unwrap();
+let lib = mesmo::Mesmo::new().unwrap();
 
 use mesmo::accounts::SigningRole;
 
-let result = bridge.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
-let acct = bridge.accounts()
+let result = lib.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
+let acct = lib.accounts()
     .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
     .unwrap();
 let signed = acct

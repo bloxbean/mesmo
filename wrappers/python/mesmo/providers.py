@@ -8,15 +8,15 @@ only stdlib ``urllib``.
 
 A provider implements two methods:
 
-    utxos(address)        -> list of UTXO dicts at the address (no selection — the bridge selects)
+    utxos(address)        -> list of UTXO dicts at the address (no selection — the lib selects)
     protocol_params()     -> protocol parameters dict
 
 Use one directly, or via the ``QuickTx.build_with`` convenience::
 
-    from mesmo import MesmoLib
+    from mesmo import Mesmo
     from mesmo.providers import BlockfrostProvider
 
-    lib = MesmoLib()
+    lib = Mesmo()
     provider = BlockfrostProvider(project_id, network="preprod")   # or YaciProvider() for DevKit
     result = lib.quicktx.build_with(txplan_yaml, provider, sender_address)
 """

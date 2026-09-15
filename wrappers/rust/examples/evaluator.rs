@@ -2,7 +2,7 @@
 //!
 //! A Plutus build needs each redeemer's execution units. This example mints a token with an
 //! always-succeeds validator and shows both ways to obtain them:
-//!   1. the offline default — the bridge computes the units in-process with Scalus (no network); and
+//!   1. the offline default — the lib computes the units in-process with Scalus (no network); and
 //!   2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 //!
 //! libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
@@ -16,7 +16,7 @@
 //!   cargo run --example evaluator --features providers
 //! ```
 use mesmo::providers::ChainDataProvider;
-use mesmo::{Bridge, Result};
+use mesmo::{Mesmo, Result};
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -51,10 +51,10 @@ fn main() -> Result<()> {
     let sender = utxos[0]["address"].as_str().expect("sender address").to_string();
 
     let provider = LocalProvider { utxos, params };
-    let bridge = Bridge::new()?;
+    let lib = Mesmo::new()?;
 
     // 1) Offline default: no evaluator -> Scalus runs the validator and stamps the computed units.
-    let result = bridge
+    let result = lib
         .quicktx()
         .build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
     println!(
@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     //
     //    use mesmo::providers::BlockfrostEvaluator;
     //    let evaluator = BlockfrostEvaluator::new("preprod_your_project_id", "preprod")?;
-    //    let result = bridge.quicktx().build_with(&yaml, &provider, &sender, Some(&evaluator))?;
+    //    let result = lib.quicktx().build_with(&yaml, &provider, &sender, Some(&evaluator))?;
     //
     // To supply units yourself, call build() directly with the units as a JSON array.
     Ok(())

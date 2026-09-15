@@ -8,7 +8,7 @@ from ctypes import c_int, c_char_p, c_void_p, POINTER, byref
 from mesmo.network import Network
 
 # Native libmesmo version this wrapper expects, kept in lockstep with the package version. On init the
-# wrapper compares it against mesmo_version() and fails fast on a skew (see MesmoLib._check_version).
+# wrapper compares it against mesmo_version() and fails fast on a skew (see Mesmo._check_version).
 EXPECTED_LIB_VERSION = "0.1.0"
 
 
@@ -17,7 +17,7 @@ def _base_version(v):
     return v.split("-", 1)[0].split("+", 1)[0].strip()
 
 
-class MesmoLib:
+class Mesmo:
     """Low-level FFI wrapper around libmesmo shared library."""
 
     # Error codes
@@ -37,7 +37,7 @@ class MesmoLib:
 
     # Networks. Kept as aliases of the Network enum for the call sites that predate it — prefer
     # `from mesmo import Network`. NB these are CCL's enum ordinals, not Cardano's on-chain network
-    # id (MAINNET is 0 here, but a mainnet address's on-chain network_id is 1); see ccl/network.py.
+    # id (MAINNET is 0 here, but a mainnet address's on-chain network_id is 1); see mesmo/network.py.
     MAINNET = Network.MAINNET
     TESTNET = Network.TESTNET
 
@@ -254,14 +254,14 @@ class MesmoLib:
            IsolateThread context"), not a Python exception. Raise instead.
         2. **Thread affinity.** An IsolateThread belongs to the OS thread that created it and carries
            that thread's stack bounds and VM thread-locals. Reusing one handle from another thread —
-           which is what this class used to do — corrupts the VM: sharing a MesmoLib across a
+           which is what this class used to do — corrupts the VM: sharing a Mesmo across a
            ThreadPoolExecutor killed the interpreter with "Must either be at a safepoint or in native
            mode". Each thread therefore gets its own handle via graal_attach_thread. The Java side's
            result/error state is thread-local too, so concurrent calls stay independent.
         """
         if self._closed:
             raise MesmoClosedError(
-                "MesmoLib is closed; create a new instance (or don't call it outside its `with` block)"
+                "Mesmo is closed; create a new instance (or don't call it outside its `with` block)"
             )
         thread = getattr(self._local, "thread", None)
         if thread is None:
@@ -360,11 +360,11 @@ class MesmoError(Exception):
 
 
 class CclInvalidHandleError(MesmoError):
-    """Raised when an account handle is unknown, closed, or from another bridge (code -11)."""
+    """Raised when an account handle is unknown, closed, or from another lib (code -11)."""
 
 
 class MesmoClosedError(RuntimeError):
-    """Raised when a MesmoLib is used after close().
+    """Raised when a Mesmo instance is used after close().
 
     Without this, the stale isolate handle reaches the native library and GraalVM aborts the whole
     process ("Failed to enter the specified IsolateThread context") — not a Python exception, so it

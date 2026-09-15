@@ -12,7 +12,7 @@ import (
 
 // End-to-end submit tests: build each intent's TxPlan offline, sign it with the right key roles,
 // submit it to a Yaci DevKit devnet, and assert the node accepted it (the tx is retrievable
-// on-chain). This proves the bridge produces node-acceptable transactions — not just buildable CBOR.
+// on-chain). This proves the lib produces node-acceptable transactions — not just buildable CBOR.
 //
 // They use the fixed test account the fixtures are derived from (intentMnemonic / intentSender),
 // funded fresh on the devnet per test for isolation. They skip when DevKit is not running, so they
@@ -80,9 +80,9 @@ func signSubmitN(t *testing.T, yaml string, utxos []map[string]interface{}, pp m
 	var result *TxResult
 	var err error
 	if execUnits != nil {
-		result, err = bridge.QuickTx.Build(yaml, utxos, pp, additionalSigners, execUnits)
+		result, err = lib.QuickTx.Build(yaml, utxos, pp, additionalSigners, execUnits)
 	} else {
-		result, err = bridge.QuickTx.Build(yaml, utxos, pp, additionalSigners)
+		result, err = lib.QuickTx.Build(yaml, utxos, pp, additionalSigners)
 	}
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -149,11 +149,11 @@ func TestIntegrationManagedAccountHandleSignSubmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get utxos: %v", err)
 	}
-	built, err := bridge.QuickTx.Build(readIntentFixture(t, "stake_registration.yaml"), utxos, devnetPP(t), 1)
+	built, err := lib.QuickTx.Build(readIntentFixture(t, "stake_registration.yaml"), utxos, devnetPP(t), 1)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	acct, err := bridge.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(intentMnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("open account: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestIntegrationDRepKeyRequired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get utxos: %v", err)
 	}
-	built, err := bridge.QuickTx.Build(readIntentFixture(t, "drep_registration.yaml"), u, pp, 1)
+	built, err := lib.QuickTx.Build(readIntentFixture(t, "drep_registration.yaml"), u, pp, 1)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestIntegrationDonation(t *testing.T) {
 		yaml := strings.Replace(baseYaml, "current_treasury_value: 0",
 			"current_treasury_value: "+treasury, 1)
 
-		result, err := bridge.QuickTx.Build(yaml, utxos, pp, 0)
+		result, err := lib.QuickTx.Build(yaml, utxos, pp, 0)
 		if err != nil {
 			t.Fatalf("build: %v", err)
 		}
@@ -431,7 +431,7 @@ func TestIntegrationVoting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get utxos: %v", err)
 	}
-	proposal, err := bridge.QuickTx.Build(readIntentFixture(t, "governance_proposal.yaml"), u3, pp, 0)
+	proposal, err := lib.QuickTx.Build(readIntentFixture(t, "governance_proposal.yaml"), u3, pp, 0)
 	if err != nil {
 		t.Fatalf("build proposal: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestIntegrationAikenMintRejects(t *testing.T) {
 	skipIfNoDevKit(t)
 	// Negative validation: redeemer 0 makes the same validator evaluate to false, so phase-2
 	// validation fails and the node must reject the tx. Exec units are supplied manually — the
-	// bridge's StaticTransactionEvaluator stamps them without running the script, which is exactly
+	// lib's StaticTransactionEvaluator stamps them without running the script, which is exactly
 	// what lets a validation-failing tx reach the node.
 	devkitReset()
 	waitForBlock()
@@ -669,7 +669,7 @@ func TestIntegrationAikenMintRejects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get utxos: %v", err)
 	}
-	result, err := bridge.QuickTx.Build(readIntentFixture(t, "plutus/aiken_mint_fail.yaml"),
+	result, err := lib.QuickTx.Build(readIntentFixture(t, "plutus/aiken_mint_fail.yaml"),
 		utxos, devnetPP(t), 0, aikenExecUnits())
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -696,9 +696,9 @@ func signSubmitFee(t *testing.T, yaml string, utxos []map[string]interface{}, pp
 	var result *TxResult
 	var err error
 	if execUnits != nil {
-		result, err = bridge.QuickTx.Build(yaml, utxos, pp, additionalSigners, execUnits)
+		result, err = lib.QuickTx.Build(yaml, utxos, pp, additionalSigners, execUnits)
 	} else {
-		result, err = bridge.QuickTx.Build(yaml, utxos, pp, additionalSigners)
+		result, err = lib.QuickTx.Build(yaml, utxos, pp, additionalSigners)
 	}
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -958,11 +958,11 @@ func TestIntegrationNativeScriptSpend(t *testing.T) {
 	pp := devnetPP(t)
 
 	// Build a native script the sender's payment key satisfies, and its script address.
-	info, err := bridge.Address.Info(intentSender)
+	info, err := lib.Address.Info(intentSender)
 	if err != nil {
 		t.Fatalf("address info: %v", err)
 	}
-	scriptRes, err := bridge.Script.NativeFromJson(
+	scriptRes, err := lib.Script.NativeFromJson(
 		fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, info.PaymentCredentialHash))
 	if err != nil {
 		t.Fatalf("native script: %v", err)
@@ -977,7 +977,7 @@ func TestIntegrationNativeScriptSpend(t *testing.T) {
 	// NativeFromJson's cbor_hex is the hash preimage (leading 0x00 language tag); the TxPlan
 	// native_script block wants the bare script CBOR.
 	scriptHex := script.CborHex[2:]
-	scriptAddress, err := bridge.Address.FromBytes("70" + script.ScriptHash) // testnet script enterprise
+	scriptAddress, err := lib.Address.FromBytes("70" + script.ScriptHash) // testnet script enterprise
 	if err != nil {
 		t.Fatalf("script address: %v", err)
 	}
@@ -1110,7 +1110,7 @@ func TestIntegrationCompose(t *testing.T) {
 	}
 	utxos := append(append([]map[string]interface{}{}, u1...), u2...)
 
-	result, err := bridge.QuickTx.Build(readIntentFixture(t, "compose.yaml"), utxos, pp, 0)
+	result, err := lib.QuickTx.Build(readIntentFixture(t, "compose.yaml"), utxos, pp, 0)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}

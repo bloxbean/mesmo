@@ -11,15 +11,15 @@
 //! MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //!   cargo run --example transaction
 //! ```
-use mesmo::{Bridge, Network};
+use mesmo::{Mesmo, Network};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bridge = Bridge::new()?;
+    let lib = Mesmo::new()?;
 
-    let sender = bridge.accounts().create(Network::Testnet)?; // managed handle — signs below
+    let sender = lib.accounts().create(Network::Testnet)?; // managed handle — signs below
     let sender_info = sender.info()?;
-    let receiver = bridge.accounts().create(Network::Testnet)?;
+    let receiver = lib.accounts().create(Network::Testnet)?;
     let receiver_info = receiver.info()?;
     let sender_addr = sender_info["base_address"].as_str().unwrap();
     let receiver_addr = receiver_info["base_address"].as_str().unwrap();
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Build the unsigned transaction offline.
-    let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params, None, 0)?;
+    let result = lib.quicktx().build(&yaml, &utxos, &protocol_params, None, 0)?;
     println!("Built unsigned transaction from TxPlan YAML");
     println!("  tx hash: {}", result.tx_hash);
     println!("  fee    : {}", result.fee);

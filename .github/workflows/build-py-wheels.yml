@@ -275,4 +275,4 @@ jobs:
           python -m venv /tmp/venv
           /tmp/venv/bin/pip install --quiet "$WHEEL"
           cd /tmp && env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH /tmp/venv/bin/python -c \
-            "import mesmo; lib = mesmo.MesmoLib(); assert lib.version(); print('OK: wheel loads its bundled lib, version', lib.version())"
+            "import mesmo; lib = mesmo.Mesmo(); assert lib.version(); print('OK: wheel loads its bundled lib, version', lib.version())"

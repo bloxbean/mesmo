@@ -1,36 +1,36 @@
 # Go API Reference
 
-Everything lives in package `ccl`:
+Everything lives in package `mesmo`:
 
 ```go
 import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
-## Bridge
+## Mesmo
 
 ```go
-func New() (*Bridge, error)
-func (b *Bridge) Close() error
-func (b *Bridge) Version() (string, error)
+func New() (*Mesmo, error)
+func (b *Mesmo) Close() error
+func (b *Mesmo) Version() (string, error)
 
-var ErrBridgeClosed = errors.New("ccl: bridge is closed")
+var ErrClosed = errors.New("mesmo: closed")
 ```
 
 `New()` loads the native library (downloading it on first use — see [troubleshooting](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate on a dedicated pinned OS thread, and verifies the library version matches the wrapper. The API groups are exported fields:
 
 ```go
-bridge.Accounts // *AccountsApi (managed accounts, ADR-0016)
-bridge.Address  // *AddressApi
-bridge.Crypto   // *CryptoApi
-bridge.Tx       // *TxApi
-bridge.Plutus   // *PlutusApi
-bridge.Script   // *ScriptApi
-bridge.QuickTx  // *QuickTxApi
+lib.Accounts // *AccountsApi (managed accounts, ADR-0016)
+lib.Address  // *AddressApi
+lib.Crypto   // *CryptoApi
+lib.Tx       // *TxApi
+lib.Plutus   // *PlutusApi
+lib.Script   // *ScriptApi
+lib.QuickTx  // *QuickTxApi
 ```
 
-**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrBridgeClosed` (test with `errors.Is`) — it never hangs or panics.
+**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrClosed` (test with `errors.Is`) — it never hangs or panics.
 
-**Concurrency.** A `*Bridge` may be shared across goroutines; calls are serialized onto the bridge's single isolate thread. Create multiple bridges for parallelism.
+**Concurrency.** A `*Mesmo` may be shared across goroutines; calls are serialized onto Mesmo's single isolate thread. Create multiple instances for parallelism.
 
 ## Networks
 
@@ -78,13 +78,13 @@ Native failures surface as `*MesmoError` — match with `errors.As`. Error codes
 
 Predicate methods (`Address.Validate`, `Crypto.ValidateMnemonic`, `Crypto.Verify`) return `bool` and never error.
 
-## bridge.Accounts — managed accounts
+## lib.Accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
 
 ```go
-acct, err := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)  // or bridge.Accounts.Create(...)
+acct, err := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)  // or lib.Accounts.Create(...)
 defer acct.Close()
 
 info, _ := acct.Info()                            // *AccountPublicInfo — never the mnemonic
@@ -102,7 +102,7 @@ signed, err := acct.SignTx(txCbor, mesmo.RolePayment|mesmo.RoleStake)
   witnesses apply in canonical order. An empty mask is rejected.
 - `Close()` is explicit and idempotent — close Accounts like files. Like `os.File`, a dropped
   Account is reclaimed best-effort by a GC finalizer (fallback only; timing is the GC's). All
-  Account calls ride the Bridge's dedicated isolate thread, so concurrent goroutine use is safe
+  Account calls ride the Mesmo's dedicated isolate thread, so concurrent goroutine use is safe
   (and serialized). `String()` shows only the handle.
 - `Info()` returns public data only: the base/enterprise/stake/change addresses, network and
   derivation indices, `DRepID`, and the committee identifiers (`CommitteeColdID`/`CommitteeHotID`, bech32,
@@ -111,7 +111,7 @@ signed, err := acct.SignTx(txCbor, mesmo.RolePayment|mesmo.RoleStake)
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.Address
+## lib.Address
 
 ```go
 func (a *AddressApi) Info(bech32 string) (*AddressInfo, error)
@@ -131,7 +131,7 @@ type AddressInfo struct {
 }
 ```
 
-## bridge.Crypto
+## lib.Crypto
 
 ```go
 func (c *CryptoApi) Blake2b256(dataHex string) (string, error)
@@ -153,12 +153,12 @@ managed accounts for signing — handles never expose key bytes.
 Hash inputs are hex in → hex out:
 
 ```go
-digest, _ := bridge.Crypto.Blake2b256("48656c6c6f") // "Hello"
-key, _ := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
-sig, _ := bridge.Crypto.Sign(msgHex, key.PrivateKey) // pass the extended key whole
+digest, _ := lib.Crypto.Blake2b256("48656c6c6f") // "Hello"
+key, _ := lib.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+sig, _ := lib.Crypto.Sign(msgHex, key.PrivateKey) // pass the extended key whole
 ```
 
-## bridge.Tx
+## lib.Tx
 
 ```go
 func (t *TxApi) Hash(txCborHex string) (string, error)
@@ -170,7 +170,7 @@ func (t *TxApi) Deserialize(txCborHex string) (string, error)
 
 `ToJson`/`Deserialize` return a JSON string with a `body` field (inputs/outputs/fee). `SignWithSecretKey` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `Account.SignTx`.
 
-## bridge.Plutus
+## lib.Plutus
 
 ```go
 func (p *PlutusApi) DataHash(datumCborHex string) (string, error)   // 64 hex chars
@@ -179,10 +179,10 @@ func (p *PlutusApi) DataFromJson(jsonStr string) (string, error)    // returns C
 ```
 
 ```go
-hash, _ := bridge.Plutus.DataHash("182a")  // hash of PlutusData int 42
+hash, _ := lib.Plutus.DataHash("182a")  // hash of PlutusData int 42
 ```
 
-## bridge.Script
+## lib.Script
 
 ```go
 func (s *ScriptApi) NativeFromJson(jsonStr string) (string, error)              // JSON: {policy_id, script_hash, cbor_hex}
@@ -193,7 +193,7 @@ func (s *ScriptApi) Hash(scriptCborHex string, scriptType int) (string, error)  
 
 ```go
 scriptJSON := fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, info.PaymentCredentialHash)
-result, _ := bridge.Script.NativeFromJson(scriptJSON)
+result, _ := lib.Script.NativeFromJson(scriptJSON)
 // unmarshal result → policy_id, script_hash, cbor_hex
 ```
 
@@ -205,7 +205,7 @@ credentials) is public data on `acct.Info()`; governance *signing* uses `SignTx`
 An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment leaf — pass
 `addressIndex` to `Accounts.FromMnemonic` to enumerate addresses.
 
-## bridge.QuickTx
+## lib.QuickTx
 
 ```go
 func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interface{}, additionalSigners int, execUnits ...interface{}) (*TxResult, error)
@@ -228,10 +228,10 @@ type TxResult struct {
 - **`BuildWith`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```go
-result, err := bridge.QuickTx.Build(yaml, utxos, params, 0)          // plain payment
+result, err := lib.QuickTx.Build(yaml, utxos, params, 0)          // plain payment
 
-stakeResult, err := bridge.QuickTx.Build(yaml, utxos, params, 1)     // payment+stake signing
+stakeResult, err := lib.QuickTx.Build(yaml, utxos, params, 1)     // payment+stake signing
 
-plutusResult, err := bridge.QuickTx.Build(yaml, utxos, params, 0,
+plutusResult, err := lib.QuickTx.Build(yaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```

@@ -1,7 +1,7 @@
 // TypeScript declarations for @bloxbean/mesmo.
 //
-// These mirror the runtime surface of `src/index.js` exactly: a `MesmoBridge` with *namespaced* APIs
-// (`bridge.accounts.create(...)`, `bridge.quicktx.build(...)`, …). `test/types.test-d.ts` compiles
+// These mirror the runtime surface of `src/index.js` exactly: a `Mesmo` with *namespaced* APIs
+// (`lib.accounts.create(...)`, `lib.quicktx.build(...)`, …). `test/types.test-d.ts` compiles
 // against this file (`bun run typecheck`) so the two cannot drift apart.
 
 // --- Network -------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ export interface TxResult {
 /** @deprecated Alias of {@link TxResult}, kept for backwards compatibility. */
 export type QuickTxResult = TxResult;
 
-/** A deserialized transaction (`bridge.tx.deserialize()`); shape follows CCL's transaction JSON. */
+/** A deserialized transaction (`lib.tx.deserialize()`); shape follows CCL's transaction JSON. */
 export type TransactionJson = Record<string, unknown>;
 
 // --- Errors --------------------------------------------------------------------------------------
@@ -107,14 +107,14 @@ export declare class MesmoError extends Error {
     constructor(code: number, message: string);
 }
 
-/** Thrown when a {@link MesmoBridge} is used after `close()`. */
+/** Thrown when a {@link Mesmo} is used after `close()`. */
 export declare class MesmoClosedError extends Error {
     constructor();
 }
 
 // --- Namespaces ----------------------------------------------------------------------------------
 //
-// Reached through a MesmoBridge instance: `bridge.account`, `bridge.address`, … They are not
+// Reached through a Mesmo instance: `lib.account`, `lib.address`, … They are not
 // constructible from outside, so they are declared as interfaces (no runtime export) — except
 // QuickTxApi, which the module does export.
 
@@ -184,9 +184,9 @@ export declare class Account {
     [Symbol.dispose](): void;
 }
 
-/** Managed-accounts namespace (`bridge.accounts`). */
+/** Managed-accounts namespace (`lib.accounts`). */
 export declare class AccountsApi {
-    constructor(bridge: MesmoBridge);
+    constructor(lib: Mesmo);
     /** The mnemonic crosses the FFI boundary once, here; no later operation needs it. */
     fromMnemonic(mnemonic: string, network: Network, accountIndex?: number, addressIndex?: number): Account;
     /** Fresh 24-word account; no secret in the result — export the phrase once, deliberately. */
@@ -229,7 +229,7 @@ export interface ScriptApi {
 }
 
 export declare class QuickTxApi {
-    constructor(bridge: MesmoBridge);
+    constructor(lib: Mesmo);
 
     /**
      * Build an unsigned transaction from a CCL TxPlan (YAML), fully offline.
@@ -262,9 +262,9 @@ export declare class QuickTxApi {
     ): Promise<TxResult>;
 }
 
-// --- The bridge ----------------------------------------------------------------------------------
+// --- The lib ----------------------------------------------------------------------------------
 
-export declare class MesmoBridge {
+export declare class Mesmo {
     /** @param libPath directory containing libmesmo.{dylib,so,dll}; falls back to MESMO_LIB_PATH, the bundled copy, then the platform package. */
     constructor(libPath?: string);
 
@@ -282,7 +282,7 @@ export declare class MesmoBridge {
     /** Tear down the GraalVM isolate. Idempotent; any later call throws {@link MesmoClosedError}. */
     close(): void;
 
-    /** Enables `using bridge = new MesmoBridge()`. */
+    /** Enables `using lib = new Mesmo()`. */
     [Symbol.dispose](): void;
 }
 
@@ -293,7 +293,7 @@ export declare class MesmoBridge {
  * these two methods — the type is structural.
  */
 export declare class ChainDataProvider {
-    /** All UTXOs at `address` (no selection — the bridge selects internally). */
+    /** All UTXOs at `address` (no selection — the lib selects internally). */
     utxos(address: string): Promise<Utxo[]>;
     /** Current protocol parameters (CCL ProtocolParams shape). */
     protocolParams(): Promise<ProtocolParams>;

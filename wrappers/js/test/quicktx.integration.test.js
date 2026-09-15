@@ -9,7 +9,7 @@
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/quicktx.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { MesmoBridge, TESTNET, SigningRole, YaciProvider } from "../src/index.js";
+import { Mesmo, TESTNET, SigningRole, YaciProvider } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -29,16 +29,16 @@ const INTENT_SENDER = "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3
 // The enterprise address the mint fixtures pay the freshly minted asset to.
 const MINT_RECEIVER = "addr_test1vz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzerspjrlsz";
 
-function createManaged(bridge, network) {
-  const acct = bridge.accounts.create(network);
+function createManaged(lib, network) {
+  const acct = lib.accounts.create(network);
   const info = acct.info;
   const mnemonic = acct.exportRecoveryPhrase();
   acct.close();
   return { ...info, mnemonic };
 }
 
-function signPayment(bridge, mnemonic, txCbor) {
-  using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+function signPayment(lib, mnemonic, txCbor) {
+  using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);
   return acct.signTx(txCbor);
 }
 
@@ -65,7 +65,7 @@ function totalLovelace(utxos) {
 }
 
 describe("QuickTx Integration (DevKit)", () => {
-  let bridge;
+  let lib;
   let devkit;
   let skip = false;
 
@@ -77,17 +77,17 @@ describe("QuickTx Integration (DevKit)", () => {
       console.log("Skipping: Yaci DevKit not available on port 10000");
       return;
     }
-    bridge = new MesmoBridge();
+    lib = new Mesmo();
     await devkit.reset();
     await devkit.waitForBlock(3000);
   });
 
   afterAll(() => {
-    if (bridge) bridge.close();
+    if (lib) lib.close();
   });
 
   async function fundSender(ada = 150) {
-    const account = createManaged(bridge, TESTNET);
+    const account = createManaged(lib, TESTNET);
     await devkit.topup(account.base_address, ada);
     await devkit.waitForBlock(2000);
     return account;
@@ -97,18 +97,18 @@ describe("QuickTx Integration (DevKit)", () => {
     if (skip) return;
 
     const sender = await fundSender();
-    const receiver = createManaged(bridge, TESTNET);
+    const receiver = createManaged(lib, TESTNET);
 
     const utxos = await devkit.getUtxos(sender.base_address);
     const pp = await devkit.getProtocolParams();
 
     const yaml = paymentYaml(sender.base_address, receiver.base_address, "5000000");
-    const result = bridge.quicktx.build(yaml, utxos, pp);
+    const result = lib.quicktx.build(yaml, utxos, pp);
     expect(result.tx_cbor.length).toBeGreaterThan(0);
     expect(result.tx_hash.length).toBe(64);
     expect(Number(result.fee)).toBeGreaterThan(0);
 
-    const signedTx = signPayment(bridge, sender.mnemonic, result.tx_cbor);
+    const signedTx = signPayment(lib, sender.mnemonic, result.tx_cbor);
     const txHash = await devkit.submitTx(signedTx);
     expect(txHash).toBeTruthy();
 
@@ -121,8 +121,8 @@ describe("QuickTx Integration (DevKit)", () => {
     if (skip) return;
 
     const sender = await fundSender();
-    const r1 = createManaged(bridge, TESTNET);
-    const r2 = createManaged(bridge, TESTNET);
+    const r1 = createManaged(lib, TESTNET);
+    const r2 = createManaged(lib, TESTNET);
 
     const utxos = await devkit.getUtxos(sender.base_address);
     const pp = await devkit.getProtocolParams();
@@ -144,8 +144,8 @@ transaction:
             - unit: lovelace
               quantity: "2000000"
 `;
-    const result = bridge.quicktx.build(yaml, utxos, pp);
-    const signedTx = signPayment(bridge, sender.mnemonic, result.tx_cbor);
+    const result = lib.quicktx.build(yaml, utxos, pp);
+    const signedTx = signPayment(lib, sender.mnemonic, result.tx_cbor);
     await devkit.submitTx(signedTx);
 
     await devkit.waitForBlock(3000);
@@ -159,12 +159,12 @@ transaction:
     if (skip) return;
 
     const sender = await fundSender();
-    const receiver = createManaged(bridge, TESTNET);
+    const receiver = createManaged(lib, TESTNET);
 
     // The shipped provider fetches the devnet's real UTXOs + protocol params and feeds build().
     const provider = new YaciProvider();
     const yaml = paymentYaml(sender.base_address, receiver.base_address, "5000000");
-    const result = await bridge.quicktx.buildWith(yaml, provider, [sender.base_address]);
+    const result = await lib.quicktx.buildWith(yaml, provider, [sender.base_address]);
 
     expect(result.tx_cbor.length).toBeGreaterThan(0);
     expect(result.tx_hash.length).toBe(64);
@@ -204,8 +204,8 @@ transaction:
     let lastErr;
     for (let attempt = 1; attempt <= 5; attempt++) {
       const yaml = baseYaml.replace("current_treasury_value: 0", `current_treasury_value: ${treasury}`);
-      const result = bridge.quicktx.build(yaml, utxos, pp);
-      const signed = signPayment(bridge, INTENT_MNEMONIC, result.tx_cbor);
+      const result = lib.quicktx.build(yaml, utxos, pp);
+      const signed = signPayment(lib, INTENT_MNEMONIC, result.tx_cbor);
       const submitResult = await devkit.submitTx(signed);
       if (/^[0-9a-f]{64}$/.test(submitResult)) return; // accepted
       lastErr = submitResult;
@@ -220,13 +220,13 @@ transaction:
     if (skip) return;
 
     const sender = await fundSender(2);
-    const receiver = createManaged(bridge, TESTNET);
+    const receiver = createManaged(lib, TESTNET);
 
     const utxos = await devkit.getUtxos(sender.base_address);
     const pp = await devkit.getProtocolParams();
 
     const yaml = paymentYaml(sender.base_address, receiver.base_address, "100000000");
-    expect(() => bridge.quicktx.build(yaml, utxos, pp)).toThrow();
+    expect(() => lib.quicktx.build(yaml, utxos, pp)).toThrow();
   });
 
   // Plutus round-trip: build the script_minting fixture with caller-supplied exec units, sign with
@@ -253,11 +253,11 @@ transaction:
       pp.cost_models_raw ? Object.keys(pp.cost_models_raw).join("+") : "");
     const yaml = readFileSync(join(FIXTURES, "plutus", "script_minting.yaml"), "utf8");
 
-    const result = bridge.quicktx.build(yaml, utxos, pp, [{ mem: 2000000, steps: 500000000 }]);
+    const result = lib.quicktx.build(yaml, utxos, pp, [{ mem: 2000000, steps: 500000000 }]);
     expect(result.tx_hash.length).toBe(64);
 
     const signedTx = (() => {
-      using acct = bridge.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
+      using acct = lib.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
       const map = { payment: SigningRole.PAYMENT, stake: SigningRole.STAKE, drep: SigningRole.DREP };
       return acct.signTx(result.tx_cbor, ["payment"].reduce((m, k) => m | map[k], 0));
     })();

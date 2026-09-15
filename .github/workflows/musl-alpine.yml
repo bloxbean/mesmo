@@ -163,7 +163,7 @@ jobs:
               # single-quoted docker sh -c.
               python3 -m venv /tmp/wheelvenv
               /tmp/wheelvenv/bin/pip install --quiet "$WHEEL"
-              cd /tmp && env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import mesmo; lib = mesmo.MesmoLib(); assert lib.version(); lib.accounts.create(mesmo.MesmoLib.TESTNET).close(); print(\"OK: wheel bundling the musl lib works on Alpine, no MESMO_LIB_PATH\")"
+              cd /tmp && env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import mesmo; lib = mesmo.Mesmo(); assert lib.version(); lib.accounts.create(mesmo.Mesmo.TESTNET).close(); print(\"OK: wheel bundling the musl lib works on Alpine, no MESMO_LIB_PATH\")"
             '
 
       - name: Verify the JS wrapper runs on Alpine under Bun
@@ -177,7 +177,7 @@ jobs:
               cp /out/libmesmo.so wrappers/js/libs/libmesmo.so
               cd wrappers/js
               env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH bun -e "
-                import { MesmoBridge, platformSuffix, TESTNET } from \"./src/index.js\";
+                import { Mesmo, platformSuffix, TESTNET } from \"./src/index.js\";
 
                 // The regression this guards: platformSuffix() used to have no musl detection at all,
                 // so on Alpine it returned linux-x86_64 and resolved the *glibc* package, which
@@ -187,13 +187,13 @@ jobs:
                   throw new Error(\`platformSuffix() = \${suffix} on Alpine; expected linux-musl-x86_64\`);
                 }
 
-                const bridge = new MesmoBridge();
+                const lib = new Mesmo();
                 try {
-                  if (!bridge.version()) throw new Error(\"no version\");
-                  bridge.accounts.create(TESTNET).close();
+                  if (!lib.version()) throw new Error(\"no version\");
+                  lib.accounts.create(TESTNET).close();
                   console.log(\`OK: JS wrapper runs on Alpine/musl under Bun (suffix=\${suffix})\`);
                 } finally {
-                  bridge.close();
+                  lib.close();
                 }
               "
             '

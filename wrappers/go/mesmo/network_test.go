@@ -38,7 +38,7 @@ func TestNetworkOrdinalIsInverseOfOnChainNetworkID(t *testing.T) {
 					tc.network, tc.wantAddrPrefix, acct.BaseAddress)
 			}
 
-			info, err := bridge.Address.Info(acct.BaseAddress)
+			info, err := lib.Address.Info(acct.BaseAddress)
 			if err != nil {
 				t.Fatalf("Address.Info failed: %v", err)
 			}
@@ -99,14 +99,14 @@ func TestInvalidNetworkReturnsGoError(t *testing.T) {
 		}
 	}
 
-	_, err := bridge.Accounts.Create(bogus)
+	_, err := lib.Accounts.Create(bogus)
 	assertInvalid("Accounts.Create", err)
 
-	mnemonic, err := bridge.Crypto.GenerateMnemonic(24)
+	mnemonic, err := lib.Crypto.GenerateMnemonic(24)
 	if err != nil {
 		t.Fatalf("GenerateMnemonic failed: %v", err)
 	}
 
-	_, err = bridge.Accounts.FromMnemonic(mnemonic, bogus, 0, 0)
+	_, err = lib.Accounts.FromMnemonic(mnemonic, bogus, 0, 0)
 	assertInvalid("Accounts.FromMnemonic", err)
 }

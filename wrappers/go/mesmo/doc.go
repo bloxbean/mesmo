@@ -1,4 +1,4 @@
-// Package ccl provides Go bindings for the Cardano Client Lib (CCL), exposed through the libmesmo
+// Package mesmo provides Go bindings for the Cardano Client Lib (CCL), exposed through the libmesmo
 // GraalVM native shared library. It covers account, address, crypto, transaction (QuickTx / TxPlan),
 // Plutus, script, governance, and wallet operations.
 //

@@ -7,11 +7,11 @@ Run from the repo root:
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/01_account_and_keys.py
 """
-from mesmo import MesmoLib, Network
+from mesmo import Mesmo, Network
 
 
 def main():
-    lib = MesmoLib()
+    lib = Mesmo()
     try:
         # 1. Create a brand-new testnet account (managed handle; the recovery phrase
         #    is exported once, deliberately — it is never part of account info).

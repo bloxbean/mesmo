@@ -10,13 +10,13 @@ package mesmo
 //
 // A provider implements two methods:
 //
-//	Utxos(address)     -> all UTXOs at the address (no selection — the bridge selects)
+//	Utxos(address)     -> all UTXOs at the address (no selection — the lib selects)
 //	ProtocolParams()   -> protocol parameters
 //
 // Use one directly, or via QuickTxApi.BuildWith:
 //
 //	provider := mesmo.NewBlockfrostProvider(projectID, "preprod") // or mesmo.NewYaciProvider("")
-//	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+//	result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ var httpClient = &http.Client{Timeout: 60 * time.Second}
 // ChainDataProvider fetches the chain data QuickTx.Build needs. Implement it to plug in any backend
 // (Blockfrost, Koios, Ogmios, Yaci DevKit, ...).
 type ChainDataProvider interface {
-	// Utxos returns all UTXOs at the address (the bridge selects internally; no selection needed).
+	// Utxos returns all UTXOs at the address (the lib selects internally; no selection needed).
 	Utxos(address string) ([]map[string]interface{}, error)
 	// ProtocolParams returns the current protocol parameters.
 	ProtocolParams() (map[string]interface{}, error)
@@ -188,7 +188,7 @@ func (p *BlockfrostProvider) ProtocolParams() (map[string]interface{}, error) {
 }
 
 // TransactionEvaluator computes a Plutus transaction's redeemer execution units. Implement it to plug
-// in any evaluator (Blockfrost, Ogmios, ...). The bridge computes them offline with Scalus when you
+// in any evaluator (Blockfrost, Ogmios, ...). The lib computes them offline with Scalus when you
 // supply none (ADR-0013); an evaluator lets you use a remote one instead. HTTP is a wrapper concern —
 // libmesmo never makes network calls (ADR-0002).
 type TransactionEvaluator interface {

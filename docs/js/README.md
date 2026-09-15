@@ -2,13 +2,13 @@
 
 `@bloxbean/mesmo` brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to JavaScript as a native library. No JVM, no remote service: the heavy lifting happens inside `libmesmo`, a GraalVM native-image build of CCL that ships with the package.
 
-> **Bun only.** The wrapper uses `bun:ffi` and requires [Bun](https://bun.sh) ≥ 1.0. Node.js is not supported: Node FFI bridges (ffi-napi, koffi) crash against a GraalVM native library due to its stack-boundary detection.
+> **Bun only.** The wrapper uses `bun:ffi` and requires [Bun](https://bun.sh) ≥ 1.0. Node.js is not supported: Node FFI libraries (ffi-napi, koffi) crash against a GraalVM native library due to its stack-boundary detection.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API reference](api.md) | Every class and method: `MesmoBridge`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api.md) | Every class and method: `Mesmo`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions.md) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers.md) | Fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting.md) | Native library resolution, platform support, common errors |
@@ -35,29 +35,29 @@ macOS Intel is not supported with prebuilt binaries (Oracle GraalVM dropped Inte
 ## Quick start
 
 ```js
-import { MesmoBridge, TESTNET } from "@bloxbean/mesmo";
+import { Mesmo, TESTNET } from "@bloxbean/mesmo";
 
-const bridge = new MesmoBridge();
+const lib = new Mesmo();
 try {
   // Create a new managed account (testnet). Its info never contains the phrase;
   // export the recovery phrase once, deliberately.
-  using account = bridge.accounts.create(TESTNET);
+  using account = lib.accounts.create(TESTNET);
   console.log(account.info.base_address);   // addr_test1...
   console.log(account.info.stake_address);  // stake_test1...
   const mnemonic = account.exportRecoveryPhrase();
 
   // Restore it later from the phrase.
-  using restored = bridge.accounts.fromMnemonic(mnemonic, TESTNET, 0, 0);
+  using restored = lib.accounts.fromMnemonic(mnemonic, TESTNET, 0, 0);
 } finally {
-  bridge.close();
+  lib.close();
 }
 ```
 
 Or let `using` handle the lifecycle:
 
 ```js
-using bridge = new MesmoBridge();
-using account = bridge.accounts.create(TESTNET);
+using lib = new Mesmo();
+using account = lib.accounts.create(TESTNET);
 ```
 
 ### Build, sign, and inspect a transaction — fully offline
@@ -78,10 +78,10 @@ transaction:
               quantity: "5000000"
 `;
 
-const result = bridge.quicktx.build(yaml, utxos, protocolParams);
+const result = lib.quicktx.build(yaml, utxos, protocolParams);
 // result = { tx_cbor, tx_hash, fee }
 
-const signed = sender.signTx(result.tx_cbor);   // sender = bridge.accounts.fromMnemonic(...)
+const signed = sender.signTx(result.tx_cbor);   // sender = lib.accounts.fromMnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
@@ -91,7 +91,7 @@ With a provider, fetching the chain data is one call:
 import { YaciProvider } from "@bloxbean/mesmo";
 
 const provider = new YaciProvider();  // local Yaci DevKit
-const result = await bridge.quicktx.buildWith(yaml, provider, [account.base_address]);
+const result = await lib.quicktx.buildWith(yaml, provider, [account.base_address]);
 ```
 
 ## Design in one paragraph

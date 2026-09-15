@@ -11,8 +11,8 @@ class QuickTx:
     is the unsigned transaction CBOR plus its hash and fee.
     """
 
-    def __init__(self, bridge):
-        self._bridge = bridge
+    def __init__(self, lib):
+        self._owner = lib
 
     def build(self, txplan_yaml, utxos, protocol_params, exec_units=None, additional_signers=0):
         """Build an unsigned transaction from a TxPlan YAML document.
@@ -23,7 +23,7 @@ class QuickTx:
             protocol_params: protocol parameters dict (CCL ``ProtocolParams`` model).
             exec_units: optional list of redeemer execution units (``[{"mem","steps"}]``), one per
                 redeemer in transaction order, for Plutus script transactions. Compute these with any
-                evaluator (Ogmios, Blockfrost, Aiken, Scalus); the bridge does not run the script.
+                evaluator (Ogmios, Blockfrost, Aiken, Scalus); the lib does not run the script.
             additional_signers: number of vkey witnesses the fee must budget beyond those implied by
                 the input UTXOs (one per sender). You know how many keys will sign: ``0`` for a plain
                 payment, ``1`` for a stake or DRep certificate (``["payment", "stake"]`` signing),
@@ -38,15 +38,15 @@ class QuickTx:
         utxos_json = json.dumps(utxos)
         pp_json = json.dumps(protocol_params)
         exec_units_json = json.dumps(exec_units) if exec_units is not None else None
-        rc = self._bridge._lib.mesmo_quicktx_build(
-            self._bridge._thread,
-            self._bridge._encode(txplan_yaml),
-            self._bridge._encode(utxos_json),
-            self._bridge._encode(pp_json),
-            self._bridge._encode(exec_units_json),
+        rc = self._owner._lib.mesmo_quicktx_build(
+            self._owner._thread,
+            self._owner._encode(txplan_yaml),
+            self._owner._encode(utxos_json),
+            self._owner._encode(pp_json),
+            self._owner._encode(exec_units_json),
             int(additional_signers),
         )
-        return yaml.safe_load(self._bridge._check(rc))
+        return yaml.safe_load(self._owner._check(rc))
 
     def build_with(self, txplan_yaml, provider, senders, evaluator=None, additional_signers=0):
         """Fetch chain data from ``provider`` (and, optionally, execution units from ``evaluator``),
@@ -56,8 +56,8 @@ class QuickTx:
         with :meth:`build`. UTXOs are de-duplicated by ``(tx_hash, output_index)``, so overlapping
         senders can't double-fund the build. For multi-sender transactions, TxPlan's
         ``context.fee_payer`` decides who pays the fee.
-        The bridge stays offline — this only moves the optional HTTP fetch into wrapper code. See
-        :mod:`ccl.providers` for available providers (Yaci DevKit, Blockfrost) or implement your own.
+        The lib stays offline — this only moves the optional HTTP fetch into wrapper code. See
+        :mod:`mesmo.providers` for available providers (Yaci DevKit, Blockfrost) or implement your own.
 
         Execution units for Plutus scripts:
           - with an ``evaluator``: a remote two-pass — build a draft, ask the evaluator to compute the
@@ -68,9 +68,9 @@ class QuickTx:
 
         Args:
             txplan_yaml: the TxPlan YAML string defining the transaction(s).
-            provider: a :class:`ccl.providers.ChainDataProvider` (``utxos(address)`` + ``protocol_params()``).
+            provider: a :class:`mesmo.providers.ChainDataProvider` (``utxos(address)`` + ``protocol_params()``).
             senders: list of addresses whose UTXOs fund the transaction(s).
-            evaluator: optional :class:`ccl.providers.TransactionEvaluator` (``evaluate(tx_cbor, utxos)``)
+            evaluator: optional :class:`mesmo.providers.TransactionEvaluator` (``evaluate(tx_cbor, utxos)``)
                 to compute the units remotely; when omitted, the offline Scalus default is used.
 
         Returns:

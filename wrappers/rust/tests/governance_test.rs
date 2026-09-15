@@ -3,15 +3,15 @@
 //! committee ids and credentials) is public data on the managed account's info; raw governance
 //! key material comes from crypto::derive_key.
 
-use mesmo::Bridge;
+use mesmo::Mesmo;
 use serde_json::Value;
 
-fn bridge() -> Bridge {
-    Bridge::new().expect("Failed to create bridge")
+fn lib() -> Mesmo {
+    Mesmo::new().expect("Failed to create lib")
 }
 
-fn managed_mnemonic(bridge: &Bridge) -> (Value, String) {
-    let acct = bridge
+fn managed_mnemonic(lib: &Mesmo) -> (Value, String) {
+    let acct = lib
         .accounts()
         .create(mesmo::Network::Mainnet)
         .expect("Failed to create account");
@@ -24,7 +24,7 @@ fn managed_mnemonic(bridge: &Bridge) -> (Value, String) {
 
 #[test]
 fn test_gov_identifiers_in_account_info() {
-    let b = bridge();
+    let b = lib();
     let (info, _phrase) = managed_mnemonic(&b);
     assert!(info["drep_id"].as_str().unwrap().starts_with("drep1"));
     assert!(info["committee_cold_id"]
@@ -42,7 +42,7 @@ fn test_gov_identifiers_in_account_info() {
 
 #[test]
 fn test_derive_key_matches_account_credentials() {
-    let b = bridge();
+    let b = lib();
     let (info, mnemonic) = managed_mnemonic(&b);
     for (role, field) in [
         ("committee_cold", "committee_cold_credential"),
@@ -61,14 +61,14 @@ fn test_derive_key_matches_account_credentials() {
 
 #[test]
 fn test_derive_key_from_invalid_mnemonic() {
-    let b = bridge();
+    let b = lib();
     let result = b.crypto().derive_key("not a valid mnemonic", 0, 0, "drep");
     assert!(result.is_err(), "expected error for invalid mnemonic");
 }
 
 #[test]
 fn test_derive_key_rejects_unknown_role() {
-    let b = bridge();
+    let b = lib();
     let mnemonic = b
         .crypto()
         .generate_mnemonic(24)
@@ -79,7 +79,7 @@ fn test_derive_key_rejects_unknown_role() {
 
 #[test]
 fn test_derive_key_returns_cip105_bech32_encodings_for_gov_roles() {
-    let b = bridge();
+    let b = lib();
     let mnemonic = b.crypto().generate_mnemonic(24).expect("mnemonic");
     for (role, prefix) in [("drep", "drep"), ("committee_cold", "cc_cold"), ("committee_hot", "cc_hot")] {
         let key: Value =

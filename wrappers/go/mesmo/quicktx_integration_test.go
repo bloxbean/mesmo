@@ -345,7 +345,7 @@ func TestIntegrationSimpleADATransfer(t *testing.T) {
 	}
 
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "5000000")
-	result, err := bridge.QuickTx.Build(yaml, utxos, pp, 0)
+	result, err := lib.QuickTx.Build(yaml, utxos, pp, 0)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -406,7 +406,7 @@ transaction:
               quantity: "2000000"
 `, sender.BaseAddress, r1.BaseAddress, r2.BaseAddress)
 
-	result, err := bridge.QuickTx.Build(yaml, utxos, pp, 0)
+	result, err := lib.QuickTx.Build(yaml, utxos, pp, 0)
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -436,7 +436,7 @@ func TestIntegrationInsufficientFunds(t *testing.T) {
 	pp, _ := devkitGetProtocolParams()
 
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "100000000")
-	if _, err := bridge.QuickTx.Build(yaml, utxos, pp, 0); err == nil {
+	if _, err := lib.QuickTx.Build(yaml, utxos, pp, 0); err == nil {
 		t.Fatal("expected insufficient funds error")
 	}
 }
@@ -461,7 +461,7 @@ func TestIntegrationBuildWith(t *testing.T) {
 
 	provider := NewYaciProvider("") // local DevKit cluster
 	yaml := quickTxYaml(sender.BaseAddress, receiver.BaseAddress, "5000000")
-	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
+	result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestIntegrationBuildWith(t *testing.T) {
 // signWithMnemonic signs with the payment role through a managed handle opened for the call.
 func signWithMnemonic(t *testing.T, mnemonic, txCbor string) string {
 	t.Helper()
-	acct, err := bridge.Accounts.FromMnemonic(mnemonic, Testnet, 0, 0)
+	acct, err := lib.Accounts.FromMnemonic(mnemonic, Testnet, 0, 0)
 	if err != nil {
 		t.Fatalf("Accounts.FromMnemonic: %v", err)
 	}

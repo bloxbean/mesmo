@@ -11,7 +11,7 @@ Run from the repo root:
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/03_build_and_sign_tx.py
 """
-from mesmo import MesmoLib, Network
+from mesmo import Mesmo, Network
 
 # Minimal protocol parameters (CCL ProtocolParams model).
 PROTOCOL_PARAMS = {
@@ -25,7 +25,7 @@ PROTOCOL_PARAMS = {
 
 
 def main():
-    lib = MesmoLib()
+    lib = Mesmo()
     try:
         sender = lib.accounts.create(Network.TESTNET)   # managed handle — signs below
         with lib.accounts.create(Network.TESTNET) as r:

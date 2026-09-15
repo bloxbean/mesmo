@@ -28,14 +28,14 @@ bun add @bloxbean/mesmo                 # once published
 bun add ./bloxbean-mesmo-0.1.0.tgz
 ```
 
-The package ships the matching `libmesmo.*` under `libs/`, so `new MesmoBridge()` just works — nothing
+The package ships the matching `libmesmo.*` under `libs/`, so `new Mesmo()` just works — nothing
 else to set. Build the tarball locally with:
 
 ```bash
 ./gradlew :wrappers:js:pack           # -> wrappers/js/bloxbean-mesmo-*.tgz
 ```
 
-At load time the bindings look for the library in this order: an explicit `new MesmoBridge(libPath)`,
+At load time the bindings look for the library in this order: an explicit `new Mesmo(libPath)`,
 the `MESMO_LIB_PATH` env var, then the bundled `libs/` copy.
 
 **Development — against a locally built library** (no package): point `MESMO_LIB_PATH` at a directory
@@ -72,25 +72,25 @@ The [`examples/`](examples/) directory contains:
 ## Quick start
 
 ```javascript
-import { MesmoBridge, TESTNET } from './src/index.js';
+import { Mesmo, TESTNET } from './src/index.js';
 
-const bridge = new MesmoBridge();      // loads libmesmo, starts a GraalVM isolate
+const lib = new Mesmo();      // loads libmesmo, starts a GraalVM isolate
 try {
-  using account = bridge.accounts.create(TESTNET); // managed handle (ADR-0016)
+  using account = lib.accounts.create(TESTNET); // managed handle (ADR-0016)
   console.log(account.info.base_address);        // addr_test1...
   console.log(account.exportRecoveryPhrase());   // 24-word phrase — one-shot, deliberate
 } finally {
-  bridge.close();                    // tears down the isolate
+  lib.close();                    // tears down the isolate
 }
 ```
 
 ## API namespaces
 
-A `MesmoBridge` instance exposes these namespaces (all offline operations):
-`bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`,
-`bridge.script`, `bridge.quicktx`.
+A `Mesmo` instance exposes these namespaces (all offline operations):
+`lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`,
+`lib.script`, `lib.quicktx`.
 
-Errors throw `MesmoError`; using a bridge after `close()` throws `MesmoClosedError`.
+Errors throw `MesmoError`; using a Mesmo after `close()` throws `MesmoClosedError`.
 
 ### Networks — read this before passing a number
 
@@ -103,26 +103,26 @@ Every `network` parameter takes one of the exported constants:
 
 > **⚠️ These are CCL's `Network` enum ordinals, NOT Cardano's on-chain network id — and they are
 > inverted with respect to it.** On-chain, `0 = testnet` and `1 = mainnet`; here `MAINNET = 0` and
-> `TESTNET = 1`. So `bridge.accounts.create(0)` derives a **mainnet** key, not a testnet one.
+> `TESTNET = 1`. So `lib.accounts.create(0)` derives a **mainnet** key, not a testnet one.
 > **Never pass a raw number — always pass a constant.**
 
 `network` is **required** (there is no mainnet default), an out-of-range value throws, and the
 TypeScript type is closed (`type Network = 0 | 1`), so `create(99)` will not compile:
 
 ```js
-import { MesmoBridge, TESTNET, MAINNET } from '@bloxbean/mesmo';
+import { Mesmo, TESTNET, MAINNET } from '@bloxbean/mesmo';
 
-bridge.accounts.create(TESTNET);           // addr_test1… — on-chain network_id 0
-bridge.accounts.create();                  // TypeError: network is required
-bridge.accounts.create(99);                // RangeError: invalid network
+lib.accounts.create(TESTNET);           // addr_test1… — on-chain network_id 0
+lib.accounts.create();                  // TypeError: network is required
+lib.accounts.create(99);                // RangeError: invalid network
 ```
 
 The **genuine on-chain network id** is the `network_id` field returned by `address.info()` — it is
 *not* a `Network` ordinal and must not be fed back into `create()`:
 
 ```js
-using acct = bridge.accounts.create(MAINNET);           // MAINNET is the ordinal 0 …
-bridge.address.info(acct.info.base_address).network_id; // … but the on-chain id is 1
+using acct = lib.accounts.create(MAINNET);           // MAINNET is the ordinal 0 …
+lib.address.info(acct.info.base_address).network_id; // … but the on-chain id is 1
 ```
 
 ### TypeScript
@@ -135,7 +135,7 @@ Transactions are defined as a [TxPlan](https://github.com/bloxbean/cardano-clien
 **YAML** document and built fully offline — you supply the UTXOs and protocol parameters:
 
 ```js
-const result = bridge.quicktx.build(yaml, utxos, protocolParams); // { tx_cbor, tx_hash, fee }
+const result = lib.quicktx.build(yaml, utxos, protocolParams); // { tx_cbor, tx_hash, fee }
 ```
 
 See [`examples/transaction.js`](examples/transaction.js).
@@ -147,24 +147,24 @@ those for you over HTTP (Bun's built-in `fetch`), so the native library stays of
 provider-free:
 
 ```js
-import { MesmoBridge, YaciProvider, BlockfrostProvider } from "@bloxbean/mesmo";
+import { Mesmo, YaciProvider, BlockfrostProvider } from "@bloxbean/mesmo";
 
-const bridge = new MesmoBridge();
+const lib = new Mesmo();
 const provider = new BlockfrostProvider(projectId, { network: "preprod" }); // or new YaciProvider()
-const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
+const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 Plug in any backend (Koios, Ogmios, …) by supplying an object with `utxos(address)` and
-`protocolParams()`. UTXO *selection* is handled inside the bridge — a provider only returns all
+`protocolParams()`. UTXO *selection* is handled inside Mesmo — a provider only returns all
 UTXOs at the address.
 
 ## Transaction evaluators (optional)
 
-A Plutus build needs each redeemer's execution units. The bridge computes them **offline** with
+A Plutus build needs each redeemer's execution units. Mesmo computes them **offline** with
 Scalus when you supply none — so a script build just works, no evaluation step:
 
 ```javascript
-const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]); // Scalus computes the units
+const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress]); // Scalus computes the units
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
@@ -176,7 +176,7 @@ here in the wrapper:
 import { BlockfrostEvaluator } from "@bloxbean/mesmo";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress], evaluator);
+const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress], evaluator);
 ```
 
 Plug in any evaluator (Ogmios, …) by supplying an object with `evaluate(txCbor, utxos)`. To supply

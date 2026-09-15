@@ -1,10 +1,10 @@
 import pytest
-from mesmo._ffi import MesmoLib
+from mesmo._ffi import Mesmo
 
 
 @pytest.fixture(scope="session")
-def ccl():
-    """Create a shared MesmoLib instance for all tests."""
-    lib = MesmoLib()
+def mesmo():
+    """Create a shared Mesmo instance for all tests."""
+    lib = Mesmo()
     yield lib
     lib.close()

@@ -9,7 +9,7 @@
 //   LIB_DIR=../../core/build/native/nativeCompile
 //   MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //     bun examples/transaction.js
-import { MesmoBridge, TESTNET } from '../src/index.js';
+import { Mesmo, TESTNET } from '../src/index.js';
 
 // Minimal protocol parameters (CCL test-resource values).
 const protocolParams = {
@@ -21,10 +21,10 @@ const protocolParams = {
   max_collateral_inputs: 3,
 };
 
-const bridge = new MesmoBridge();
+const lib = new Mesmo();
 try {
-  using sender = bridge.accounts.create(TESTNET); // managed handle — signs below
-  using receiver = bridge.accounts.create(TESTNET);
+  using sender = lib.accounts.create(TESTNET); // managed handle — signs below
+  using receiver = lib.accounts.create(TESTNET);
   const senderAddress = sender.info.base_address;
   const receiverAddress = receiver.info.base_address;
 
@@ -51,7 +51,7 @@ transaction:
 `;
 
   // Build the unsigned transaction offline.
-  const result = bridge.quicktx.build(yaml, utxos, protocolParams);
+  const result = lib.quicktx.build(yaml, utxos, protocolParams);
   console.log('Built unsigned transaction from TxPlan YAML');
   console.log('  tx hash:', result.tx_hash);
   console.log('  fee    :', result.fee);
@@ -62,5 +62,5 @@ transaction:
   console.log('Signed transaction cbor:', signed.slice(0, 80), '...');
   console.log('\nNext step (not shown): submit `signed` to a Cardano node over HTTP.');
 } finally {
-  bridge.close();
+  lib.close();
 }

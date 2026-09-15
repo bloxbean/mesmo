@@ -4,8 +4,8 @@ import json
 class Address:
     """Address namespace for CCL operations."""
 
-    def __init__(self, bridge):
-        self._b = bridge
+    def __init__(self, lib):
+        self._b = lib
 
     def info(self, bech32_address):
         """Get address info. Returns dict with type, network_id, credential hashes.
@@ -13,7 +13,7 @@ class Address:
         ``network_id`` is Cardano's genuine **on-chain** network id (1 = mainnet, 0 = testnet). It is
         not the same number as the :class:`mesmo.Network` ordinal used to derive the address, and must
         not be passed back into the ``network`` parameter of the account/wallet/gov calls — the two
-        are inverted for mainnet/testnet. See ``ccl/network.py``.
+        are inverted for mainnet/testnet. See ``mesmo/network.py``.
         """
         rc = self._b._lib.mesmo_address_info(self._b._thread, self._b._encode(bech32_address))
         return json.loads(self._b._check(rc))
@@ -31,7 +31,7 @@ class Address:
     def validate(self, bech32_address):
         """Validate a bech32 address. Returns True if valid."""
         rc = self._b._lib.mesmo_address_validate(self._b._thread, self._b._encode(bech32_address))
-        from mesmo._ffi import MesmoLib
-        if rc == MesmoLib.MESMO_SUCCESS:
+        from mesmo._ffi import Mesmo
+        if rc == Mesmo.MESMO_SUCCESS:
             return True
         return False

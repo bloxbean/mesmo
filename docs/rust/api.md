@@ -1,15 +1,15 @@
 # Rust API Reference
 
 ```rust
-use mesmo::{Bridge, Network, MesmoError, Result};
+use mesmo::{Mesmo, Network, MesmoError, Result};
 ```
 
 Most methods return `mesmo::Result<String>` where the string is either a JSON document (parse with `serde_json`) or a bare hex/bech32 value — noted per method below.
 
-## Bridge
+## Mesmo
 
 ```rust
-impl Bridge {
+impl Mesmo {
     pub fn new() -> Result<Self>;
     pub fn version(&self) -> Result<String>;
 
@@ -23,11 +23,11 @@ impl Bridge {
 }
 ```
 
-`Bridge::new()` creates a GraalVM isolate and verifies the native library version matches the crate.
+`Mesmo::new()` creates a GraalVM isolate and verifies the native library version matches the crate.
 
-**Lifecycle.** Teardown is RAII: `Drop` tears down the isolate. The namespace handles (`AddressApi<'_>` etc.) borrow the bridge, so the borrow checker statically prevents use-after-free; managed `Account`s are owned values that a bridge drop hard-invalidates (typed -11 errors).
+**Lifecycle.** Teardown is RAII: `Drop` tears down the isolate. The namespace handles (`AddressApi<'_>` etc.) borrow Mesmo, so the borrow checker statically prevents use-after-free; managed `Account`s are owned values that a Mesmo drop hard-invalidates (typed -11 errors).
 
-**Threading.** `Bridge` is **`!Send` and `!Sync`** — moving it to another thread is a compile error. The GraalVM isolate thread is bound to the OS thread that created it; create one `Bridge` per thread.
+**Threading.** `Mesmo` is **`!Send` and `!Sync`** — moving it to another thread is a compile error. The GraalVM isolate thread is bound to the OS thread that created it; create one `Mesmo` per thread.
 
 ## Networks
 
@@ -61,11 +61,11 @@ Error codes (`mesmo::error_codes`):
 | `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
 | `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
 | `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx().build` error — usually a malformed plan) |
-| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Bridge that was dropped |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Mesmo that was dropped |
 
 Predicate methods (`validate`, `validate_mnemonic`, `verify`) return `bool` and never error.
 
-## bridge.accounts() — managed accounts
+## lib.accounts() — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
@@ -73,15 +73,15 @@ account API.
 ```rust
 use mesmo::accounts::SigningRole;
 
-let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
+let acct = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
 let info = acct.info()?;                          // serde_json::Value — never the mnemonic
 let signed = acct.sign_tx(&tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 // Drop closes the handle; acct.close() is the explicit, idempotent form
 ```
 
 - The `Account` is an **owned value**, not a borrow: it can live in the same struct as its
-  `Bridge`. Dropping the `Bridge` hard-invalidates outstanding accounts — their calls fail with
-  `MESMO_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Bridge`, an
+  `Mesmo`. Dropping the `Mesmo` hard-invalidates outstanding accounts — their calls fail with
+  `MESMO_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Mesmo`, an
   `Account` is `!Send`.
 - `create(network)` — fresh 24-word account; **no secret in the result**. Retrieve the phrase once,
   deliberately, with `export_recovery_phrase()` — a second call fails, as does export on a
@@ -96,7 +96,7 @@ let signed = acct.sign_tx(&tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.address()
+## lib.address()
 
 ```rust
 pub fn info(&self, bech32: &str) -> Result<String>;       // JSON
@@ -107,7 +107,7 @@ pub fn from_bytes(&self, hex_bytes: &str) -> Result<String>; // bech32
 
 `info` JSON fields: `type` (`"Base"`, `"Enterprise"`, `"Pointer"`, `"Reward"`), `network_id` (on-chain: 1 = mainnet), `payment_credential_hash`, `delegation_credential_hash`, `is_pubkey_payment`, `is_script_payment`.
 
-## bridge.crypto()
+## lib.crypto()
 
 ```rust
 pub fn blake2b_256(&self, data_hex: &str) -> Result<String>;
@@ -127,14 +127,14 @@ cardano-cli and GovTool accept for registration). Key derivation is network-inde
 Prefer managed accounts for signing — handles never expose key bytes.
 
 ```rust
-let digest = bridge.crypto().blake2b_256("48656c6c6f")?; // "Hello"
+let digest = lib.crypto().blake2b_256("48656c6c6f")?; // "Hello"
 let key: serde_json::Value =
-    serde_json::from_str(&bridge.crypto().derive_key(&mnemonic, 0, 0, "payment")?)?;
+    serde_json::from_str(&lib.crypto().derive_key(&mnemonic, 0, 0, "payment")?)?;
 let sk = key["private_key"].as_str().unwrap();
-let sig = bridge.crypto().sign(msg_hex, &sk)?;           // pass the extended key whole
+let sig = lib.crypto().sign(msg_hex, &sk)?;           // pass the extended key whole
 ```
 
-## bridge.tx()
+## lib.tx()
 
 ```rust
 pub fn hash(&self, tx_cbor_hex: &str) -> Result<String>;   // 64-hex tx id
@@ -146,7 +146,7 @@ pub fn deserialize(&self, tx_cbor_hex: &str) -> Result<String>;  // JSON
 
 `to_json`/`deserialize` return JSON with a `body` object (inputs/outputs/fee). `sign_with_secret_key` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `account().sign_tx`.
 
-## bridge.plutus()
+## lib.plutus()
 
 ```rust
 pub fn data_hash(&self, datum_cbor_hex: &str) -> Result<String>;   // 64 hex chars
@@ -155,10 +155,10 @@ pub fn data_from_json(&self, json: &str) -> Result<String>;        // CBOR hex
 ```
 
 ```rust
-let hash = bridge.plutus().data_hash("182a")?;  // hash of PlutusData int 42
+let hash = lib.plutus().data_hash("182a")?;  // hash of PlutusData int 42
 ```
 
-## bridge.script()
+## lib.script()
 
 ```rust
 pub fn native_from_json(&self, json: &str) -> Result<String>;  // JSON: { policy_id, script_hash, cbor_hex }
@@ -169,7 +169,7 @@ pub fn hash(&self, script_cbor_hex: &str, script_type: i32) -> Result<String>;  
 
 ```rust
 let script_json = format!(r#"{{"type":"sig","keyHash":"{key_hash}"}}"#);
-let parsed: serde_json::Value = serde_json::from_str(&bridge.script().native_from_json(&script_json)?)?;
+let parsed: serde_json::Value = serde_json::from_str(&lib.script().native_from_json(&script_json)?)?;
 // parsed["policy_id"], parsed["script_hash"], parsed["cbor_hex"]
 ```
 
@@ -181,7 +181,7 @@ credentials) is public data on `acct.info()`; governance *signing* uses `sign_tx
 An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment leaf — pass
 `address_index` to `accounts().from_mnemonic` to enumerate addresses.
 
-## bridge.quicktx()
+## lib.quicktx()
 
 ```rust
 #[derive(Debug, serde::Deserialize)]
@@ -205,8 +205,8 @@ pub fn build_with(&self, yaml: &str, provider: &dyn ChainDataProvider, senders: 
 ```rust
 use serde_json::json;
 
-let result = bridge.quicktx().build(&yaml, &utxos, &params, None)?;
+let result = lib.quicktx().build(&yaml, &utxos, &params, None)?;
 
-let plutus = bridge.quicktx().build(&yaml, &utxos, &params,
+let plutus = lib.quicktx().build(&yaml, &utxos, &params,
     Some(&json!([{"mem": 2000000, "steps": 500000000}])))?;
 ```

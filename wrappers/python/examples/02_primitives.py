@@ -7,11 +7,11 @@ Run from the repo root:
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/02_primitives.py
 """
-from mesmo import MesmoLib, Network
+from mesmo import Mesmo, Network
 
 
 def main():
-    lib = MesmoLib()
+    lib = Mesmo()
     try:
         # --- Mnemonics ---
         mnemonic = lib.crypto.generate_mnemonic(24)

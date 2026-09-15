@@ -6,7 +6,7 @@
 #![cfg(feature = "providers")]
 
 use mesmo::providers::{BlockfrostProvider, ChainDataProvider};
-use mesmo::{Bridge, Result};
+use mesmo::{Mesmo, Result};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -48,11 +48,11 @@ impl ChainDataProvider for StubProvider {
 
 #[test]
 fn build_with_offline() {
-    let bridge = Bridge::new().expect("bridge");
+    let lib = Mesmo::new().expect("lib");
     let yaml = format!(
         "version: 1.0\ntransaction:\n  - tx:\n      from: {SENDER}\n      intents:\n        - type: payment\n          address: {RECEIVER}\n          amounts:\n            - unit: lovelace\n              quantity: \"5000000\"\n"
     );
-    let res = bridge
+    let res = lib
         .quicktx()
         .build_with(&yaml, &StubProvider, &[SENDER], 0, None)
         .expect("build_with");
@@ -152,11 +152,11 @@ impl ChainDataProvider for TwoSenderProvider {
 
 #[test]
 fn build_with_merges_and_dedupes_across_senders() {
-    let bridge = Bridge::new().expect("bridge");
+    let lib = Mesmo::new().expect("lib");
     let yaml = format!(
         "version: 1.0\ntransaction:\n  - tx:\n      from: {SENDER}\n      intents:\n        - type: payment\n          address: {RECEIVER}\n          amounts:\n            - unit: lovelace\n              quantity: \"5000000\"\n"
     );
-    let res = bridge
+    let res = lib
         .quicktx()
         .build_with(&yaml, &TwoSenderProvider, &[SENDER, RECEIVER], 0, None)
         .expect("multi-sender build_with");

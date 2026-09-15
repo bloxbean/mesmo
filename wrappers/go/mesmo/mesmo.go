@@ -49,7 +49,7 @@ func (n Network) Valid() bool {
 // letting it reach the native library and come back as an opaque enum-ordinal failure.
 func (n Network) validate() error {
 	if !n.Valid() {
-		return fmt.Errorf("ccl: invalid network %s: use Mainnet(0) or Testnet(1) "+
+		return fmt.Errorf("mesmo: invalid network %s: use Mainnet(0) or Testnet(1) "+
 			"(these are CCL enum ordinals, not Cardano's on-chain network id)", n)
 	}
 	return nil
@@ -96,16 +96,16 @@ type AddressInfo struct {
 	IsScriptPayment          bool   `json:"is_script_payment"`
 }
 
-// Bridge wraps the CCL native library.
+// Mesmo wraps the CCL native library.
 //
 // All FFI calls are funneled to a single, dedicated OS thread (see loop) for the
-// lifetime of the Bridge. A GraalVM IsolateThread is bound to the OS thread that
+// lifetime of the Mesmo. A GraalVM IsolateThread is bound to the OS thread that
 // created it, but the Go runtime can migrate a goroutine across OS threads between
 // (or within) FFI calls. Calling the isolate from a different OS thread than the one
 // that created it makes GraalVM read the wrong thread's stack — which on Linux
 // x86_64 crashes with a "yellow zone" StackOverflowError. Pinning every call to one
 // locked OS thread keeps the isolate thread and the executing thread in sync.
-type Bridge struct {
+type Mesmo struct {
 	isolate uintptr
 	thread  uintptr
 
@@ -123,14 +123,14 @@ type Bridge struct {
 	QuickTx  *QuickTxApi
 }
 
-// New creates a new Bridge instance with a GraalVM isolate. The native library is located and loaded
+// New creates a new Mesmo instance with a GraalVM isolate. The native library is located and loaded
 // on first use (see resolveLibPath) — via MESMO_LIB_PATH, a per-version cache, or a one-time download.
-func New() (*Bridge, error) {
+func New() (*Mesmo, error) {
 	if err := ensureLoaded(); err != nil {
 		return nil, err
 	}
 
-	b := &Bridge{calls: make(chan func())}
+	b := &Mesmo{calls: make(chan func())}
 
 	ready := make(chan error, 1)
 	go b.loop(ready)
@@ -143,20 +143,20 @@ func New() (*Bridge, error) {
 		return nil, err
 	}
 
-	b.Accounts = &AccountsApi{bridge: b}
-	b.Address = &AddressApi{bridge: b}
-	b.Crypto = &CryptoApi{bridge: b}
-	b.Tx = &TxApi{bridge: b}
-	b.Plutus = &PlutusApi{bridge: b}
-	b.Script = &ScriptApi{bridge: b}
-	b.QuickTx = &QuickTxApi{bridge: b}
+	b.Accounts = &AccountsApi{lib: b}
+	b.Address = &AddressApi{lib: b}
+	b.Crypto = &CryptoApi{lib: b}
+	b.Tx = &TxApi{lib: b}
+	b.Plutus = &PlutusApi{lib: b}
+	b.Script = &ScriptApi{lib: b}
+	b.QuickTx = &QuickTxApi{lib: b}
 
 	return b, nil
 }
 
 // loop owns the isolate's OS thread: it locks the thread, creates the isolate on it,
 // then executes every queued FFI closure on that same thread until Close.
-func (b *Bridge) loop(ready chan<- error) {
+func (b *Mesmo) loop(ready chan<- error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -171,23 +171,23 @@ func (b *Bridge) loop(ready chan<- error) {
 	}
 }
 
-// ErrBridgeClosed is returned by any call made on a Bridge after Close. Test for it with errors.Is.
-var ErrBridgeClosed = errors.New("ccl: bridge is closed")
+// ErrClosed is returned by any call made on a Mesmo after Close. Test for it with errors.Is.
+var ErrClosed = errors.New("mesmo: closed")
 
 // run executes fn on the isolate's dedicated OS thread and blocks until it finishes. It returns
-// ErrBridgeClosed if the Bridge is closed.
+// ErrClosed if the Mesmo is closed.
 //
 // The closed check is not optional: Close sets b.calls to nil, and a send on a nil channel blocks
 // forever — while this goroutine holds b.mu. A single stray call after Close would therefore hang
 // that goroutine permanently *and* deadlock every other goroutine behind the mutex, with no error
 // and no stack to point at the cause. Failing fast here turns the worst failure mode into an error
 // value.
-func (b *Bridge) run(fn func()) error {
+func (b *Mesmo) run(fn func()) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	if b.calls == nil {
-		return ErrBridgeClosed
+		return ErrClosed
 	}
 
 	done := make(chan struct{})
@@ -201,7 +201,7 @@ func (b *Bridge) run(fn func()) error {
 
 // invoke runs a result-returning FFI call on the isolate thread and reads the
 // per-thread result/error there, where the Java thread-local state lives.
-func (b *Bridge) invoke(call func() int32) (string, error) {
+func (b *Mesmo) invoke(call func() int32) (string, error) {
 	var s string
 	var err error
 	if rerr := b.run(func() {
@@ -218,8 +218,8 @@ func (b *Bridge) invoke(call func() int32) (string, error) {
 
 // invokeRC runs an FFI call on the isolate thread and returns its raw status code,
 // for calls (e.g. validate/verify) where the caller interprets the code directly.
-// A closed Bridge yields ErrGeneral, so those calls report failure rather than deadlocking.
-func (b *Bridge) invokeRC(call func() int32) int32 {
+// A closed Mesmo yields ErrGeneral, so those calls report failure rather than deadlocking.
+func (b *Mesmo) invokeRC(call func() int32) int32 {
 	var rc int32
 	if err := b.run(func() { rc = call() }); err != nil {
 		return ErrGeneral
@@ -228,7 +228,7 @@ func (b *Bridge) invokeRC(call func() int32) int32 {
 }
 
 // Close tears down the GraalVM isolate and stops its OS thread.
-func (b *Bridge) Close() error {
+func (b *Mesmo) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -249,7 +249,7 @@ func (b *Bridge) Close() error {
 	return nil
 }
 
-func (b *Bridge) getResult() string {
+func (b *Mesmo) getResult() string {
 	ptr := cclGetResult(b.thread)
 	if ptr == nil {
 		return ""
@@ -259,7 +259,7 @@ func (b *Bridge) getResult() string {
 	return result
 }
 
-func (b *Bridge) getError() string {
+func (b *Mesmo) getError() string {
 	ptr := cclGetLastError(b.thread)
 	if ptr == nil {
 		return ""
@@ -270,7 +270,7 @@ func (b *Bridge) getError() string {
 }
 
 // Version returns the library version string.
-func (b *Bridge) Version() (string, error) {
+func (b *Mesmo) Version() (string, error) {
 	return b.invoke(func() int32 { return cclVersion(b.thread) })
 }
 
@@ -287,7 +287,7 @@ func baseVersion(v string) string {
 
 // checkVersion fails fast on a native-lib / wrapper version skew rather than surfacing it later as a
 // confusing missing-symbol or wrong-result error. Bypass with MESMO_SKIP_VERSION_CHECK.
-func (b *Bridge) checkVersion() error {
+func (b *Mesmo) checkVersion() error {
 	if os.Getenv("MESMO_SKIP_VERSION_CHECK") != "" {
 		return nil
 	}
@@ -307,11 +307,11 @@ func (b *Bridge) checkVersion() error {
 // --- AddressApi ---
 
 type AddressApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 func (a *AddressApi) Info(bech32 string) (*AddressInfo, error) {
-	result, err := a.bridge.invoke(func() int32 { return cclAddressInfo(a.bridge.thread, bech32) })
+	result, err := a.lib.invoke(func() int32 { return cclAddressInfo(a.lib.thread, bech32) })
 	if err != nil {
 		return nil, err
 	}
@@ -323,44 +323,44 @@ func (a *AddressApi) Info(bech32 string) (*AddressInfo, error) {
 }
 
 func (a *AddressApi) Validate(bech32 string) bool {
-	return a.bridge.invokeRC(func() int32 { return cclAddressValidate(a.bridge.thread, bech32) }) == Success
+	return a.lib.invokeRC(func() int32 { return cclAddressValidate(a.lib.thread, bech32) }) == Success
 }
 
 func (a *AddressApi) ToBytes(bech32 string) (string, error) {
-	return a.bridge.invoke(func() int32 { return cclAddressToBytes(a.bridge.thread, bech32) })
+	return a.lib.invoke(func() int32 { return cclAddressToBytes(a.lib.thread, bech32) })
 }
 
 func (a *AddressApi) FromBytes(hexBytes string) (string, error) {
-	return a.bridge.invoke(func() int32 { return cclAddressFromBytes(a.bridge.thread, hexBytes) })
+	return a.lib.invoke(func() int32 { return cclAddressFromBytes(a.lib.thread, hexBytes) })
 }
 
 // --- CryptoApi ---
 
 type CryptoApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 func (c *CryptoApi) Blake2b256(dataHex string) (string, error) {
-	return c.bridge.invoke(func() int32 { return cclCryptoBlake2b256(c.bridge.thread, dataHex) })
+	return c.lib.invoke(func() int32 { return cclCryptoBlake2b256(c.lib.thread, dataHex) })
 }
 
 func (c *CryptoApi) Blake2b224(dataHex string) (string, error) {
-	return c.bridge.invoke(func() int32 { return cclCryptoBlake2b224(c.bridge.thread, dataHex) })
+	return c.lib.invoke(func() int32 { return cclCryptoBlake2b224(c.lib.thread, dataHex) })
 }
 
 func (c *CryptoApi) GenerateMnemonic(wordCount int) (string, error) {
-	return c.bridge.invoke(func() int32 { return cclCryptoGenerateMnemon(c.bridge.thread, int32(wordCount)) })
+	return c.lib.invoke(func() int32 { return cclCryptoGenerateMnemon(c.lib.thread, int32(wordCount)) })
 }
 
 func (c *CryptoApi) ValidateMnemonic(mnemonic string) bool {
-	return c.bridge.invokeRC(func() int32 { return cclCryptoValidateMnemon(c.bridge.thread, mnemonic) }) == Success
+	return c.lib.invokeRC(func() int32 { return cclCryptoValidateMnemon(c.lib.thread, mnemonic) }) == Success
 }
 
 // Sign produces an Ed25519 signature. skHex is a 32-byte seed (64 hex chars) or a
 // 64-byte BIP32-Ed25519 extended key (128 hex chars, e.g. DeriveKey's PrivateKey) —
 // the form is detected by length.
 func (c *CryptoApi) Sign(messageHex, skHex string) (string, error) {
-	return c.bridge.invoke(func() int32 { return cclCryptoSign(c.bridge.thread, messageHex, skHex) })
+	return c.lib.invoke(func() int32 { return cclCryptoSign(c.lib.thread, messageHex, skHex) })
 }
 
 // DeriveKey is the stateless CIP-1852 key-derivation utility — the explicit "raw key
@@ -370,8 +370,8 @@ func (c *CryptoApi) Sign(messageHex, skHex string) (string, error) {
 // its first half is a clamped scalar, not a seed. Key derivation is network-independent.
 // Prefer the managed Accounts API for signing; handles never expose key bytes.
 func (c *CryptoApi) DeriveKey(mnemonic string, accountIndex, addressIndex int, role string) (*DerivedKey, error) {
-	result, err := c.bridge.invoke(func() int32 {
-		return cclCryptoDeriveKey(c.bridge.thread, mnemonic, int32(accountIndex), int32(addressIndex), role)
+	result, err := c.lib.invoke(func() int32 {
+		return cclCryptoDeriveKey(c.lib.thread, mnemonic, int32(accountIndex), int32(addressIndex), role)
 	})
 	if err != nil {
 		return nil, err
@@ -384,65 +384,65 @@ func (c *CryptoApi) DeriveKey(mnemonic string, accountIndex, addressIndex int, r
 }
 
 func (c *CryptoApi) Verify(signatureHex, messageHex, pkHex string) bool {
-	return c.bridge.invokeRC(func() int32 { return cclCryptoVerify(c.bridge.thread, signatureHex, messageHex, pkHex) }) == Success
+	return c.lib.invokeRC(func() int32 { return cclCryptoVerify(c.lib.thread, signatureHex, messageHex, pkHex) }) == Success
 }
 
 // --- TxApi ---
 
 type TxApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 func (t *TxApi) Hash(txCborHex string) (string, error) {
-	return t.bridge.invoke(func() int32 { return cclTxHash(t.bridge.thread, txCborHex) })
+	return t.lib.invoke(func() int32 { return cclTxHash(t.lib.thread, txCborHex) })
 }
 
 func (t *TxApi) SignWithSecretKey(txCborHex, skCborHex string) (string, error) {
-	return t.bridge.invoke(func() int32 { return cclTxSignSecretKey(t.bridge.thread, txCborHex, skCborHex) })
+	return t.lib.invoke(func() int32 { return cclTxSignSecretKey(t.lib.thread, txCborHex, skCborHex) })
 }
 
 func (t *TxApi) ToJson(txCborHex string) (string, error) {
-	return t.bridge.invoke(func() int32 { return cclTxToJSON(t.bridge.thread, txCborHex) })
+	return t.lib.invoke(func() int32 { return cclTxToJSON(t.lib.thread, txCborHex) })
 }
 
 func (t *TxApi) FromJson(txJson string) (string, error) {
-	return t.bridge.invoke(func() int32 { return cclTxFromJSON(t.bridge.thread, txJson) })
+	return t.lib.invoke(func() int32 { return cclTxFromJSON(t.lib.thread, txJson) })
 }
 
 func (t *TxApi) Deserialize(txCborHex string) (string, error) {
-	return t.bridge.invoke(func() int32 { return cclTxDeserialize(t.bridge.thread, txCborHex) })
+	return t.lib.invoke(func() int32 { return cclTxDeserialize(t.lib.thread, txCborHex) })
 }
 
 // --- PlutusApi ---
 
 type PlutusApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 func (p *PlutusApi) DataHash(datumCborHex string) (string, error) {
-	return p.bridge.invoke(func() int32 { return cclPlutusDataHash(p.bridge.thread, datumCborHex) })
+	return p.lib.invoke(func() int32 { return cclPlutusDataHash(p.lib.thread, datumCborHex) })
 }
 
 func (p *PlutusApi) DataToJson(cborHex string) (string, error) {
-	return p.bridge.invoke(func() int32 { return cclPlutusDataToJSON(p.bridge.thread, cborHex) })
+	return p.lib.invoke(func() int32 { return cclPlutusDataToJSON(p.lib.thread, cborHex) })
 }
 
 func (p *PlutusApi) DataFromJson(jsonStr string) (string, error) {
-	return p.bridge.invoke(func() int32 { return cclPlutusDataFromJSON(p.bridge.thread, jsonStr) })
+	return p.lib.invoke(func() int32 { return cclPlutusDataFromJSON(p.lib.thread, jsonStr) })
 }
 
 // --- ScriptApi ---
 
 type ScriptApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 func (s *ScriptApi) NativeFromJson(jsonStr string) (string, error) {
-	return s.bridge.invoke(func() int32 { return cclScriptNativeFromJSON(s.bridge.thread, jsonStr) })
+	return s.lib.invoke(func() int32 { return cclScriptNativeFromJSON(s.lib.thread, jsonStr) })
 }
 
 func (s *ScriptApi) Hash(scriptCborHex string, scriptType int) (string, error) {
-	return s.bridge.invoke(func() int32 { return cclScriptHash(s.bridge.thread, scriptCborHex, int32(scriptType)) })
+	return s.lib.invoke(func() int32 { return cclScriptHash(s.lib.thread, scriptCborHex, int32(scriptType)) })
 }
 
 // --- QuickTx API ---
@@ -456,7 +456,7 @@ type TxResult struct {
 
 // QuickTxApi builds unsigned transactions from a CCL TxPlan (YAML), fully offline.
 type QuickTxApi struct {
-	bridge *Bridge
+	lib *Mesmo
 }
 
 // Build builds an unsigned transaction from a TxPlan YAML document using the caller-supplied
@@ -472,7 +472,7 @@ type QuickTxApi struct {
 //
 // For Plutus script transactions, pass the redeemers' execution units as the optional execUnits
 // argument: a slice of {mem, steps} (one per redeemer, in transaction order). Omit them to have the
-// bridge compute them offline with Scalus.
+// lib compute them offline with Scalus.
 func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interface{}, additionalSigners int, execUnits ...interface{}) (*TxResult, error) {
 	if additionalSigners < 0 {
 		return nil, fmt.Errorf("additionalSigners must be >= 0, got %d", additionalSigners)
@@ -496,8 +496,8 @@ func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interf
 		execStr = string(execJSON)
 	}
 
-	result, err := q.bridge.invoke(func() int32 {
-		return cclQuicktxBuild(q.bridge.thread, yaml, string(utxosJSON), string(ppJSON), execStr, int32(additionalSigners))
+	result, err := q.lib.invoke(func() int32 {
+		return cclQuicktxBuild(q.lib.thread, yaml, string(utxosJSON), string(ppJSON), execStr, int32(additionalSigners))
 	})
 	if err != nil {
 		return nil, err

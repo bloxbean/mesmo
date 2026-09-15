@@ -43,7 +43,7 @@ func TestQuickTxScriptSpendE2E(t *testing.T) {
 	execUnits := []map[string]interface{}{{"mem": 2000000, "steps": 500000000}}
 
 	// With execution units: builds.
-	result, err := bridge.QuickTx.Build(yaml, utxos, testProtocolParams(), 0, execUnits)
+	result, err := lib.QuickTx.Build(yaml, utxos, testProtocolParams(), 0, execUnits)
 	if err != nil {
 		t.Fatalf("script spend build failed: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestQuickTxScriptSpendE2E(t *testing.T) {
 	}
 
 	// Without execution units: the script can't be costed, so the build must fail.
-	if _, err := bridge.QuickTx.Build(yaml, utxos, testProtocolParams(), 0); err == nil {
+	if _, err := lib.QuickTx.Build(yaml, utxos, testProtocolParams(), 0); err == nil {
 		t.Error("expected script spend to fail without execution units")
 	}
 }
@@ -74,7 +74,7 @@ func TestQuickTxScriptMintE2E(t *testing.T) {
 	}}
 	execUnits := []map[string]interface{}{{"mem": 2000000, "steps": 500000000}}
 
-	result, err := bridge.QuickTx.Build(yaml, utxos, testProtocolParams(), 0, execUnits)
+	result, err := lib.QuickTx.Build(yaml, utxos, testProtocolParams(), 0, execUnits)
 	if err != nil {
 		t.Fatalf("script mint build failed: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestQuickTxScriptMintE2E(t *testing.T) {
 		t.Errorf("bad result: cbor=%d hash=%d", len(result.TxCbor), len(result.TxHash))
 	}
 
-	if _, err := bridge.QuickTx.Build(yaml, utxos, testProtocolParams(), 0); err == nil {
+	if _, err := lib.QuickTx.Build(yaml, utxos, testProtocolParams(), 0); err == nil {
 		t.Error("expected script mint to fail without execution units")
 	}
 }

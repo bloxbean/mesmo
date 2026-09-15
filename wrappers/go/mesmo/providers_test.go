@@ -90,7 +90,7 @@ func TestBlockfrostUnknownNetwork(t *testing.T) {
 }
 
 // BuildWith end-to-end, offline: a local server returns the known-good static protocol
-// params and UTXOs, and the bridge builds a real payment from them — no DevKit required.
+// params and UTXOs, and the lib builds a real payment from them — no DevKit required.
 func TestBuildWithOffline(t *testing.T) {
 	sender := intentSender
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +104,7 @@ func TestBuildWithOffline(t *testing.T) {
 
 	provider := NewYaciProvider(srv.URL)
 	yaml := quickTxYaml(sender, intentSender2, "5000000")
-	res, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
+	res, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestBuildWithMergesAndDedupesAcrossSenders(t *testing.T) {
 
 	provider := NewYaciProvider(srv.URL)
 	yaml := quickTxYaml(senderA, senderB, "5000000")
-	res, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderA, senderB}, 0)
+	res, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderA, senderB}, 0)
 	if err != nil {
 		t.Fatalf("BuildWith(two senders): %v", err)
 	}

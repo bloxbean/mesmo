@@ -8,7 +8,7 @@ Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-cl
 
 ## What's Included
 
-The bridge exposes CCL's **offline/local** operations:
+Mesmo exposes CCL's **offline/local** operations:
 
 - **Accounts** — Managed account handles (ADR-0016): open once, sign with typed roles; secrets never leave the handle
 - **Address** — Parse, validate, convert between bech32 and bytes
@@ -37,7 +37,7 @@ Shared references: the [TxPlan (YAML) transaction format](docs/quicktx.md) with 
 
 ```
 mesmo/
-├── core/                    # Java bridge + GraalVM native-image → libmesmo
+├── core/                    # Java core + GraalVM native-image → libmesmo
 │   ├── src/main/java/       # @CEntryPoint API classes
 │   └── src/test/java/       # JVM unit tests (72+ tests)
 ├── native-test/             # C smoke tests
@@ -258,9 +258,9 @@ graal_tear_down_isolate(thread);
 ### Usage Pattern (Python)
 
 ```python
-from mesmo import MesmoLib
+from mesmo import Mesmo
 
-lib = MesmoLib()  # loads libmesmo and creates isolate
+lib = Mesmo()  # loads libmesmo and creates isolate
 
 from mesmo import Network
 
@@ -281,17 +281,17 @@ lib.close()
 ### Usage Pattern (Rust)
 
 ```rust
-use mesmo::Bridge;
+use mesmo::Mesmo;
 
-let bridge = Bridge::new().unwrap();
+let lib = Mesmo::new().unwrap();
 
-let account = bridge.accounts().create(mesmo::Network::Mainnet).unwrap(); // managed handle
+let account = lib.accounts().create(mesmo::Network::Mainnet).unwrap(); // managed handle
 println!("Address: {}", account.info().unwrap()["base_address"]);
 
-let hash = bridge.crypto().blake2b_256("48656c6c6f").unwrap();
-let tx_hash = bridge.tx().hash(tx_cbor).unwrap();
-let datum_hash = bridge.plutus().data_hash("182a").unwrap();
-// Bridge::drop() tears down the isolate automatically
+let hash = lib.crypto().blake2b_256("48656c6c6f").unwrap();
+let tx_hash = lib.tx().hash(tx_cbor).unwrap();
+let datum_hash = lib.plutus().data_hash("182a").unwrap();
+// Mesmo::drop() tears down the isolate automatically
 ```
 
 ### Usage Pattern (Go)
@@ -299,34 +299,34 @@ let datum_hash = bridge.plutus().data_hash("182a").unwrap();
 ```go
 import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 
-bridge, _ := mesmo.New()
-defer bridge.Close()
+lib, _ := mesmo.New()
+defer lib.Close()
 
-account, _ := bridge.Accounts.Create(mesmo.Mainnet) // managed handle
+account, _ := lib.Accounts.Create(mesmo.Mainnet) // managed handle
 defer account.Close()
 info, _ := account.Info()
 fmt.Println("Address:", info.BaseAddress)
 
-hash, _ := bridge.Crypto.Blake2b256("48656c6c6f")
-txHash, _ := bridge.Tx.Hash(txCbor)
-datumHash, _ := bridge.Plutus.DataHash("182a")
+hash, _ := lib.Crypto.Blake2b256("48656c6c6f")
+txHash, _ := lib.Tx.Hash(txCbor)
+datumHash, _ := lib.Plutus.DataHash("182a")
 ```
 
 ### Usage Pattern (JavaScript / Bun)
 
 ```javascript
-import { MesmoBridge, MAINNET } from '@bloxbean/mesmo';
+import { Mesmo, MAINNET } from '@bloxbean/mesmo';
 
-const bridge = new MesmoBridge();
+const lib = new Mesmo();
 
-using account = bridge.accounts.create(MAINNET); // managed handle
+using account = lib.accounts.create(MAINNET); // managed handle
 console.log('Address:', account.info.base_address);
 
-const hash = bridge.crypto.blake2b256('48656c6c6f');
-const txHash = bridge.tx.hash(txCbor);
-const datumHash = bridge.plutus.dataHash('182a');
+const hash = lib.crypto.blake2b256('48656c6c6f');
+const txHash = lib.tx.hash(txCbor);
+const datumHash = lib.plutus.dataHash('182a');
 
-bridge.close();
+lib.close();
 ```
 
 ## API Reference

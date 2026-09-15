@@ -1,7 +1,7 @@
 // Build and sign a payment transaction fully offline from a TxPlan (YAML).
 //
 // The transaction is defined as a TxPlan YAML document; we supply the UTXOs and protocol
-// parameters ourselves (no node / no provider). The bridge builds the unsigned CBOR, which we
+// parameters ourselves (no node / no provider). The lib builds the unsigned CBOR, which we
 // then sign locally. Submitting it is a separate, online step.
 //
 // Run from wrappers/go:
@@ -29,16 +29,16 @@ var protocolParams = map[string]interface{}{
 }
 
 func main() {
-	bridge, err := mesmo.New()
+	lib, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close()
+	defer lib.Close()
 
-	sender, _ := bridge.Accounts.Create(mesmo.Testnet) // managed handle — signs below
+	sender, _ := lib.Accounts.Create(mesmo.Testnet) // managed handle — signs below
 	defer sender.Close()
 	senderInfo, _ := sender.Info()
-	receiver, _ := bridge.Accounts.Create(mesmo.Testnet)
+	receiver, _ := lib.Accounts.Create(mesmo.Testnet)
 	receiverInfo, _ := receiver.Info()
 	receiver.Close()
 
@@ -65,7 +65,7 @@ transaction:
 `, senderInfo.BaseAddress, receiverInfo.BaseAddress)
 
 	// Build the unsigned transaction offline.
-	result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams, 0)
+	result, err := lib.QuickTx.Build(yaml, utxos, protocolParams, 0)
 	if err != nil {
 		log.Fatal(err)
 	}

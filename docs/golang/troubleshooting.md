@@ -2,7 +2,7 @@
 
 ## How the native library is found
 
-The `ccl` package resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at runtime, once per process, in this order:
+The `mesmo` package resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at runtime, once per process, in this order:
 
 1. **`MESMO_LIB_PATH`** — a directory containing the library, or the library file itself. If set but the file isn't there, resolution fails hard (no fallback) — this is the way to run against a locally built library.
 2. **The per-version cache**: `os.UserCacheDir()/mesmo/<version>/` (e.g. `~/Library/Caches/...` on macOS, `~/.cache/...` on Linux).
@@ -38,9 +38,9 @@ No prebuilt artifact exists for your platform (see matrix below). Build from sou
 
 The wrapper and the native library must match on base semver. This usually means `MESMO_LIB_PATH` points at a stale build, or `MESMO_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `ccl: bridge is closed`
+### `mesmo: closed`
 
-Something called the bridge after `Close()`. Check with `errors.Is(err, mesmo.ErrBridgeClosed)`. Keep the bridge alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
+Something called Mesmo after `Close()`. Check with `errors.Is(err, mesmo.ErrClosed)`. Keep Mesmo alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
 
 ### `CCL Error -10: ...` from `QuickTx.Build`
 
@@ -56,7 +56,7 @@ Early revisions of the module had a stale internal pin that broke `go get`. Upda
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library or for development against the bridge itself:
+Needed only on platforms without a prebuilt library or for development against Mesmo itself:
 
 ```bash
 git clone https://github.com/bloxbean/mesmo

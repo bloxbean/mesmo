@@ -2,7 +2,7 @@
 
 ## How the native library is found
 
-`new MesmoBridge(libPath?)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
+`new Mesmo(libPath?)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
 
 1. The explicit `libPath` constructor argument (a directory).
 2. The `MESMO_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
@@ -39,9 +39,9 @@ The library file wasn't found or couldn't be loaded.
 
 The wrapper and the native library must match on base semver. This appears when `MESMO_LIB_PATH` points at a stale build. Rebuild the library, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `MesmoClosedError: MesmoBridge is closed`
+### `MesmoClosedError: Mesmo is closed`
 
-Something called the bridge after `close()`. This error is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole process. Keep calls inside the bridge's `try`/`using` scope, or create a new bridge.
+Something called Mesmo after `close()`. This error is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole process. Keep calls inside Mesmo's `try`/`using` scope, or create a new lib.
 
 ### `CCL Error -10: ...` from `quicktx.build`
 
@@ -57,11 +57,11 @@ The protocol parameters' cost models were mangled. `build()` normalizes the comm
 
 ### Crash / segfault under Node.js
 
-Node is not supported — this is expected, not a bug. GraalVM native libraries do stack-boundary checks that Node FFI bridges violate. Run under [Bun](https://bun.sh) ≥ 1.0.
+Node is not supported — this is expected, not a bug. GraalVM native libraries do stack-boundary checks that Node FFI libraries violate. Run under [Bun](https://bun.sh) ≥ 1.0.
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library (macOS Intel, Alpine ARM) or for development against the bridge itself:
+Needed only on platforms without a prebuilt library (macOS Intel, Alpine ARM) or for development against Mesmo itself:
 
 ```bash
 git clone https://github.com/bloxbean/mesmo

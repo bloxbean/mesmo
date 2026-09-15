@@ -2,7 +2,7 @@
 // mnemonic-per-call path, one-shot recovery-phrase export, and secret hygiene. Fully offline.
 import { beforeAll, afterAll, describe, expect, it } from 'bun:test';
 import {
-  MesmoBridge, MesmoError, MESMO_ERROR_INVALID_HANDLE, SigningRole, TESTNET,
+  Mesmo, MesmoError, MESMO_ERROR_INVALID_HANDLE, SigningRole, TESTNET,
 } from '../src/index.js';
 
 const TEST_MNEMONIC = 'test walk nut penalty hip pave soap entry language right filter choice';
@@ -16,10 +16,10 @@ const PROTOCOL_PARAMS = {
   max_collateral_inputs: 3,
 };
 
-let bridge;
+let lib;
 
-beforeAll(() => { bridge = new MesmoBridge(); });
-afterAll(() => bridge.close());
+beforeAll(() => { lib = new Mesmo(); });
+afterAll(() => lib.close());
 
 function unsignedStakeReg(info) {
   const yaml = `
@@ -35,12 +35,12 @@ transaction:
     tx_hash: 'a'.repeat(64), output_index: 0, address: info.base_address,
     amount: [{ unit: 'lovelace', quantity: '2000000000' }],
   }];
-  return bridge.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, null, 1).tx_cbor;
+  return lib.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, null, 1).tx_cbor;
 }
 
 describe('managed accounts', () => {
   it('open info matches the pinned derivation and carries no secret', () => {
-    const acct = bridge.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
+    const acct = lib.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
     try {
       const info = acct.info;
       // Pinned CIP-1852 derivation for the standard CCL test mnemonic at testnet 0/0; the
@@ -61,7 +61,7 @@ describe('managed accounts', () => {
   });
 
   it('signing is deterministic, adds role witnesses, mask order irrelevant', () => {
-    const acct = bridge.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
+    const acct = lib.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
     try {
       const unsigned = unsignedStakeReg(acct.info);
 
@@ -77,7 +77,7 @@ describe('managed accounts', () => {
   });
 
   it('rejects an empty role mask', () => {
-    const acct = bridge.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
+    const acct = lib.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
     try {
       const unsigned = unsignedStakeReg(acct.info);
       expect(() => acct.signTx(unsigned, 0)).toThrow(MesmoError);
@@ -87,7 +87,7 @@ describe('managed accounts', () => {
   });
 
   it('close is idempotent; use-after-close throws -11', () => {
-    const acct = bridge.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
+    const acct = lib.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
     acct.close();
     acct.close(); // idempotent
     try {
@@ -100,13 +100,13 @@ describe('managed accounts', () => {
   });
 
   it('create → export once → restore; imported accounts never export', () => {
-    const acct = bridge.accounts.create(TESTNET);
+    const acct = lib.accounts.create(TESTNET);
     try {
       const base = acct.info.base_address;
       const phrase = acct.exportRecoveryPhrase();
       expect(phrase.trim().split(/\s+/).length).toBe(24);
 
-      const restored = bridge.accounts.fromMnemonic(phrase, TESTNET);
+      const restored = lib.accounts.fromMnemonic(phrase, TESTNET);
       try {
         expect(restored.info.base_address).toBe(base);
         expect(() => restored.exportRecoveryPhrase()).toThrow(MesmoError);
@@ -120,7 +120,7 @@ describe('managed accounts', () => {
   });
 
   it('toString never contains secrets, before or after close', () => {
-    const acct = bridge.accounts.create(TESTNET);
+    const acct = lib.accounts.create(TESTNET);
     const phrase = acct.exportRecoveryPhrase();
     expect(String(acct)).not.toContain('addr'); // not even public data, just the handle
     expect(String(acct)).not.toContain(phrase.split(/\s+/)[0]);
@@ -131,7 +131,7 @@ describe('managed accounts', () => {
   it('Symbol.dispose closes the account (using-declaration support)', () => {
     let leaked;
     {
-      const acct = bridge.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
+      const acct = lib.accounts.fromMnemonic(TEST_MNEMONIC, TESTNET);
       leaked = acct;
       acct[Symbol.dispose]();
     }
@@ -144,7 +144,7 @@ describe('GC fallback', () => {
   // entries pin key material Java-side until process exit. Deterministic close remains
   // the contract — this pins only that leaks are eventually narrowed (ADR-0016).
   function leakAccountHandle() {
-    const acct = bridge.accounts.create(TESTNET);
+    const acct = lib.accounts.create(TESTNET);
     return acct._handle; // BigInt copy; the Account object itself is dropped
   }
 
@@ -153,9 +153,9 @@ describe('GC fallback', () => {
     for (let i = 0; i < 100; i++) {
       Bun.gc(true);
       await new Promise((r) => setTimeout(r, 10)); // let finalizer tasks run
-      const rc = bridge._lib.mesmo_account_get_info(bridge._thread, handle);
+      const rc = lib._lib.mesmo_account_get_info(lib._thread, handle);
       if (rc === -11) return; // finalizer closed it
-      if (rc === 0) bridge._check(rc); // drain the parked info so the slot stays clean
+      if (rc === 0) lib._check(rc); // drain the parked info so the slot stays clean
     }
     throw new Error('dropped Account was never reclaimed — no GC fallback closes leaked handles');
   });

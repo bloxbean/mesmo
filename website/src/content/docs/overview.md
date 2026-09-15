@@ -49,8 +49,8 @@ All four wrappers are first-class and kept at strict parity — same API groups,
 |---|---|---|
 | JavaScript (Bun) | [docs](../js/) | `@bloxbean/mesmo` (npm) |
 | Go | [docs](../go/) | `github.com/bloxbean/mesmo/wrappers/go` |
-| Rust | [docs](../rust/) | `mesmo` (crate, imported as `ccl`) |
-| Python | [docs](../python/) | `mesmo` (PyPI, imported as `ccl`) |
+| Rust | [docs](../rust/) | `mesmo` (crate, imported as `mesmo`) |
+| Python | [docs](../python/) | `mesmo` (PyPI, imported as `mesmo`) |
 
 ## How big is it?
 

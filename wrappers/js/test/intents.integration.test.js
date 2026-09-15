@@ -20,7 +20,7 @@
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/intents.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { MesmoBridge, TESTNET, SigningRole } from "../src/index.js";
+import { Mesmo, TESTNET, SigningRole } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -63,7 +63,7 @@ function readFixture(rel) {
 }
 
 describe("Intents Integration (DevKit)", () => {
-  let bridge;
+  let lib;
   let devkit;
   let skip = false;
 
@@ -75,11 +75,11 @@ describe("Intents Integration (DevKit)", () => {
       console.log("Skipping: Yaci DevKit not available on port 10000");
       return;
     }
-    bridge = new MesmoBridge();
+    lib = new Mesmo();
   });
 
   afterAll(() => {
-    if (bridge) bridge.close();
+    if (lib) lib.close();
   });
 
   // --- helpers (mirror the Go test harness) ---
@@ -113,13 +113,13 @@ describe("Intents Integration (DevKit)", () => {
   }
 
   function intentSign(txCbor, keys, addressIndex = 0) {
-    using acct = bridge.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET, 0, addressIndex);
+    using acct = lib.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET, 0, addressIndex);
     return acct.signTx(txCbor, rolesMask(keys));
   }
 
   async function signSubmit(yaml, utxos, pp, execUnits, keys, additionalSigners = null) {
     const budget = additionalSigners ?? Math.max(0, keys.length - 1);
-    const result = bridge.quicktx.build(yaml, utxos, pp, execUnits ?? null, budget);
+    const result = lib.quicktx.build(yaml, utxos, pp, execUnits ?? null, budget);
     const signed = intentSign(result.tx_cbor, keys);
     return submitExpectHash(signed);
   }
@@ -177,9 +177,9 @@ describe("Intents Integration (DevKit)", () => {
     if (skip) return;
     await resetAndFund();
     const utxos = await devkit.getUtxos(INTENT_SENDER);
-    const built = bridge.quicktx.build(
+    const built = lib.quicktx.build(
       readFixture("stake_registration.yaml"), utxos, await devnetPP(), null, 1);
-    const acct = bridge.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
+    const acct = lib.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
     let signed;
     try {
       signed = acct.signTx(built.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
@@ -324,7 +324,7 @@ describe("Intents Integration (DevKit)", () => {
     const pp = await devnetPP();
 
     const utxos = await devkit.getUtxos(INTENT_SENDER);
-    const built = bridge.quicktx.build(readFixture("drep_registration.yaml"), utxos, pp, null, 1);
+    const built = lib.quicktx.build(readFixture("drep_registration.yaml"), utxos, pp, null, 1);
 
     // Sign with the payment key ONLY, omitting the DRep-key witness.
     const signedPaymentOnly = intentSign(built.tx_cbor, ['payment']);
@@ -383,7 +383,7 @@ describe("Intents Integration (DevKit)", () => {
 
     // Submit an info proposal. Its build-result tx hash is the gov action id we vote on.
     const u3 = await devkit.getUtxos(INTENT_SENDER);
-    const proposal = bridge.quicktx.build(readFixture("governance_proposal.yaml"), u3, pp);
+    const proposal = lib.quicktx.build(readFixture("governance_proposal.yaml"), u3, pp);
     const actionTxHash = proposal.tx_hash;
     const signedProposal = intentSign(proposal.tx_cbor, ["payment"]);
     await submitExpectHash(signedProposal);
@@ -455,7 +455,7 @@ describe("Intents Integration (DevKit)", () => {
 
   // Negative validation: redeemer 0 makes the same validator evaluate to false, so phase-2
   // validation fails and the node must reject the tx. Exec units are supplied manually — the
-  // bridge's StaticTransactionEvaluator stamps them without running the script, which is exactly
+  // lib's StaticTransactionEvaluator stamps them without running the script, which is exactly
   // what lets a validation-failing tx reach the node.
   it("rejects the Aiken redeemer-check mint with a wrong redeemer", async () => {
     if (skip) return;
@@ -465,7 +465,7 @@ describe("Intents Integration (DevKit)", () => {
     await devkit.waitForBlock(3000);
 
     const utxos = await devkit.getUtxos(INTENT_SENDER);
-    const result = bridge.quicktx.build(readFixture("plutus/aiken_mint_fail.yaml"),
+    const result = lib.quicktx.build(readFixture("plutus/aiken_mint_fail.yaml"),
       utxos, await devnetPP(), [{ mem: 2000000, steps: 500000000 }]);
     const signed = intentSign(result.tx_cbor, ["payment"]);
     const res = await devkit.submitTx(signed);
@@ -534,7 +534,7 @@ describe("Intents Integration (DevKit)", () => {
   // signSubmit, additionally returning the tx fee so callers can assert the sender's exact
   // balance change (the ledger read-back "submit accepted" alone can't give).
   async function signSubmitFee(yaml, utxos, pp, execUnits, keys) {
-    const result = bridge.quicktx.build(yaml, utxos, pp, execUnits ?? null,
+    const result = lib.quicktx.build(yaml, utxos, pp, execUnits ?? null,
       Math.max(0, keys.length - 1));
     const signed = intentSign(result.tx_cbor, keys);
     await submitExpectHash(signed);
@@ -675,13 +675,13 @@ describe("Intents Integration (DevKit)", () => {
     const pp = await resetAndFund();
 
     // Build a native script the sender's payment key satisfies, and its script address.
-    const info = bridge.address.info(INTENT_SENDER);
-    const script = JSON.parse(bridge.script.nativeFromJson(
+    const info = lib.address.info(INTENT_SENDER);
+    const script = JSON.parse(lib.script.nativeFromJson(
       JSON.stringify({ type: "sig", keyHash: info.payment_credential_hash })));
     // nativeFromJson's cbor_hex is the hash preimage (leading 0x00 language tag); the TxPlan
     // native_script block wants the bare script CBOR.
     const scriptHex = script.cbor_hex.slice(2);
-    const scriptAddress = bridge.address.fromBytes("70" + script.script_hash); // testnet script enterprise
+    const scriptAddress = lib.address.fromBytes("70" + script.script_hash); // testnet script enterprise
 
     // Step 1: lock 5 ADA at the script address.
     const lockYaml = `
@@ -768,7 +768,7 @@ transaction:
       ...(await devkit.getUtxos(INTENT_SENDER)),
       ...(await devkit.getUtxos(INTENT_SENDER2)),
     ];
-    const result = bridge.quicktx.build(readFixture("compose.yaml"), utxos, pp);
+    const result = lib.quicktx.build(readFixture("compose.yaml"), utxos, pp);
     const once = intentSign(result.tx_cbor, ['payment']);
     const twice = intentSign(once, ['payment'], 1);
     await submitExpectHash(twice);

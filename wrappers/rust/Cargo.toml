@@ -12,7 +12,7 @@ authors = ["bloxbean"]
 keywords = ["cardano", "cardano-client", "cardano-client-lib", "blockchain"]
 categories = ["api-bindings", "cryptography::cryptocurrencies"]
 
-# Published as `cardano-client-lib`, but imported as `ccl` (e.g. `use mesmo::...`) — keep the short
+# Published as `cardano-client-lib`, but imported as `mesmo` (e.g. `use mesmo::...`) — keep the short
 # crate identifier stable while the registry/dist name is descriptive.
 [lib]
 name = "mesmo"

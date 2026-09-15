@@ -2,7 +2,7 @@
 //
 // A Plutus build needs each redeemer's execution units. This example mints a token with an
 // always-succeeds validator and shows both ways to obtain them:
-//  1. the offline default — the bridge computes the units in-process with Scalus (no network); and
+//  1. the offline default — the lib computes the units in-process with Scalus (no network); and
 //  2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 //
 // libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
@@ -54,14 +54,14 @@ func main() {
 
 	provider := &localProvider{utxos: utxos, params: params}
 
-	bridge, err := mesmo.New()
+	lib, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close()
+	defer lib.Close()
 
 	// 1) Offline default: no evaluator -> Scalus runs the validator and stamps the computed units.
-	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
+	result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func main() {
 	//    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
 	//
 	//	evaluator, _ := mesmo.NewBlockfrostEvaluator("preprod_your_project_id", "preprod")
-	//	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
+	//	result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 	//
 	// To supply units yourself, call Build directly with the units as the last argument.
 }

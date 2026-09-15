@@ -22,8 +22,8 @@ func TestUseAfterCloseReturnsErrorNotDeadlock(t *testing.T) {
 
 	select {
 	case e := <-done:
-		if !errors.Is(e, ErrBridgeClosed) {
-			t.Errorf("after Close, got %v; want ErrBridgeClosed", e)
+		if !errors.Is(e, ErrClosed) {
+			t.Errorf("after Close, got %v; want ErrClosed", e)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("DEADLOCK: call after Close never returned")
@@ -33,8 +33,8 @@ func TestUseAfterCloseReturnsErrorNotDeadlock(t *testing.T) {
 	go func() { _, e := b.Accounts.Create(Testnet); done <- e }()
 	select {
 	case e := <-done:
-		if !errors.Is(e, ErrBridgeClosed) {
-			t.Errorf("second call after Close: got %v; want ErrBridgeClosed", e)
+		if !errors.Is(e, ErrClosed) {
+			t.Errorf("second call after Close: got %v; want ErrClosed", e)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("DEADLOCK: mutex still held by the first post-Close call")
