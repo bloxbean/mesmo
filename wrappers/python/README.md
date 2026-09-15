@@ -21,7 +21,7 @@ The native library is **bundled inside the platform wheel** — no separate down
 ```bash
 pip install mesmo
 # or, a locally built wheel:
-pip install path/to/cardano_client_lib-*.whl
+pip install path/to/mesmo-*.whl
 ```
 
 Wheels are published for `linux-x86_64`, `linux-aarch64`, `linux-musl-x86_64` (Alpine),
@@ -33,7 +33,7 @@ ships the matching `libmesmo.*` inside the package (`mesmo/_libs/`), so `import 
 else to set. Build one locally (needs `pip install build`):
 
 ```bash
-./gradlew :wrappers:python:wheel     # -> wrappers/python/dist/cardano_client_lib-*.whl
+./gradlew :wrappers:python:wheel     # -> wrappers/python/dist/mesmo-*.whl
 ```
 
 At load time the bindings look for the library in this order: an explicit `MesmoLib(lib_path=...)`,
