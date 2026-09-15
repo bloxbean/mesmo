@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 func main() {
-	bridge, err := ccl.New()
+	bridge, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func main() {
 
 	// 1. Create a brand-new testnet account (managed handle; the recovery phrase is
 	//    exported once, deliberately — it is never part of the account's Info).
-	account, err := bridge.Accounts.Create(ccl.Testnet)
+	account, err := bridge.Accounts.Create(mesmo.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func main() {
 	fmt.Println("  mnemonic    :", mnemonic)
 
 	// 2. Restore the same account from its phrase — the address must match.
-	restored, err := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	restored, err := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 	if err != nil {
 		log.Fatal(err)
 	}

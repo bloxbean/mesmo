@@ -4,10 +4,10 @@
 //!
 //! ```text
 //! LIB_DIR=../../core/build/native/nativeCompile
-//! CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//! MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //!   cargo run --example primitives
 //! ```
-use ccl::{Bridge, Network};
+use mesmo::{Bridge, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge = Bridge::new()?;

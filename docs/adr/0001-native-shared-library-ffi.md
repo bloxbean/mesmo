@@ -15,7 +15,7 @@ runtime — without having to build and keep four independent reimplementations 
 
 ## Decision
 
-Compile CCL into a single **native shared library** (`libccl`) using **GraalVM native-image**, exposing
+Compile CCL into a single **native shared library** (`libmesmo`) using **GraalVM native-image**, exposing
 a stable **C ABI** via `@CEntryPoint` exports, and bind to it from each language through that language's
 FFI. No JVM is shipped or required at runtime. Data crosses the boundary as C strings (JSON/YAML/hex).
 
@@ -31,7 +31,7 @@ FFI. No JVM is shipped or required at runtime. Data crosses the boundary as C st
 ## Alternatives considered
 
 - **Rely solely on existing per-language native libraries** — they exist and work, but carry the risk
-  of being abruptly abandoned; Cardano Client Bindings is the maintained fallback. (Building and maintaining our
+  of being abruptly abandoned; Mesmo is the maintained fallback. (Building and maintaining our
   *own* four independent reimplementations would also be a large, duplicated effort with correctness
   drift across languages.)
 - **JNI / embedded JVM** — ships and runs a JVM; heavy footprint and startup.

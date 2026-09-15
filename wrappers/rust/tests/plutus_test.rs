@@ -2,7 +2,7 @@
 //! (wrappers/python/tests/test_plutus.py). The happy-path data_hash vector already lives in
 //! integration_test.rs; this adds the invalid-CBOR and empty-input error cases.
 
-use ccl::Bridge;
+use mesmo::Bridge;
 
 fn bridge() -> Bridge {
     Bridge::new().expect("Failed to create bridge")

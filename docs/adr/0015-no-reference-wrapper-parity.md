@@ -6,7 +6,7 @@
 
 ## Context
 
-The bridge exposes one native library (`libccl`) through four wrappers — Python, Go, Rust, and
+The bridge exposes one native library (`libmesmo`) through four wrappers — Python, Go, Rust, and
 JavaScript (Bun) ([ADR-0003](0003-four-language-wrappers-uniform-ffi.md)). As the FFI surface grows,
 the wrappers can **drift**: one wrapper gains a new `@CEntryPoint` or capability that the others lack.
 
@@ -28,8 +28,8 @@ completeness, not a hierarchy.
   all four run the same build → sign → submit scenarios against a live DevKit in `integration-tests.yml`.
 - **Backed by a contributor checklist** for the manual parts (below).
 
-Explicitly **out of scope:** identical *code*. Each wrapper stays idiomatic — `CclLib` (Python) /
-`Bridge` (Go, Rust) / `CclBridge` (JS), `snake_case` vs `camelCase`, per-language error types — and
+Explicitly **out of scope:** identical *code*. Each wrapper stays idiomatic — `MesmoLib` (Python) /
+`Bridge` (Go, Rust) / `MesmoBridge` (JS), `snake_case` vs `camelCase`, per-language error types — and
 some tests are legitimately wrapper-specific (the library loaders, the version-skew check, JS's
 cost-model normalization, musl detection). Parity means the same *capabilities and coverage*, not the
 same source.
@@ -41,8 +41,8 @@ same source.
 - **Harder / accepted cost:** every FFI change is ~4× the work (bind + expose + test in each wrapper).
   That is the price of genuine parity, accepted deliberately.
 - **The checklist — on any FFI / API change:**
-  1. **Core** — add/change the `@CEntryPoint` (`ccl_*` naming) + a JVM test.
-  2. **Bind it in all four FFI layers** — `wrappers/python/ccl/_ffi.py`, `wrappers/go/ccl/ffi.go`,
+  1. **Core** — add/change the `@CEntryPoint` (`mesmo_*` naming) + a JVM test.
+  2. **Bind it in all four FFI layers** — `wrappers/python/mesmo/_ffi.py`, `wrappers/go/mesmo/ffi.go`,
      `wrappers/rust/src/ffi.rs`, `wrappers/js/src/index.js`.
   3. **Expose it** in each wrapper's public API, idiomatically.
   4. **Test it in all four**, at the same level (offline build assertions + a DevKit integration test

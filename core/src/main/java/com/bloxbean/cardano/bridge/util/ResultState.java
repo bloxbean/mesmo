@@ -1,7 +1,7 @@
 package com.bloxbean.cardano.bridge.util;
 
 /**
- * Thread-local transport for a call's result string, consumed by {@code ccl_get_result}.
+ * Thread-local transport for a call's result string, consumed by {@code mesmo_get_result}.
  *
  * <p><b>Consumptive (ADR-0016):</b> {@link #get()} removes the value as it returns it, so a
  * secret-bearing result (a generated mnemonic, an exported private key) cannot linger as the

@@ -3,15 +3,15 @@
 Run from the repo root:
 
     LIB_DIR=core/build/native/nativeCompile
-    PYTHONPATH=wrappers/python CCL_LIB_PATH=$LIB_DIR \
+    PYTHONPATH=wrappers/python MESMO_LIB_PATH=$LIB_DIR \
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/01_account_and_keys.py
 """
-from ccl import CclLib, Network
+from mesmo import MesmoLib, Network
 
 
 def main():
-    lib = CclLib()
+    lib = MesmoLib()
     try:
         # 1. Create a brand-new testnet account (managed handle; the recovery phrase
         #    is exported once, deliberately — it is never part of account info).

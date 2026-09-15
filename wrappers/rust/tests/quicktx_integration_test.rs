@@ -5,7 +5,7 @@
 //! - Native library built: ./gradlew :core:nativeCompile
 //!
 //! Run with:
-//!   cd wrappers/rust && CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   cd wrappers/rust && MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!       cargo test --features providers --test quicktx_integration_test -- --test-threads=1
 //!
 //! Shared DevKit plumbing lives in `tests/common/mod.rs` (see that module for the harness the intents
@@ -13,7 +13,7 @@
 
 mod common;
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use common::*;
 
 // --- YAML builders ---
@@ -58,9 +58,9 @@ fn test_integration_simple_ada_transfer() {
     let signed_tx = {
         let acct = bridge
             .accounts()
-            .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+            .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
             .expect("open account");
-        acct.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)
+        acct.sign_tx(&result.tx_cbor, mesmo::accounts::SigningRole::PAYMENT)
             .expect("sign failed")
     };
     let tx_hash = devkit_submit_tx(&signed_tx);
@@ -110,9 +110,9 @@ fn test_integration_multiple_receivers() {
     let signed_tx = {
         let acct = bridge
             .accounts()
-            .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+            .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
             .expect("open account");
-        acct.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)
+        acct.sign_tx(&result.tx_cbor, mesmo::accounts::SigningRole::PAYMENT)
             .expect("sign failed")
     };
     let tx_hash = devkit_submit_tx(&signed_tx);
@@ -157,7 +157,7 @@ fn test_integration_build_with_yaci_provider() {
     let (sender, _mnemonic) = fund_sender(&bridge, 150);
     let (receiver, _, _) = get_testnet_account(&bridge);
 
-    let provider = ccl::providers::YaciProvider::default(); // local DevKit cluster
+    let provider = mesmo::providers::YaciProvider::default(); // local DevKit cluster
     let yaml = payment_yaml(&sender, &receiver, "5000000");
     let result = bridge
         .quicktx()

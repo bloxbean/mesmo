@@ -12,8 +12,8 @@
 //
 // Use one directly, or via quicktx.buildWith:
 //
-//   import { CclBridge, BlockfrostProvider } from "@bloxbean/cardano-client-lib";
-//   const bridge = new CclBridge();
+//   import { MesmoBridge, BlockfrostProvider } from "@bloxbean/mesmo";
+//   const bridge = new MesmoBridge();
 //   const provider = new BlockfrostProvider(projectId, { network: "preprod" }); // or new YaciProvider()
 //   const result = await bridge.quicktx.buildWith(txplanYaml, provider, senderAddress);
 
@@ -128,7 +128,7 @@ export class BlockfrostProvider extends ChainDataProvider {
 //
 // The native library computes execution units offline with Scalus when you supply none (ADR-0013).
 // A TransactionEvaluator lets you compute them with a *remote* evaluator instead. HTTP is a wrapper
-// concern — libccl never makes network calls (ADR-0002). Use one via
+// concern — libmesmo never makes network calls (ADR-0002). Use one via
 // `quicktx.buildWith(yaml, provider, sender, evaluator)`.
 
 // Interface marker: an evaluator exposes `evaluate(txCbor, utxos)` returning `[{ mem, steps }]`,

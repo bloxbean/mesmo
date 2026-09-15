@@ -38,18 +38,18 @@ def test_plutus_data_json_roundtrip(ccl):
 # --- Negative / Error Tests ---
 
 def test_plutus_data_hash_invalid_cbor(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.plutus.data_hash("zzzz")
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected
 
 
 def test_plutus_data_hash_empty(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.plutus.data_hash("")
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected

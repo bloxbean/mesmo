@@ -9,7 +9,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 
 ## Overview
 
-- **Single function**: `ccl_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json, additional_signers)` → returns `0` on success.
+- **Single function**: `mesmo_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json, additional_signers)` → returns `0` on success.
 - **Result**: a YAML document with `tx_cbor` (unsigned transaction), `tx_hash`, and `fee`.
 - **Fully offline**: the caller supplies UTXOs and protocol parameters — the native library makes no
   HTTP calls and never submits. (The native entry point has no provider mode; each wrapper offers a
@@ -20,7 +20,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 ### Entry point
 
 ```c
-int ccl_quicktx_build(
+int mesmo_quicktx_build(
     graal_isolatethread_t* thread,
     const char* yaml,                  // TxPlan YAML
     const char* utxos_json,            // JSON array of UTXOs
@@ -34,7 +34,7 @@ int ccl_quicktx_build(
 
 | Code | Meaning |
 |------|---------|
-| `0`  | Success — retrieve the result via `ccl_get_result(thread)` |
+| `0`  | Success — retrieve the result via `mesmo_get_result(thread)` |
 | `-2` | Invalid argument (e.g. missing YAML or protocol parameters) |
 | `-8` | Insufficient funds (UTXOs can't cover outputs + fees) |
 | `-10`| Transaction build failure (e.g. malformed TxPlan) |
@@ -218,7 +218,7 @@ transaction:
             - unit: lovelace
               quantity: "2000000"
         - type: metadata
-          metadata: '{"674": {"msg": "Hello from Cardano Client Bindings"}}'
+          metadata: '{"674": {"msg": "Hello from Mesmo"}}'
 ```
 
 ### 5. Plutus mint (with caller-supplied execution units)
@@ -502,7 +502,7 @@ Mint under a Plutus policy (`script_minting`, shown in [example 5](#5-plutus-min
 ## Using it from the wrappers
 
 Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?, additionalSigners)` that
-marshals the chain data to JSON, calls `ccl_quicktx_build`, and parses the YAML result — plus a
+marshals the chain data to JSON, calls `mesmo_quicktx_build`, and parses the YAML result — plus a
 `build_with(yaml, provider, senders, additionalSigners, evaluator?)` convenience that fetches the
 chain data from a provider first (see
 each wrapper's providers guide). The result is an object/dict/struct with `tx_cbor`, `tx_hash`, and
@@ -519,9 +519,9 @@ submit it yourself.
 ### Python
 
 ```python
-from ccl import CclLib, Network, SigningRole
+from mesmo import MesmoLib, Network, SigningRole
 
-lib = CclLib()
+lib = MesmoLib()
 # additional_signers: witnesses beyond the input-implied payment key(s) — here 1 (a stake cert)
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params, additional_signers=1)
 with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
@@ -531,9 +531,9 @@ with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
 ### JavaScript (Bun)
 
 ```javascript
-import { CclBridge, TESTNET, SigningRole } from '@bloxbean/cardano-client-lib';
+import { MesmoBridge, TESTNET, SigningRole } from '@bloxbean/mesmo';
 
-const bridge = new CclBridge();
+const bridge = new MesmoBridge();
 const result = bridge.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
 using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
 const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
@@ -542,25 +542,25 @@ const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STA
 ### Go
 
 ```go
-bridge, _ := ccl.New()
+bridge, _ := mesmo.New()
 defer bridge.Close()
 
 result, _ := bridge.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+acct, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
-signed, _ := acct.SignTx(result.TxCbor, ccl.RolePayment|ccl.RoleStake)
+signed, _ := acct.SignTx(result.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
 ### Rust
 
 ```rust
-let bridge = ccl::Bridge::new().unwrap();
+let bridge = mesmo::Bridge::new().unwrap();
 
-use ccl::accounts::SigningRole;
+use mesmo::accounts::SigningRole;
 
 let result = bridge.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
 let acct = bridge.accounts()
-    .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+    .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
     .unwrap();
 let signed = acct
     .sign_tx(&result.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)

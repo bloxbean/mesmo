@@ -5,7 +5,7 @@
 //  1. the offline default — the bridge computes the units in-process with Scalus (no network); and
 //  2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 //
-// libccl never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
+// libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
 // wrapper: BuildWith runs a two-pass (draft -> evaluate -> rebuild).
 //
 // Run from wrappers/go:
@@ -21,7 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 // localProvider returns fixed fixtures (stands in for Blockfrost/Yaci/…).
@@ -54,7 +54,7 @@ func main() {
 
 	provider := &localProvider{utxos: utxos, params: params}
 
-	bridge, err := ccl.New()
+	bridge, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func main() {
 	// 2) Remote evaluator (illustrative — needs a Blockfrost project id). The two-pass builds a
 	//    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
 	//
-	//	evaluator, _ := ccl.NewBlockfrostEvaluator("preprod_your_project_id", "preprod")
+	//	evaluator, _ := mesmo.NewBlockfrostEvaluator("preprod_your_project_id", "preprod")
 	//	result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 	//
 	// To supply units yourself, call Build directly with the units as the last argument.

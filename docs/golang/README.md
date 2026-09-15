@@ -15,16 +15,16 @@ The `ccl` Go package brings [Cardano Client Lib (CCL)](https://github.com/bloxbe
 ## Installation
 
 ```bash
-go get github.com/bloxbean/cardano-client-bindings/wrappers/go
+go get github.com/bloxbean/mesmo/wrappers/go
 ```
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
-Requires Go ≥ 1.21. On first use, the package downloads the prebuilt native library (`libccl`) for your platform from the project's GitHub releases into your user cache directory (`os.UserCacheDir()/cardano-client-bindings/<version>/`) — a one-time, per-version download. No environment variables or build flags are needed.
+Requires Go ≥ 1.21. On first use, the package downloads the prebuilt native library (`libmesmo`) for your platform from the project's GitHub releases into your user cache directory (`os.UserCacheDir()/mesmo/<version>/`) — a one-time, per-version download. No environment variables or build flags are needed.
 
-To use a locally built library instead (or on a platform without prebuilt binaries), set `CCL_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-found).
+To use a locally built library instead (or on a platform without prebuilt binaries), set `MESMO_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-found).
 
 ## Quick start
 
@@ -35,11 +35,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 func main() {
-	bridge, err := ccl.New()
+	bridge, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func main() {
 
 	// Create a new managed account (testnet). Its Info never contains the phrase;
 	// export the recovery phrase once, deliberately.
-	account, err := bridge.Accounts.Create(ccl.Testnet)
+	account, err := bridge.Accounts.Create(mesmo.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func main() {
 	mnemonic, _ := account.ExportRecoveryPhrase()
 
 	// Restore it later from the phrase.
-	restored, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	restored, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 	defer restored.Close()
 }
 ```
@@ -84,14 +84,14 @@ transaction:
 result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams)
 // result.TxCbor, result.TxHash, result.Fee
 
-signed, err := sender.SignTx(result.TxCbor, ccl.RolePayment) // sender = bridge.Accounts.FromMnemonic(...)
+signed, err := sender.SignTx(result.TxCbor, mesmo.RolePayment) // sender = bridge.Accounts.FromMnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider, fetching the chain data is one call:
 
 ```go
-provider := ccl.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
+provider := mesmo.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
 result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 ```
 
@@ -101,16 +101,16 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Concurrency
 
-A `*Bridge` is safe to share across goroutines: all native calls are funneled to one dedicated, pinned OS thread (a GraalVM isolate thread is bound to the OS thread that created it), so calls are serialized. For parallel native work, create multiple `Bridge` instances. Always `defer bridge.Close()`; calls after `Close` return `ccl.ErrBridgeClosed` rather than crashing.
+A `*Bridge` is safe to share across goroutines: all native calls are funneled to one dedicated, pinned OS thread (a GraalVM isolate thread is bound to the OS thread that created it), so calls are serialized. For parallel native work, create multiple `Bridge` instances. Always `defer bridge.Close()`; calls after `Close` return `mesmo.ErrBridgeClosed` rather than crashing.
 
 ## Networks
 
 ```go
-ccl.Mainnet // 0
-ccl.Testnet // 1
+mesmo.Mainnet // 0
+mesmo.Testnet // 1
 ```
 
-Every key-derivation method takes a typed `ccl.Network` — passing a bare `int` is a compile error. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).
+Every key-derivation method takes a typed `mesmo.Network` — passing a bare `int` is a compile error. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).
 
 ## Examples
 

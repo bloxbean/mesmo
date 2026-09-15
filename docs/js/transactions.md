@@ -7,9 +7,9 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```js
-import { CclBridge, TESTNET, YaciProvider } from "@bloxbean/cardano-client-lib";
+import { MesmoBridge, TESTNET, YaciProvider } from "@bloxbean/mesmo";
 
-using bridge = new CclBridge();
+using bridge = new MesmoBridge();
 const provider = new YaciProvider();          // or BlockfrostProvider, or your own
 
 // 1. Describe — TxPlan YAML (see the intent catalog)
@@ -175,7 +175,7 @@ const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender]
 To cost against a real node instead, pass an evaluator — `buildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```js
-import { BlockfrostEvaluator } from "@bloxbean/cardano-client-lib";
+import { BlockfrostEvaluator } from "@bloxbean/mesmo";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
 const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender], evaluator);

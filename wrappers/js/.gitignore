@@ -1,5 +1,5 @@
 # Bundled native library — staged at pack time from :core:nativeCompile, never committed.
-libs/libccl.*
+libs/libmesmo.*
 # Pack output
 *.tgz
 node_modules/

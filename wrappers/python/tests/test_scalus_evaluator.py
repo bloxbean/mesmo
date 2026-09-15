@@ -16,7 +16,7 @@ def test_plutus_mint_falls_back_to_scalus(ccl):
     # Params include cost models (Scalus needs them to run the UPLC machine).
     params = json.loads((FIXTURES / "protocol-params.json").read_text())
 
-    # exec_units omitted → Scalus computes them offline by evaluating the validator in libccl.
+    # exec_units omitted → Scalus computes them offline by evaluating the validator in libmesmo.
     result = ccl.quicktx.build(yaml, utxos, params)
 
     assert result.get("tx_cbor"), "expected a built transaction"

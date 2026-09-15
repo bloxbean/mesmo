@@ -28,7 +28,7 @@ export default defineConfig({
         {
           label: 'AI Agents',
           items: [
-            { label: 'Using CCL Bindings with AI', slug: 'ai' },
+            { label: 'Using Mesmo with AI', slug: 'ai' },
             { label: 'AI Starter Pack', slug: 'ai/starter-pack' },
           ],
         },

@@ -15,7 +15,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 // Minimal protocol parameters (CCL test-resource values), the CCL ProtocolParams model as a map.
@@ -29,16 +29,16 @@ var protocolParams = map[string]interface{}{
 }
 
 func main() {
-	bridge, err := ccl.New()
+	bridge, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer bridge.Close()
 
-	sender, _ := bridge.Accounts.Create(ccl.Testnet) // managed handle — signs below
+	sender, _ := bridge.Accounts.Create(mesmo.Testnet) // managed handle — signs below
 	defer sender.Close()
 	senderInfo, _ := sender.Info()
-	receiver, _ := bridge.Accounts.Create(ccl.Testnet)
+	receiver, _ := bridge.Accounts.Create(mesmo.Testnet)
 	receiverInfo, _ := receiver.Info()
 	receiver.Close()
 
@@ -75,7 +75,7 @@ transaction:
 	fmt.Println("  cbor   :", result.TxCbor[:80], "...")
 
 	// Sign it with the sender's managed handle — no mnemonic in the call.
-	signed, err := sender.SignTx(result.TxCbor, ccl.RolePayment)
+	signed, err := sender.SignTx(result.TxCbor, mesmo.RolePayment)
 	if err != nil {
 		log.Fatal(err)
 	}

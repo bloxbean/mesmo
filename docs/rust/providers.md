@@ -8,7 +8,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
-use ccl::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
+use mesmo::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
 ```
 
 ## ChainDataProvider
@@ -91,6 +91,6 @@ Chain data flows through `serde_json::Value`, which keeps JSON integers exact (`
 
 ## Timeouts & errors
 
-HTTP failures surface as `CclError { code: CCL_ERROR_GENERAL, message: "<context>: <cause>" }`.
+HTTP failures surface as `MesmoError { code: MESMO_ERROR_GENERAL, message: "<context>: <cause>" }`.
 
 > **Caveat:** the provider HTTP calls currently set no explicit request timeout, so a hung endpoint can block the calling thread indefinitely. If your application can't tolerate that, wrap provider calls in your own timeout mechanism or implement the `ChainDataProvider` trait over an HTTP client you configure.

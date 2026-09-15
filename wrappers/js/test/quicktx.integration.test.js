@@ -5,11 +5,11 @@
 // - Native library built: ./gradlew :core:nativeCompile
 //
 // Run with:
-//   cd wrappers/js && CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//   cd wrappers/js && MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/quicktx.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { CclBridge, TESTNET, SigningRole, YaciProvider } from "../src/index.js";
+import { MesmoBridge, TESTNET, SigningRole, YaciProvider } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -77,7 +77,7 @@ describe("QuickTx Integration (DevKit)", () => {
       console.log("Skipping: Yaci DevKit not available on port 10000");
       return;
     }
-    bridge = new CclBridge();
+    bridge = new MesmoBridge();
     await devkit.reset();
     await devkit.waitForBlock(3000);
   });

@@ -6,7 +6,7 @@
 
 ## Context
 
-The shipped Linux `libccl.so` was built on `ubuntu-latest` (glibc ~2.39), so it failed to load on older
+The shipped Linux `libmesmo.so` was built on `ubuntu-latest` (glibc ~2.39), so it failed to load on older
 distros (`version 'GLIBC_2.3x' not found`). We explored shipping a **fully static, no-`.so`** library to
 be distro-independent. A spike established two hard facts:
 
@@ -26,7 +26,7 @@ Keep the in-process FFI **shared library** and achieve portability on two axes:
    Debian 9+, and all newer).
 2. **CPU baseline** — set `-march=compatibility` in `native-image.properties` so the binary uses only
    instructions common to all CPUs of the architecture.
-3. **musl variant** — additionally build a musl `libccl.so` via `--libc=musl` (with a musl
+3. **musl variant** — additionally build a musl `libmesmo.so` via `--libc=musl` (with a musl
    toolchain: `musl-gcc` + a musl-linked `zlib`), shipped as `linux-musl-x86_64`, so Alpine/musl is
    covered by its own artifact. **aarch64 musl is unsupported by GraalVM** (native-image's
    `--libc=musl` toolchain detection hardcodes `x86_64-linux-musl-gcc`), so `linux-musl-aarch64`
@@ -37,7 +37,7 @@ The musl artifact must reach **bundled**-wrapper users separately: the fetching 
 (wheel) and JS (npm) bundle the lib into their packages, so each needs a musl artifact of its own or
 Alpine users silently receive the glibc build, which cannot load under musl:
 
-- **npm:** a separate `@bloxbean/cardano-client-lib-linux-musl-x86_64` package, pinned as an
+- **npm:** a separate `@bloxbean/mesmo-linux-musl-x86_64` package, pinned as an
   `optionalDependency`. The **`libc` field is load-bearing**: `os` (`linux`) and `cpu` (`x64`) both
   match on Alpine, so *only* `libc: ["musl"]` vs `["glibc"]` lets npm pick the right one. And because
   npm can install *both* platform packages on an Alpine box, the wrapper still resolves at runtime:

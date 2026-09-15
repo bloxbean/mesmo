@@ -5,7 +5,7 @@ CIP-1852 payment leaf — one handle per leaf (`address_index` selects it). Thes
 that the wallet workflows (create, restore, enumerate addresses) survive on handles alone.
 """
 
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_wallet_create(ccl):

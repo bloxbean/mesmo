@@ -1,10 +1,10 @@
 # Rust API Reference
 
 ```rust
-use ccl::{Bridge, Network, CclError, Result};
+use mesmo::{Bridge, Network, MesmoError, Result};
 ```
 
-Most methods return `ccl::Result<String>` where the string is either a JSON document (parse with `serde_json`) or a bare hex/bech32 value — noted per method below.
+Most methods return `mesmo::Result<String>` where the string is either a JSON document (parse with `serde_json`) or a bare hex/bech32 value — noted per method below.
 
 ## Bridge
 
@@ -43,25 +43,25 @@ impl Network { pub fn as_i32(self) -> i32 }  // Mainnet=0, Testnet=1
 ## Errors
 
 ```rust
-pub struct CclError { pub code: i32, pub message: String }  // Display: "CCL Error {code}: {message}"
-pub type Result<T> = std::result::Result<T, CclError>;
+pub struct MesmoError { pub code: i32, pub message: String }  // Display: "CCL Error {code}: {message}"
+pub type Result<T> = std::result::Result<T, MesmoError>;
 ```
 
-Error codes (`ccl::error_codes`):
+Error codes (`mesmo::error_codes`):
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure (also: version mismatch, HTTP provider errors) |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument (also: interior NUL in a string) |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx().build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Bridge that was dropped |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure (also: version mismatch, HTTP provider errors) |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument (also: interior NUL in a string) |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx().build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Bridge that was dropped |
 
 Predicate methods (`validate`, `validate_mnemonic`, `verify`) return `bool` and never error.
 
@@ -71,7 +71,7 @@ Handle-based accounts (ADR-0016): open once, then operate without the mnemonic �
 account API.
 
 ```rust
-use ccl::accounts::SigningRole;
+use mesmo::accounts::SigningRole;
 
 let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
 let info = acct.info()?;                          // serde_json::Value — never the mnemonic
@@ -81,7 +81,7 @@ let signed = acct.sign_tx(&tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 
 - The `Account` is an **owned value**, not a borrow: it can live in the same struct as its
   `Bridge`. Dropping the `Bridge` hard-invalidates outstanding accounts — their calls fail with
-  `CCL_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Bridge`, an
+  `MESMO_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Bridge`, an
   `Account` is `!Send`.
 - `create(network)` — fresh 24-word account; **no secret in the result**. Retrieve the phrase once,
   deliberately, with `export_recovery_phrase()` — a second call fails, as does export on a

@@ -7,7 +7,7 @@
 //! [`crate::Bridge`] — holding shared, close-aware access to the bridge's isolate state.
 //! It can live in the same struct as its `Bridge`. Validity is enforced at runtime: any call after
 //! the account's `close()` — or after the `Bridge` itself is dropped — fails with a normal
-//! [`CclError`] (`CCL_ERROR_INVALID_HANDLE`, `-11`), never by touching a dead isolate. Like the
+//! [`MesmoError`] (`MESMO_ERROR_INVALID_HANDLE`, `-11`), never by touching a dead isolate. Like the
 //! `Bridge`, an `Account` is `!Send`.
 
 use std::cell::Cell;
@@ -16,7 +16,7 @@ use std::rc::Rc;
 
 use serde_json::Value;
 
-use crate::{check_at, error_codes, ffi, to_cstring, Bridge, BridgeShared, CclError, Network, Result};
+use crate::{check_at, error_codes, ffi, to_cstring, Bridge, BridgeShared, MesmoError, Network, Result};
 
 /// Typed signing roles. Combine with `|`; witnesses are applied in canonical order
 /// (payment, stake, DRep, committee cold, committee hot) regardless of combination order.
@@ -57,7 +57,7 @@ impl<'a> AccountsApi<'a> {
         let mut handle: i64 = 0;
         let thread = self.bridge.shared.thread()?;
         let rc = unsafe {
-            ffi::ccl_account_open_mnemonic(
+            ffi::mesmo_account_open_mnemonic(
                 thread,
                 network.into(),
                 mnemonic_cs.as_ptr(),
@@ -80,7 +80,7 @@ impl<'a> AccountsApi<'a> {
     pub fn create(&self, network: Network) -> Result<Account> {
         let mut handle: i64 = 0;
         let thread = self.bridge.shared.thread()?;
-        let rc = unsafe { ffi::ccl_account_create_handle(thread, network.into(), &mut handle) };
+        let rc = unsafe { ffi::mesmo_account_create_handle(thread, network.into(), &mut handle) };
         check_at(thread, rc)?;
         Ok(Account {
             shared: Rc::clone(&self.bridge.shared),
@@ -112,10 +112,10 @@ impl Account {
     /// "committee_hot_credential"}`. Never contains secrets.
     pub fn info(&self) -> Result<Value> {
         let thread = self.shared.thread()?;
-        let rc = unsafe { ffi::ccl_account_get_info(thread, self.handle.get()) };
+        let rc = unsafe { ffi::mesmo_account_get_info(thread, self.handle.get()) };
         let json = check_at(thread, rc)?;
-        serde_json::from_str(&json).map_err(|e| CclError {
-            code: error_codes::CCL_ERROR_SERIALIZATION,
+        serde_json::from_str(&json).map_err(|e| MesmoError {
+            code: error_codes::MESMO_ERROR_SERIALIZATION,
             message: format!("Failed to parse account info: {}", e),
         })
     }
@@ -129,7 +129,7 @@ impl Account {
         let tx_cs = to_cstring(tx_cbor_hex)?;
         let thread = self.shared.thread()?;
         let rc = unsafe {
-            ffi::ccl_account_sign_tx_handle(thread, self.handle.get(), tx_cs.as_ptr(), roles.0 as i32)
+            ffi::mesmo_account_sign_tx_handle(thread, self.handle.get(), tx_cs.as_ptr(), roles.0 as i32)
         };
         check_at(thread, rc)
     }
@@ -146,25 +146,25 @@ impl Account {
         let thread = self.shared.thread()?;
         let mut out: *mut std::os::raw::c_char = std::ptr::null_mut();
         let rc = unsafe {
-            ffi::ccl_account_export_recovery_phrase(thread, self.handle.get(), &mut out)
+            ffi::mesmo_account_export_recovery_phrase(thread, self.handle.get(), &mut out)
         };
-        if rc != crate::error_codes::CCL_SUCCESS {
-            return Err(crate::CclError { code: rc, message: crate::get_error_at(thread) });
+        if rc != crate::error_codes::MESMO_SUCCESS {
+            return Err(crate::MesmoError { code: rc, message: crate::get_error_at(thread) });
         }
         let phrase = unsafe { std::ffi::CStr::from_ptr(out) }
             .to_string_lossy()
             .into_owned();
-        unsafe { ffi::ccl_free_string(thread, out) };
+        unsafe { ffi::mesmo_free_string(thread, out) };
         Ok(phrase)
     }
 
     /// Release the native account state. Idempotent; further use fails with
-    /// `CCL_ERROR_INVALID_HANDLE` (`-11`).
+    /// `MESMO_ERROR_INVALID_HANDLE` (`-11`).
     pub fn close(&self) -> Result<()> {
         let handle = self.handle.replace(0); // 0 is never a valid handle
         if handle != 0 {
             if let Ok(thread) = self.shared.thread() {
-                let rc = unsafe { ffi::ccl_account_close(thread, handle) };
+                let rc = unsafe { ffi::mesmo_account_close(thread, handle) };
                 check_at(thread, rc)?;
             }
         }
@@ -182,9 +182,9 @@ impl std::fmt::Debug for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let handle = self.handle.get();
         if handle == 0 {
-            write!(f, "<ccl::Account closed>")
+            write!(f, "<mesmo::Account closed>")
         } else {
-            write!(f, "<ccl::Account handle={}>", handle)
+            write!(f, "<mesmo::Account handle={}>", handle)
         }
     }
 }

@@ -1,7 +1,7 @@
 import pytest
 
-from ccl._ffi import CclError
-from ccl.network import Network
+from mesmo._ffi import MesmoError
+from mesmo.network import Network
 
 # Minimal protocol parameters (CCL ProtocolParams model).
 def _addr(ccl):
@@ -109,7 +109,7 @@ def test_insufficient_funds(ccl):
     sender = _addr(ccl)
     receiver = _addr(ccl)
     yaml_str = _payment_yaml(sender, receiver, "200000000")
-    with pytest.raises(CclError):
+    with pytest.raises(MesmoError):
         ccl.quicktx.build(yaml_str, _utxos(sender, 1_000_000), PROTOCOL_PARAMS)
 
 
@@ -150,5 +150,5 @@ def test_plutus_mint_with_exec_units(ccl):
 
 
 def test_plutus_mint_without_exec_units_fails(ccl):
-    with pytest.raises(CclError):
+    with pytest.raises(MesmoError):
         ccl.quicktx.build(MINT_YAML, _utxos(MINT_ADDR), PROTOCOL_PARAMS)

@@ -51,10 +51,10 @@ material improvement.
 
 This decision interacts with three accepted ADRs:
 
-- [ADR-0002](0002-offline-stateless-no-provider.md) keeps `libccl` offline, stateless, and free of
+- [ADR-0002](0002-offline-stateless-no-provider.md) keeps `libmesmo` offline, stateless, and free of
   provider/network configuration. That rule remains. This ADR carves a narrow, explicit exception
   for caller-created, in-memory signing capabilities: it supersedes ADR-0002 only where ADR-0002
-  says that `libccl` holds no key/account state.
+  says that `libmesmo` holds no key/account state.
 - [ADR-0003](0003-four-language-wrappers-uniform-ffi.md) requires a common thin C ABI. Account objects
   must therefore be native resources surfaced idiomatically by thin wrappers, not four independent
   account implementations.
@@ -74,11 +74,11 @@ The C ABI will create/import an account once and return an opaque integer handle
 surface is:
 
 ```c
-ccl_account_create_handle(..., uint64_t *out_handle);
-ccl_account_open_mnemonic(..., uint64_t *out_handle);
-ccl_account_get_info(..., uint64_t handle);
-ccl_account_sign(..., uint64_t handle, const char *tx_cbor, uint32_t role_mask);
-ccl_account_close(..., uint64_t handle);
+mesmo_account_create_handle(..., uint64_t *out_handle);
+mesmo_account_open_mnemonic(..., uint64_t *out_handle);
+mesmo_account_get_info(..., uint64_t handle);
+mesmo_account_sign(..., uint64_t handle, const char *tx_cbor, uint32_t role_mask);
+mesmo_account_close(..., uint64_t handle);
 ```
 
 Exact names and result mechanics may change during implementation, but these invariants will not:
@@ -257,8 +257,8 @@ by this decision.
 ```go
 sender, err := bridge.Accounts.FromMnemonic(
 	mnemonic,
-	ccl.Testnet,
-	ccl.AccountPath{Account: 0, Address: 0},
+	mesmo.Testnet,
+	mesmo.AccountPath{Account: 0, Address: 0},
 )
 if err != nil {
 	return err
@@ -269,7 +269,7 @@ built, err := bridge.QuickTx.Build(plan, utxos, params, nil)
 if err != nil {
 	return err
 }
-signed, err := sender.SignTx(built.TxCbor, ccl.Payment)
+signed, err := sender.SignTx(built.TxCbor, mesmo.Payment)
 ```
 
 Go will use a typed `SigningRole`, not variadic strings. Secret import/export should prefer a mutable
@@ -278,7 +278,7 @@ finalizer may only be a fallback.
 
 Implementations for hardware wallets, browser/CIP-30 wallets, KMS/remote services, and air-gapped
 workflows are outside the initial implementation, but the abstraction must allow them without
-requiring a mnemonic to enter `libccl`.
+requiring a mnemonic to enter `libmesmo`.
 
 ### QuickTx remains unsigned by default
 
@@ -334,7 +334,7 @@ all-wrapper release requirements in `RELEASING.md` and ADR-0015.
 
 Explicitly out of scope for this ADR are key persistence at rest, OS keychains, hardware-wallet
 protocol implementations, remote signer authentication, transaction submission, and network/provider
-state inside `libccl`.
+state inside `libmesmo`.
 
 ## Consequences
 
@@ -346,7 +346,7 @@ state inside `libccl`.
   browser, hardware, remote, multisig, and offline signers without redesigning transaction building.
 - **More accurate fee planning:** signer roles/count become part of build context instead of being
   inferred independently from the later signing call.
-- **Native state is introduced:** `libccl` must maintain an isolate-local resource registry, validate
+- **Native state is introduced:** `libmesmo` must maintain an isolate-local resource registry, validate
   handles, clean up deterministically, and test use-after-close and bridge-close behavior. This is an
   intentional exception to the broad wording of ADR-0002, but it does not introduce network or
   provider state.

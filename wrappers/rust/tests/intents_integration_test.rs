@@ -16,12 +16,12 @@
 //! - Native library built: ./gradlew :core:nativeCompile
 //!
 //! Run from wrappers/rust:
-//!   CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!     cargo test --features providers --test intents_integration_test -- --test-threads=1
 
 mod common;
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use common::*;
 use serde_json::json;
 
@@ -32,7 +32,7 @@ fn test_integration_managed_account_handle_sign_submit() {
     if skip_if_no_devkit() {
         return;
     }
-    use ccl::accounts::SigningRole;
+    use mesmo::accounts::SigningRole;
     let bridge = Bridge::new().expect("create bridge");
     devkit_reset();
     wait_for_block();
@@ -46,7 +46,7 @@ fn test_integration_managed_account_handle_sign_submit() {
         .expect("build");
     let acct = bridge
         .accounts()
-        .from_mnemonic(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0)
+        .from_mnemonic(INTENT_MNEMONIC, mesmo::Network::Testnet, 0, 0)
         .expect("open account");
     let signed = acct
         .sign_tx(&built.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)
@@ -833,7 +833,7 @@ fn test_integration_compose_two_senders() {
 }
 
 // The offline Scalus evaluator is the DEFAULT costing path: when a caller supplies no execution
-// units, libccl computes them in-process (ADR-0013). Every other Plutus test supplies units
+// units, libmesmo computes them in-process (ADR-0013). Every other Plutus test supplies units
 // manually (they must, to submit a failing script), so this is the only test proving the node
 // accepts Scalus-computed budgets end-to-end — the path out-of-the-box users are on.
 #[test]

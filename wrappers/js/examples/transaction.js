@@ -7,9 +7,9 @@
 // Run from wrappers/js:
 //
 //   LIB_DIR=../../core/build/native/nativeCompile
-//   CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//   MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //     bun examples/transaction.js
-import { CclBridge, TESTNET } from '../src/index.js';
+import { MesmoBridge, TESTNET } from '../src/index.js';
 
 // Minimal protocol parameters (CCL test-resource values).
 const protocolParams = {
@@ -21,7 +21,7 @@ const protocolParams = {
   max_collateral_inputs: 3,
 };
 
-const bridge = new CclBridge();
+const bridge = new MesmoBridge();
 try {
   using sender = bridge.accounts.create(TESTNET); // managed handle — signs below
   using receiver = bridge.accounts.create(TESTNET);

@@ -87,7 +87,7 @@ As a CLI alternative, install npm 11.15 or newer and run:
 ```bash
 npm install -g npm@^11.15.0
 npm trust github <new-package-name> \
-  --repo bloxbean/cardano-client-bindings \
+  --repo bloxbean/mesmo \
   --file publish-js.yml \
   --environment release \
   --allow-publish

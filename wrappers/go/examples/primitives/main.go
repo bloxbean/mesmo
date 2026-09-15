@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 func main() {
-	bridge, err := ccl.New()
+	bridge, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func main() {
 	fmt.Println("  verify(fake signature) ->", bridge.Crypto.Verify("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", messageHex, pub))
 
 	// --- Address parsing & validation ---
-	acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	acct, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 	defer acct.Close()
 	acctInfo, _ := acct.Info()
 	addr := acctInfo.BaseAddress

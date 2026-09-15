@@ -9,7 +9,7 @@
 //! harness needs no cargo feature. Tests SKIP (return early) when DevKit is not reachable.
 #![allow(dead_code)]
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -246,7 +246,7 @@ pub fn skip_if_no_devkit() -> bool {
 pub fn get_testnet_account(bridge: &Bridge) -> (String, String, String) {
     let acct = bridge
         .accounts()
-        .create(ccl::Network::Testnet)
+        .create(mesmo::Network::Testnet)
         .expect("create account");
     let json = acct.info().expect("account info");
     let addr = json["base_address"].as_str().unwrap().to_string();
@@ -256,8 +256,8 @@ pub fn get_testnet_account(bridge: &Bridge) -> (String, String, String) {
 }
 
 /// Map fixture role names onto the typed mask.
-pub fn roles_from_keys(keys: &[&str]) -> ccl::accounts::SigningRole {
-    use ccl::accounts::SigningRole;
+pub fn roles_from_keys(keys: &[&str]) -> mesmo::accounts::SigningRole {
+    use mesmo::accounts::SigningRole;
     let mut mask = 0u32;
     for k in keys {
         mask |= match *k {
@@ -274,7 +274,7 @@ pub fn roles_from_keys(keys: &[&str]) -> ccl::accounts::SigningRole {
 pub fn intent_sign_at(bridge: &Bridge, address_index: u32, tx_cbor: &str, keys: &[&str]) -> String {
     let acct = bridge
         .accounts()
-        .from_mnemonic(INTENT_MNEMONIC, ccl::Network::Testnet, 0, address_index)
+        .from_mnemonic(INTENT_MNEMONIC, mesmo::Network::Testnet, 0, address_index)
         .expect("open intent account");
     acct.sign_tx(tx_cbor, roles_from_keys(keys)).expect("sign")
 }

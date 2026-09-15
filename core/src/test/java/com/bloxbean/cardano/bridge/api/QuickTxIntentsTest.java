@@ -149,7 +149,7 @@ class QuickTxIntentsTest {
 
     @Test
     void metadata() throws Exception {
-        Metadata md = MetadataBuilder.metadataFromJson("{\"674\":{\"msg\":\"Hello from Cardano Client Bindings\"}}");
+        Metadata md = MetadataBuilder.metadataFromJson("{\"674\":{\"msg\":\"Hello from Mesmo\"}}");
         assertBuilds("metadata", new Tx()
                 .payToAddress(account.enterpriseAddress(), Amount.ada(2))
                 .attachMetadata(md)

@@ -2,7 +2,7 @@
 //! coverage (wrappers/python/tests/test_address.py). The happy-path info / to_bytes / from_bytes /
 //! validate cases already live in integration_test.rs; this fills the two negative cases.
 
-use ccl::Bridge;
+use mesmo::Bridge;
 
 fn bridge() -> Bridge {
     Bridge::new().expect("Failed to create bridge")

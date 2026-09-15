@@ -2,7 +2,7 @@
 
 import pytest
 
-import ccl._ffi as ffi
+import mesmo._ffi as ffi
 
 
 def test_base_version_strips_suffix():
@@ -14,19 +14,19 @@ def test_base_version_strips_suffix():
 
 def test_matching_version_loads():
     # The bundled/in-tree lib matches EXPECTED_LIB_VERSION, so construction succeeds.
-    lib = ffi.CclLib()
+    lib = ffi.MesmoLib()
     assert ffi._base_version(lib.version()) == ffi._base_version(ffi.EXPECTED_LIB_VERSION)
 
 
 def test_version_mismatch_raises(monkeypatch):
     monkeypatch.setattr(ffi, "EXPECTED_LIB_VERSION", "9.9.9")
-    monkeypatch.delenv("CCL_SKIP_VERSION_CHECK", raising=False)
+    monkeypatch.delenv("MESMO_SKIP_VERSION_CHECK", raising=False)
     with pytest.raises(RuntimeError, match="incompatible"):
-        ffi.CclLib()
+        ffi.MesmoLib()
 
 
 def test_version_mismatch_bypassed_by_env(monkeypatch):
     monkeypatch.setattr(ffi, "EXPECTED_LIB_VERSION", "9.9.9")
-    monkeypatch.setenv("CCL_SKIP_VERSION_CHECK", "1")
-    lib = ffi.CclLib()  # must not raise despite the (fake) mismatch
+    monkeypatch.setenv("MESMO_SKIP_VERSION_CHECK", "1")
+    lib = ffi.MesmoLib()  # must not raise despite the (fake) mismatch
     assert lib.version()

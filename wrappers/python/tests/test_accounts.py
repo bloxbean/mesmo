@@ -2,8 +2,8 @@
 mnemonic-per-call path, one-shot recovery-phrase export, and secret hygiene. Fully offline."""
 import pytest
 
-from ccl import CclInvalidHandleError, Network, SigningRole
-from ccl._ffi import CclError
+from mesmo import CclInvalidHandleError, Network, SigningRole
+from mesmo._ffi import MesmoError
 
 TEST_MNEMONIC = "test walk nut penalty hip pave soap entry language right filter choice"
 
@@ -70,7 +70,7 @@ def test_sign_is_deterministic_and_mask_order_free(ccl):
 def test_empty_role_mask_rejected(ccl):
     with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
         unsigned = _unsigned_stake_reg(ccl, acct.info)
-        with pytest.raises(CclError):
+        with pytest.raises(MesmoError):
             acct.sign_tx(unsigned, 0)
 
 
@@ -91,13 +91,13 @@ def test_create_export_once_and_restore(ccl):
         assert len(phrase.split()) == 24
         with ccl.accounts.from_mnemonic(phrase, Network.TESTNET) as restored:
             assert restored.info["base_address"] == base
-        with pytest.raises(CclError):
+        with pytest.raises(MesmoError):
             acct.export_recovery_phrase()  # one-shot
 
 
 def test_export_on_imported_account_fails(ccl):
     with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
-        with pytest.raises(CclError):
+        with pytest.raises(MesmoError):
             acct.export_recovery_phrase()
 
 
@@ -106,7 +106,7 @@ def test_repr_never_contains_secrets(ccl):
         assert "addr" not in repr(acct)  # not even public data, just the handle
         phrase = acct.export_recovery_phrase()
         assert phrase.split()[0] not in repr(acct)
-    assert repr(acct) == "<ccl.Account closed>"
+    assert repr(acct) == "<mesmo.Account closed>"
 
 
 def test_two_handles_same_leaf_independent_lifecycle(ccl):
@@ -139,7 +139,7 @@ def test_close_never_drains_the_pending_result_slot(ccl):
 
     # Park a known result in the slot without fetching it — exactly how it sits
     # between a native call's return and its result read.
-    rc = ccl._lib.ccl_crypto_blake2b_256(ccl._thread, b"48656c6c6f")  # "Hello"
+    rc = ccl._lib.mesmo_crypto_blake2b_256(ccl._thread, b"48656c6c6f")  # "Hello"
     assert rc == 0
 
     acct.close()  # must not consume the parked result
@@ -159,7 +159,7 @@ def test_gc_finalizer_cannot_steal_an_inflight_result(ccl):
     holder.account = ccl.accounts.create(Network.TESTNET)
     del holder
 
-    rc = ccl._lib.ccl_crypto_blake2b_256(ccl._thread, b"48656c6c6f")
+    rc = ccl._lib.mesmo_crypto_blake2b_256(ccl._thread, b"48656c6c6f")
     assert rc == 0
 
     gc.collect()  # runs Account.__del__ -> close() with the result parked
@@ -171,8 +171,8 @@ def test_sign_tx_error_codes_are_typed_and_consistent(ccl):
     """Closed-handle recovery keys on CclInvalidHandleError (-11), and corrupt input maps to
     -9 (invalid transaction) whether the corruption is bad hex or bad CBOR — never -2."""
     import pytest
-    from ccl import CclInvalidHandleError
-    from ccl._ffi import CclError
+    from mesmo import CclInvalidHandleError
+    from mesmo._ffi import MesmoError
 
     acct = ccl.accounts.create(Network.TESTNET)
     acct.close()
@@ -181,7 +181,7 @@ def test_sign_tx_error_codes_are_typed_and_consistent(ccl):
 
     with ccl.accounts.create(Network.TESTNET) as live:
         for corrupt in ("zz", "abc"):  # non-hex; odd length
-            with pytest.raises(CclError) as excinfo:
+            with pytest.raises(MesmoError) as excinfo:
                 live.sign_tx(corrupt)
             assert excinfo.value.code == -9, f"{corrupt!r} → {excinfo.value.code}"
 
@@ -192,15 +192,15 @@ def test_foreign_handle_from_another_isolate_is_rejected():
     bridge/handle pairing silently uses the WRONG KEYS instead of failing with -11. The
     handle spaces must be disjoint (per-isolate randomized) so the documented foreign-handle
     failure actually happens."""
-    from ccl._ffi import CclLib
+    from mesmo._ffi import MesmoLib
 
-    lib1, lib2 = CclLib(), CclLib()
+    lib1, lib2 = MesmoLib(), MesmoLib()
     try:
         a1 = lib1.accounts.create(Network.TESTNET)
         a2 = lib2.accounts.create(Network.TESTNET)  # same allocation order on both isolates
 
         # Pass lib1's handle to lib2 through the raw ABI — the exact wrong-pairing mistake.
-        rc = lib2._lib.ccl_account_get_info(lib2._thread, a1._handle)
+        rc = lib2._lib.mesmo_account_get_info(lib2._thread, a1._handle)
         assert rc == -11, (
             f"foreign handle returned rc={rc}: it aliased a real account on the other "
             f"isolate (handles: lib1={a1._handle}, lib2={a2._handle})")

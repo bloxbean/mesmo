@@ -8,8 +8,8 @@ Each guide covers installation, a quick start, the full API reference, a transac
 
 | Language | Guide | Package |
 |---|---|---|
-| JavaScript (Bun) | [docs/js](js/README.md) | `@bloxbean/cardano-client-lib` (npm) |
-| Go | [docs/golang](golang/README.md) | `github.com/bloxbean/cardano-client-bindings/wrappers/go` |
+| JavaScript (Bun) | [docs/js](js/README.md) | `@bloxbean/mesmo` (npm) |
+| Go | [docs/golang](golang/README.md) | `github.com/bloxbean/mesmo/wrappers/go` |
 | Rust | [docs/rust](rust/README.md) | `cardano-client-lib` (crate, imported as `ccl`) |
 | Python | [docs/python](python/README.md) | `cardano-client-lib` (PyPI, imported as `ccl`) |
 

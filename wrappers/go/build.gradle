@@ -4,19 +4,19 @@ task copyNativeLib(type: Copy) {
     dependsOn nativeLibTask
     from project(':core').layout.buildDirectory.dir('native/nativeCompile')
     into layout.buildDirectory.dir('native')
-    include 'libccl.*'
+    include 'libmesmo.*'
     include '*.h'
 }
 
 task test(type: Exec) {
     dependsOn copyNativeLib
-    workingDir file('ccl')
+    workingDir file('mesmo')
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    // purego dlopens libccl at runtime — no cgo, no C toolchain. CCL_LIB_PATH points it at the
+    // purego dlopens libmesmo at runtime — no cgo, no C toolchain. MESMO_LIB_PATH points it at the
     // freshly built library so tests use it instead of downloading from a release. CGO_ENABLED=0
     // proves the wrapper builds as pure Go.
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'CGO_ENABLED', '0'
 
     def goArch = System.getProperty("os.arch") == "aarch64" ? "arm64" : "amd64"

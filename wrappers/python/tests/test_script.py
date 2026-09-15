@@ -1,5 +1,5 @@
 import json
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_script_native_from_json(ccl):

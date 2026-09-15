@@ -149,7 +149,7 @@ class CryptoApiTest {
     // is already the final, clamped scalar. Signing must therefore use signExtended — feeding kL
     // to the seed-based sign() re-hashes and re-clamps it, producing a signature under a
     // DIFFERENT keypair. These tests pin both directions so the documented workflow
-    // (derive_key -> ccl_crypto_sign with the whole 64-byte key -> ccl_crypto_verify against the
+    // (derive_key -> mesmo_crypto_sign with the whole 64-byte key -> mesmo_crypto_verify against the
     // returned public_key) can never silently regress again.
 
     private com.bloxbean.cardano.client.crypto.bip32.HdKeyPair deriveTestKeyPair() {

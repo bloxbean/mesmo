@@ -5,7 +5,7 @@ credentials) is public data on `account.info`, governance *signing* is `sign_tx`
 DREP / COMMITTEE_* roles, and raw governance key material comes from `crypto.derive_key`.
 """
 
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_gov_identifiers_in_account_info(ccl):

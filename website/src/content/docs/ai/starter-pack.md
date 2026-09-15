@@ -7,14 +7,14 @@ description: Everything an AI agent needs to write correct code against the Mesm
 
 ## 1. What this is
 
-Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
+Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libmesmo`) via GraalVM native-image, with four wrappers exposing the same functionality:
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install mesmo`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
-| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
-| Rust ≥ 1.70 | crate `mesmo` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
-| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
+| Python ≥ 3.8 | `pip install mesmo`, `from mesmo import MesmoLib` | `MesmoLib()` | `snake_case` |
+| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `mesmo.New()` → `Bridge` | `PascalCase` |
+| Rust ≥ 1.70 | crate `mesmo` (import as `ccl`) | `mesmo::Bridge::new()` | `snake_case`, methods return `Result` |
+| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new MesmoBridge()` | `camelCase` |
 
 All four have the same nine API groups — `account`, `address`, `crypto`, `tx`, `plutus`, `script`, `gov`, `wallet`, `quicktx` — the same error codes, and the same TxPlan YAML format. Semantics are identical; only naming idiom differs.
 
@@ -28,9 +28,9 @@ All four have the same nine API groups — `account`, `address`, `crypto`, `tx`,
 ## 3. Core workflow (build → sign → submit)
 
 ```python
-from ccl import CclLib, Network, SigningRole, YaciProvider
+from mesmo import MesmoLib, Network, SigningRole, YaciProvider
 
-with CclLib() as lib, lib.accounts.create(Network.TESTNET) as account:
+with MesmoLib() as lib, lib.accounts.create(Network.TESTNET) as account:
     address = account.info["base_address"]           # info is public data — never the mnemonic
     provider = YaciProvider()                        # or BlockfrostProvider(project_id, network="preprod")
 
@@ -58,7 +58,7 @@ To restore an existing account: `lib.accounts.from_mnemonic(mnemonic, Network.TE
 crosses the boundary once, there. A created account's phrase is exported once, deliberately, with
 `account.export_recovery_phrase()`.
 
-Go: `acct, _ := bridge.Accounts.Create(ccl.Testnet)` / `acct.SignTx(result.TxCbor, ccl.RolePayment)`.
+Go: `acct, _ := bridge.Accounts.Create(mesmo.Testnet)` / `acct.SignTx(result.TxCbor, mesmo.RolePayment)`.
 JS: `using acct = bridge.accounts.create(TESTNET)` / `acct.signTx(result.tx_cbor)`.
 Rust: `let acct = bridge.accounts().create(Network::Testnet)?` / `acct.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?`.
 The `additional_signers` build count is **positional** in Go/Rust; keyword/options elsewhere.
@@ -215,7 +215,7 @@ There is **no separate gov or wallet group**: governance identity (DRep id, comm
 
 ## 9. Errors
 
-Native errors carry a code (Python raises `CclError` with `.code`/`.message`; Go/Rust return errors; JS throws):
+Native errors carry a code (Python raises `MesmoError` with `.code`/`.message`; Go/Rust return errors; JS throws):
 
 | Code | Meaning | Typical fix |
 |---|---|---|
@@ -238,7 +238,7 @@ Predicates (`validate`, `validate_mnemonic`, `verify`) return false instead of r
 2. **Broken functions** (GraalVM reflection gaps, all languages): `tx.from_json`, `tx.sign_with_secret_key`, `plutus.data_to_json`, `plutus.data_from_json`.
 3. **JS = Bun only.** Never scaffold the JS wrapper with Node.js/`npm run` — use `bun`.
 4. **Go calls are serialized** per `Bridge` (one OS thread owns the isolate). For parallelism use multiple `Bridge` instances.
-5. **Version lock**: wrapper and native lib must match base semver; local dev uses `CCL_LIB_PATH` to point at a built library.
+5. **Version lock**: wrapper and native lib must match base semver; local dev uses `MESMO_LIB_PATH` to point at a built library.
 6. **Pre-1.0** against CCL `0.8.0-pre4` — APIs may change.
 7. **Platforms**: no macOS Intel, no Windows ARM64; Alpine Python is source-install for now.
 

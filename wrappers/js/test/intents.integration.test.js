@@ -9,18 +9,18 @@
 // funded fresh on the devnet per test for isolation. They SKIP when DevKit is not running, so they
 // are exercised only by the CI "Integration Tests (DevKit)" job, not locally.
 //
-// Mirrors wrappers/go/ccl/intents_integration_test.go.
+// Mirrors wrappers/go/mesmo/intents_integration_test.go.
 //
 // Requires:
 // - Yaci DevKit running on port 10000
 // - Native library built: ./gradlew :core:nativeCompile
 //
 // Run with:
-//   cd wrappers/js && CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//   cd wrappers/js && MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/intents.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { CclBridge, TESTNET, SigningRole } from "../src/index.js";
+import { MesmoBridge, TESTNET, SigningRole } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -75,7 +75,7 @@ describe("Intents Integration (DevKit)", () => {
       console.log("Skipping: Yaci DevKit not available on port 10000");
       return;
     }
-    bridge = new CclBridge();
+    bridge = new MesmoBridge();
   });
 
   afterAll(() => {
@@ -434,7 +434,7 @@ describe("Intents Integration (DevKit)", () => {
   });
 
   // The offline Scalus evaluator is the DEFAULT costing path: when a caller supplies no execution
-  // units, libccl computes them in-process (ADR-0013). Every other Plutus test supplies units
+  // units, libmesmo computes them in-process (ADR-0013). Every other Plutus test supplies units
   // manually (they must, to submit a failing script), so this is the only test proving the node
   // accepts Scalus-computed budgets end-to-end — the path out-of-the-box users are on.
   it("mints under a Plutus script with Scalus-computed units (no exec units supplied)", async () => {

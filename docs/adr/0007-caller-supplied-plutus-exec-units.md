@@ -34,5 +34,5 @@ clear error.
 
 ## Alternatives considered
 
-- **Bundle a UPLC evaluator inside libccl** — not feasible in a native image today; revisit later.
+- **Bundle a UPLC evaluator inside libmesmo** — not feasible in a native image today; revisit later.
 - **Refuse Plutus entirely** — too limiting; scripts are core to Cardano use.

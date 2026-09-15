@@ -1,10 +1,10 @@
-use ccl::{Bridge, TxResult};
+use mesmo::{Bridge, TxResult};
 use serde_json::{json, Value};
 
 // A known valid transaction CBOR hex (built from Java tests)
 const SAMPLE_TX_CBOR: &str = "84a300d901028182582073198b7ad003862b9798106b88fbccfca464b1a38afb34958275c4a7d7d8d002010181825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc1a001e8480021a00029810a0f5f6";
 
-fn create_managed(bridge: &Bridge, network: ccl::Network) -> (serde_json::Value, String) {
+fn create_managed(bridge: &Bridge, network: mesmo::Network) -> (serde_json::Value, String) {
     let acct = bridge
         .accounts()
         .create(network)
@@ -17,11 +17,11 @@ fn create_managed(bridge: &Bridge, network: ccl::Network) -> (serde_json::Value,
 }
 
 fn get_mnemonic(bridge: &Bridge) -> String {
-    create_managed(bridge, ccl::Network::Mainnet).1
+    create_managed(bridge, mesmo::Network::Mainnet).1
 }
 
 fn get_testnet_mnemonic(bridge: &Bridge) -> String {
-    create_managed(bridge, ccl::Network::Testnet).1
+    create_managed(bridge, mesmo::Network::Testnet).1
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn test_version() {
 #[test]
 fn test_account_create() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (info, phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (info, phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     assert!(info["base_address"].as_str().unwrap().starts_with("addr1"));
     assert!(phrase.split_whitespace().count() == 24);
     assert!(info.get("mnemonic").is_none());
@@ -44,11 +44,11 @@ fn test_account_create() {
 fn test_account_from_mnemonic() {
     let bridge = Bridge::new().expect("Failed to create bridge");
 
-    let (created_info, mnemonic) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (created_info, mnemonic) = create_managed(&bridge, mesmo::Network::Mainnet);
 
     let restored = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to restore account");
     let restored_info = restored.info().expect("Failed to get info");
 
@@ -75,7 +75,7 @@ fn test_account_get_drep_id() {
 
     let acct = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to open account");
     let info = acct.info().expect("Failed to get info");
     assert!(info["drep_id"].as_str().unwrap().starts_with("drep1"));
@@ -88,10 +88,10 @@ fn test_account_sign_tx() {
 
     let acct = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
         .expect("Failed to open account");
     let signed = acct
-        .sign_tx(SAMPLE_TX_CBOR, ccl::accounts::SigningRole::PAYMENT)
+        .sign_tx(SAMPLE_TX_CBOR, mesmo::accounts::SigningRole::PAYMENT)
         .expect("Failed to sign tx");
     assert!(signed.len() > SAMPLE_TX_CBOR.len());
 }
@@ -99,7 +99,7 @@ fn test_account_sign_tx() {
 #[test]
 fn test_address_info() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (info, _phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (info, _phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     let addr = info["base_address"].as_str().unwrap();
 
     let info_str = bridge.address().info(addr).expect("Failed to get address info");
@@ -116,16 +116,16 @@ fn test_address_info() {
 /// inversion back into a bug: renumbering `Network` to match the on-chain ids would make every
 /// caller silently derive keys for the *wrong network*, and this test is what stops that landing.
 #[test]
-fn test_network_ordinals_are_ccl_not_onchain() {
+fn test_network_ordinals_are_mesmo_not_onchain() {
     // The CCL ordinals the native library expects. Do not renumber to match on-chain ids.
-    assert_eq!(ccl::Network::Mainnet as i32, 0);
-    assert_eq!(ccl::Network::Testnet as i32, 1);
-    assert_eq!(ccl::Network::Mainnet.as_i32(), 0);
-    assert_eq!(i32::from(ccl::Network::Testnet), 1);
+    assert_eq!(mesmo::Network::Mainnet as i32, 0);
+    assert_eq!(mesmo::Network::Testnet as i32, 1);
+    assert_eq!(mesmo::Network::Mainnet.as_i32(), 0);
+    assert_eq!(i32::from(mesmo::Network::Testnet), 1);
 
     let bridge = Bridge::new().expect("Failed to create bridge");
 
-    let on_chain_network_id = |network: ccl::Network| -> i64 {
+    let on_chain_network_id = |network: mesmo::Network| -> i64 {
         let created = bridge
             .accounts()
             .create(network)
@@ -138,14 +138,14 @@ fn test_network_ordinals_are_ccl_not_onchain() {
     };
 
     // Inverted on purpose: Network::Mainnet is ordinal 0, but a mainnet address is on-chain id 1.
-    assert_eq!(on_chain_network_id(ccl::Network::Mainnet), 1);
-    assert_eq!(on_chain_network_id(ccl::Network::Testnet), 0);
+    assert_eq!(on_chain_network_id(mesmo::Network::Mainnet), 1);
+    assert_eq!(on_chain_network_id(mesmo::Network::Testnet), 0);
 }
 
 #[test]
 fn test_address_to_from_bytes() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (info, _phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (info, _phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     let addr = info["base_address"].as_str().unwrap();
 
     let hex_bytes = bridge
@@ -165,7 +165,7 @@ fn test_address_to_from_bytes() {
 fn test_address_validate() {
     let bridge = Bridge::new().expect("Failed to create bridge");
 
-    let (info, _phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (info, _phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     let addr = info["base_address"].as_str().unwrap();
 
     assert!(bridge.address().validate(addr));
@@ -299,7 +299,7 @@ fn test_plutus_data_hash() {
 #[test]
 fn test_script_native_from_json() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (acct_json, _phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (acct_json, _phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     let addr = acct_json["base_address"].as_str().unwrap();
 
     let info_str = bridge.address().info(addr).expect("Failed to get address info");
@@ -322,7 +322,7 @@ fn test_script_native_from_json() {
 #[test]
 fn test_script_hash() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (acct_json, _phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (acct_json, _phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     let addr = acct_json["base_address"].as_str().unwrap();
 
     let info_str = bridge.address().info(addr).expect("Failed to get address info");
@@ -351,7 +351,7 @@ fn test_gov_drep_key_from_mnemonic() {
 
     let acct = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to open account");
     let info = acct.info().expect("Failed to get info");
     assert!(info["drep_id"].as_str().unwrap().starts_with("drep1"));
@@ -370,7 +370,7 @@ fn test_gov_committee_cold_key_from_mnemonic() {
 
     let acct = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to open account");
     let info = acct.info().expect("Failed to get info");
     assert!(info["committee_cold_id"].as_str().unwrap().starts_with("cc_cold1"));
@@ -389,7 +389,7 @@ fn test_gov_committee_hot_key_from_mnemonic() {
 
     let acct = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to open account");
     let info = acct.info().expect("Failed to get info");
     assert!(info["committee_hot_id"].as_str().unwrap().starts_with("cc_hot1"));
@@ -404,7 +404,7 @@ fn test_gov_committee_hot_key_from_mnemonic() {
 #[test]
 fn test_wallet_create() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (info, phrase) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (info, phrase) = create_managed(&bridge, mesmo::Network::Mainnet);
     assert_eq!(phrase.split_whitespace().count(), 24);
     assert!(info["stake_address"].is_string());
 }
@@ -412,11 +412,11 @@ fn test_wallet_create() {
 #[test]
 fn test_wallet_from_mnemonic() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (created_json, mnemonic) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (created_json, mnemonic) = create_managed(&bridge, mesmo::Network::Mainnet);
 
     let restored = bridge
         .accounts()
-        .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, 0)
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to restore account");
     let restored_json = restored.info().expect("Failed to get info");
 
@@ -429,13 +429,13 @@ fn test_wallet_from_mnemonic() {
 #[test]
 fn test_wallet_get_address() {
     let bridge = Bridge::new().expect("Failed to create bridge");
-    let (_, mnemonic) = create_managed(&bridge, ccl::Network::Mainnet);
+    let (_, mnemonic) = create_managed(&bridge, mesmo::Network::Mainnet);
 
     // Address enumeration is one managed handle per CIP-1852 payment leaf.
     let addr_at = |index: u32| -> String {
         let acct = bridge
             .accounts()
-            .from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0, index)
+            .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, index)
             .expect("Failed to open account");
         let info = acct.info().expect("Failed to get info");
         info["base_address"].as_str().unwrap().to_string()
@@ -511,7 +511,7 @@ fn make_utxos(address: &str, lovelace: u64) -> Value {
 }
 
 fn get_testnet_address(bridge: &Bridge) -> (String, String) {
-    let (info, mnemonic) = create_managed(bridge, ccl::Network::Testnet);
+    let (info, mnemonic) = create_managed(bridge, mesmo::Network::Testnet);
     let addr = info["base_address"].as_str().unwrap().to_string();
     (addr, mnemonic)
 }

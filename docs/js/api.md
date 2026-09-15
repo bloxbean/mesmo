@@ -1,18 +1,18 @@
 # JavaScript API Reference
 
-All functionality hangs off a `CclBridge` instance. Import what you need from the package root:
+All functionality hangs off a `MesmoBridge` instance. Import what you need from the package root:
 
 ```js
 import {
-  CclBridge, CclError, CclClosedError,
+  MesmoBridge, MesmoError, MesmoClosedError,
   MAINNET, TESTNET,
   YaciProvider, BlockfrostProvider, BlockfrostEvaluator,
-} from "@bloxbean/cardano-client-lib";
+} from "@bloxbean/mesmo";
 ```
 
 The package ships TypeScript definitions (`index.d.ts`) for every class, method, and result shape shown below.
 
-## CclBridge
+## MesmoBridge
 
 ```ts
 constructor(libPath?: string)
@@ -23,10 +23,10 @@ close(): void
 
 Constructing a bridge loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`, `bridge.script`, `bridge.quicktx`.
 
-**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
+**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
 
 ```js
-using bridge = new CclBridge();   // closed automatically at end of scope
+using bridge = new MesmoBridge();   // closed automatically at end of scope
 ```
 
 **Threading.** A bridge is bound to the thread that created it. In Bun's single-threaded model this rarely matters; if you use workers, create one bridge per worker.
@@ -46,26 +46,26 @@ Every method that derives keys (`account.*`, `wallet.*`, `gov.*`) requires a `ne
 
 | Class | When |
 |---|---|
-| `CclError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
-| `CclClosedError` | Any API call after `close()`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
+| `MesmoClosedError` | Any API call after `close()`. |
 | `TypeError` / `RangeError` | Missing / out-of-range `network` argument. |
 | `Error` | Library load failure, isolate creation failure, version mismatch, provider HTTP failures. |
 
-Error codes on `CclError.code`:
+Error codes on `MesmoError.code`:
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
 
 Validation-style methods (`address.validate`, `crypto.validateMnemonic`, `crypto.verify`) return `false` instead of throwing.
 
@@ -75,7 +75,7 @@ Handle-based accounts (ADR-0016): open once, then operate without the mnemonic �
 account API.
 
 ```javascript
-import { SigningRole } from '@bloxbean/cardano-client-lib';
+import { SigningRole } from '@bloxbean/mesmo';
 
 const acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);   // or bridge.accounts.create(...)
 try {
@@ -84,7 +84,7 @@ try {
 } finally {
   acct.close();                                  // or: using acct = ... (Symbol.dispose)
 }
-// after close: further use throws CclError with code -11
+// after close: further use throws MesmoError with code -11
 ```
 
 - `fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0)` — the mnemonic crosses the

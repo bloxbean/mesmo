@@ -7,8 +7,8 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps (providers need `--features providers`):
 
 ```rust
-use ccl::{Bridge, Network};
-use ccl::providers::YaciProvider;
+use mesmo::{Bridge, Network};
+use mesmo::providers::YaciProvider;
 
 let bridge = Bridge::new()?;
 let provider = YaciProvider::default();   // or BlockfrostProvider, or your own impl
@@ -51,7 +51,7 @@ need their own witness — combine `SigningRole` flags with `|` (witnesses apply
 | `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `PAYMENT \| DREP` |
 | `governance_proposal` | `PAYMENT` |
 
-The examples below assume an open handle: `let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;` (with `use ccl::accounts::SigningRole;`).
+The examples below assume an open handle: `let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;` (with `use mesmo::accounts::SigningRole;`).
 | `pool_registration` / `pool_update` / `pool_retirement` | `&["payment", "stake"]` when the pool is keyed to the account's stake key |
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
@@ -155,7 +155,7 @@ let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.
 To cost against a real node instead, pass an evaluator — `build_with` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```rust
-use ccl::providers::BlockfrostEvaluator;
+use mesmo::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
 let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
@@ -174,6 +174,6 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 ## Errors you'll meet
 
-- `CCL Error -10` (`CCL_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../quicktx.md#intent-catalog--verified-shapes).
-- `CCL Error -8` (`CCL_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
+- `CCL Error -10` (`MESMO_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../quicktx.md#intent-catalog--verified-shapes).
+- `CCL Error -8` (`MESMO_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.

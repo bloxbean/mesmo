@@ -5,7 +5,7 @@
 // Mirrors the Go intents_test.go for cross-wrapper parity.
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { CclBridge } from "../src/index.js";
+import { MesmoBridge } from "../src/index.js";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -50,7 +50,7 @@ function assertBuilt(result) {
 
 describe("QuickTx intents E2E", () => {
   let bridge;
-  beforeAll(() => { bridge = new CclBridge(); });
+  beforeAll(() => { bridge = new MesmoBridge(); });
   afterAll(() => { if (bridge) bridge.close(); });
 
   const fixtures = readdirSync(FIXTURES).filter((f) => f.endsWith(".yaml")).sort();

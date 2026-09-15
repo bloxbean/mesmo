@@ -7,19 +7,19 @@
 // close would kill the process.
 
 import { describe, expect, test } from 'bun:test';
-import { CclBridge, CclClosedError, TESTNET } from '../src/index.js';
+import { MesmoBridge, MesmoClosedError, TESTNET } from '../src/index.js';
 
 describe('use-after-close', () => {
-  test('throws CclClosedError instead of aborting the process', () => {
-    const bridge = new CclBridge();
+  test('throws MesmoClosedError instead of aborting the process', () => {
+    const bridge = new MesmoBridge();
     bridge.close();
 
-    expect(() => bridge.accounts.create(TESTNET)).toThrow(CclClosedError);
-    expect(() => bridge.version()).toThrow(CclClosedError);
+    expect(() => bridge.accounts.create(TESTNET)).toThrow(MesmoClosedError);
+    expect(() => bridge.version()).toThrow(MesmoClosedError);
   });
 
   test('the thrown error is a real Error with a name', () => {
-    const bridge = new CclBridge();
+    const bridge = new MesmoBridge();
     bridge.close();
 
     try {
@@ -27,13 +27,13 @@ describe('use-after-close', () => {
       throw new Error('expected a throw');
     } catch (e) {
       expect(e).toBeInstanceOf(Error);
-      expect(e.name).toBe('CclClosedError');
+      expect(e.name).toBe('MesmoClosedError');
       expect(e.message).toContain('closed');
     }
   });
 
   test('close() is idempotent', () => {
-    const bridge = new CclBridge();
+    const bridge = new MesmoBridge();
     bridge.close();
     expect(() => bridge.close()).not.toThrow();
   });
@@ -42,10 +42,10 @@ describe('use-after-close', () => {
     // The regression was a process abort, and an aborted process cannot report its own failure — an
     // in-process assertion would simply vanish along with the runtime. Prove it out-of-process.
     const code = `
-      import { CclBridge, CclClosedError, TESTNET } from '${import.meta.dir}/../src/index.js';
-      const b = new CclBridge();
+      import { MesmoBridge, MesmoClosedError, TESTNET } from '${import.meta.dir}/../src/index.js';
+      const b = new MesmoBridge();
       b.close();
-      try { b.accounts.create(TESTNET); } catch (e) { if (e instanceof CclClosedError) console.log('raised'); }
+      try { b.accounts.create(TESTNET); } catch (e) { if (e instanceof MesmoClosedError) console.log('raised'); }
       console.log('survived');
     `;
     const proc = Bun.spawnSync(['bun', '-e', code]);
@@ -61,11 +61,11 @@ describe('Symbol.dispose', () => {
   test('`using` closes the bridge at end of scope', () => {
     let escaped;
     {
-      using bridge = new CclBridge();
+      using bridge = new MesmoBridge();
       expect(bridge.version()).toBeTruthy();
       escaped = bridge;
     }
     // Out of scope: disposed, so it must now refuse rather than abort.
-    expect(() => escaped.version()).toThrow(CclClosedError);
+    expect(() => escaped.version()).toThrow(MesmoClosedError);
   });
 });

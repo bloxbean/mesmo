@@ -11,11 +11,11 @@ must go out **first**.
 ## 1. Release the native library (do this first)
 
 The `v*` tag (created for you by the release flow) triggers
-[`release.yml`](.github/workflows/release.yml), which builds `libccl` on every platform and produces
+[`release.yml`](.github/workflows/release.yml), which builds `libmesmo` on every platform and produces
 one tarball per platform:
 
 ```
-cardano-client-lib-<tag>-<platform>.tar.gz     # contains libccl.{so,dylib,dll} + headers
+mesmo-<tag>-<platform>.tar.gz     # contains libmesmo.{so,dylib,dll} + headers
 ```
 
 Platforms (5): `linux-x86_64`, `linux-aarch64`, `linux-musl-x86_64`, `macos-aarch64`, `windows-x86_64`.
@@ -48,20 +48,20 @@ drifted version fails the build with a pointer to `syncVersions`). On a `v*` tag
 | **Go** | `defaultLibVersion` (full release tag) + `expectedLibVersion` (base compatibility version) | **No** — run the root task |
 | **Python** | `pyproject.toml` version + `EXPECTED_LIB_VERSION` (base compatibility version) | **No** — run the root task |
 
-Rust and Go both accept a `CCL_LIB_VERSION` environment override (build time for Rust, run time for
+Rust and Go both accept a `MESMO_LIB_VERSION` environment override (build time for Rust, run time for
 Go) — useful for testing against a release before pinning it.
 
-**Version-skew check.** On init each wrapper calls `ccl_version` and fails fast if it doesn't match
-the wrapper's expected version (bypass with `CCL_SKIP_VERSION_CHECK`). The lib side is single-sourced —
-`ccl_version` is generated from `gradle.properties` `version` (base semver), so bumping that is enough
+**Version-skew check.** On init each wrapper calls `mesmo_version` and fails fast if it doesn't match
+the wrapper's expected version (bypass with `MESMO_SKIP_VERSION_CHECK`). The lib side is single-sourced —
+`mesmo_version` is generated from `gradle.properties` `version` (base semver), so bumping that is enough
 for the native lib. The wrapper's *expected* version must be bumped in lockstep too:
 
 | Wrapper | Expected-version source | Bump needed? |
 |---|---|---|
 | Rust | `CARGO_PKG_VERSION` (`Cargo.toml` `version`, itself stamped from `gradle.properties`) | **no** — fully derived |
-| Python | `EXPECTED_LIB_VERSION` in [`wrappers/python/ccl/_ffi.py`](wrappers/python/ccl/_ffi.py) | **no** — synchronized by `syncVersions` |
+| Python | `EXPECTED_LIB_VERSION` in [`wrappers/python/mesmo/_ffi.py`](wrappers/python/mesmo/_ffi.py) | **no** — synchronized by `syncVersions` |
 | JS | `EXPECTED_LIB_VERSION` in [`wrappers/js/src/index.js`](wrappers/js/src/index.js) | **no** — synchronized by `syncVersions` |
-| Go | `expectedLibVersion` in [`wrappers/go/ccl/ccl.go`](wrappers/go/ccl/ccl.go) | **no** — synchronized by `syncVersions` |
+| Go | `expectedLibVersion` in [`wrappers/go/mesmo/mesmo.go`](wrappers/go/mesmo/mesmo.go) | **no** — synchronized by `syncVersions` |
 
 (Only the base semver is compared, so a `-preview1`-style suffix on the release/tag doesn't matter.)
 
@@ -71,7 +71,7 @@ Each ecosystem has a different distribution model:
 
 | Wrapper | Artifact | Registry | How the native lib ships |
 |---|---|---|---|
-| **Python** | wheel (`.whl`) | PyPI | **bundled** into `ccl/_libs/` (platform wheels) |
+| **Python** | wheel (`.whl`) | PyPI | **bundled** into `mesmo/_libs/` (platform wheels) |
 | **JS** | tarball (`.tgz`) | npm | **bundled** into per-platform `optionalDependencies` |
 | **Rust** | crate source | crates.io | **fetched** by `build.rs` from the release (crates.io can't host the binary) |
 | **Go** | *(none)* | *(none — the git repo is the module)* | **fetched** by the loader at runtime |
@@ -88,7 +88,7 @@ so each needs a musl artifact of its own:
 
 | Wrapper | musl artifact | Selected by |
 |---|---|---|
-| **JS** | `@bloxbean/cardano-client-lib-linux-musl-x86_64` npm package | npm's `libc: ["musl"]` field, plus `platformSuffix()` detecting musl at runtime |
+| **JS** | `@bloxbean/mesmo-linux-musl-x86_64` npm package | npm's `libc: ["musl"]` field, plus `platformSuffix()` detecting musl at runtime |
 | **Python** | a `musllinux_1_2_x86_64` wheel | pip, from the wheel's platform tag |
 | **Rust / Go** | *(none needed)* | `build.rs` / the loader pick `linux-musl-x86_64` off the release |
 
@@ -99,8 +99,8 @@ match on Alpine too, so without it npm resolves the glibc build, which cannot lo
 container** — so what is verified is that they work there, not merely that an artifact exists.
 
 **x86_64 only.** GraalVM's `--libc=musl` hardcodes the `x86_64-linux-musl-gcc` compiler name and never
-looks for an aarch64 one, so there is no musl/aarch64 build. Alpine-on-ARM users must build libccl
-from source and set `CCL_LIB_PATH`; the wrappers say so explicitly rather than handing back a glibc
+looks for an aarch64 one, so there is no musl/aarch64 build. Alpine-on-ARM users must build libmesmo
+from source and set `MESMO_LIB_PATH`; the wrappers say so explicitly rather than handing back a glibc
 artifact that cannot load. See [ADR-0008](docs/adr/0008-linux-glibc-baseline-portability.md).
 
 ## Go: no artifact, no registry — just a tag
@@ -116,8 +116,8 @@ git push origin wrappers/go/v0.2.0
 - The tag **must** be prefixed with the module's subdirectory (`wrappers/go/`) — that's Go's rule for
   a module that isn't at the repo root. This is a **different tag** from the native-library `v0.2.0`
   tag (they can point at the same commit).
-- After tagging, `go get github.com/bloxbean/cardano-client-bindings/wrappers/go@v0.2.0` just works — no cgo, no C
-  toolchain. On first use the loader downloads `libccl` for the platform from the native-library
+- After tagging, `go get github.com/bloxbean/mesmo/wrappers/go@v0.2.0` just works — no cgo, no C
+  toolchain. On first use the loader downloads `libmesmo` for the platform from the native-library
   release (step 1) and caches it, so `defaultLibVersion` (step 2) **must** match a published release.
 
 ## How releases are triggered (PR-gated tagging)
@@ -184,4 +184,4 @@ These enforce the flow and are configured in GitHub settings, not code:
        (crates.io), and `publish-py.yml` (PyPI) to publish.
 5. [ ] Tag `wrappers/go/vX.Y.Z` and push (Go module release — no build step, separate tag).
 6. [ ] Smoke-test each: a clean `pip install` / `npm install` / `cargo add` / `go get` with no
-       `CCL_LIB_PATH` set.
+       `MESMO_LIB_PATH` set.

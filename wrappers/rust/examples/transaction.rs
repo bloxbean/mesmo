@@ -8,10 +8,10 @@
 //!
 //! ```text
 //! LIB_DIR=../../core/build/native/nativeCompile
-//! CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//! MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //!   cargo run --example transaction
 //! ```
-use ccl::{Bridge, Network};
+use mesmo::{Bridge, Network};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  cbor   : {}...", &result.tx_cbor[..80]);
 
     // Sign it with the sender's mnemonic.
-    let signed = sender.sign_tx(&result.tx_cbor, ccl::accounts::SigningRole::PAYMENT)?;
+    let signed = sender.sign_tx(&result.tx_cbor, mesmo::accounts::SigningRole::PAYMENT)?;
     println!("Signed transaction cbor: {}...", &signed[..80]);
     println!("\nNext step (not shown): submit `signed` to a Cardano node over HTTP.");
     Ok(())

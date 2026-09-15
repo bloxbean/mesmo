@@ -3,8 +3,8 @@
 //! the owned-value guarantees (storable next to the Bridge; hard-invalidated by Bridge drop).
 //! Fully offline.
 
-use ccl::accounts::{Account, SigningRole};
-use ccl::{error_codes, Bridge, Network};
+use mesmo::accounts::{Account, SigningRole};
+use mesmo::{error_codes, Bridge, Network};
 use serde_json::{json, Value};
 
 const TEST_MNEMONIC: &str =
@@ -94,7 +94,7 @@ fn empty_role_mask_rejected() {
     let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
     let unsigned = unsigned_stake_reg(&bridge, &acct.info().unwrap());
     let err = acct.sign_tx(&unsigned, SigningRole(0)).unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn lifecycle_close_idempotent_use_after_close_typed() {
     acct.close().unwrap();
     acct.close().unwrap(); // idempotent
     let err = acct.info().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_HANDLE);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_HANDLE);
 }
 
 #[test]
@@ -121,11 +121,11 @@ fn create_export_once_and_restore() {
 
     // One-shot.
     let err = acct.export_recovery_phrase().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 
     // Imported accounts never export.
     let err = restored.export_recovery_phrase().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn debug_never_contains_secrets() {
     assert!(!debug.contains("addr")); // not even public data, just the handle
     assert!(!debug.contains(phrase.split_whitespace().next().unwrap()));
     acct.close().unwrap();
-    assert_eq!(format!("{:?}", acct), "<ccl::Account closed>");
+    assert_eq!(format!("{:?}", acct), "<mesmo::Account closed>");
 }
 
 /// The owned-handle promise (ADR-0016 amendment): an Account can live in the same struct as its
@@ -165,6 +165,6 @@ fn bridge_drop_invalidates_outstanding_accounts() {
     let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
     drop(bridge);
     let err = acct.info().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_HANDLE);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_HANDLE);
     acct.close().unwrap(); // and close after bridge-drop is a safe no-op
 }

@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * Script entry points: parse native scripts and compute script hashes.
  *
- * <p>See {@link com.bloxbean.cardano.bridge.CclBridge} for the calling convention. Every entry
+ * <p>See {@link com.bloxbean.cardano.bridge.MesmoBridge} for the calling convention. Every entry
  * point here is a static GraalVM {@code @CEntryPoint}.
  */
 public final class ScriptApi {
@@ -27,22 +27,22 @@ public final class ScriptApi {
     /**
      * Parses a native script from its JSON form.
      *
-     * <p>Exported as {@code ccl_script_native_from_json}. Accepts the standard native-script JSON
+     * <p>Exported as {@code mesmo_script_native_from_json}. Accepts the standard native-script JSON
      * (e.g. {@code {"type":"sig","keyHash":"..."}}, {@code all}/{@code any}/{@code atLeast},
      * {@code before}/{@code after}). On success the result is a JSON object:
      * <pre>{@code {"policy_id","script_hash","cbor_hex"}}</pre>
      *
      * @param thread  the current isolate thread
      * @param jsonPtr the native script as JSON (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_SERIALIZATION}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_SERIALIZATION}
      */
-    @CEntryPoint(name = "ccl_script_native_from_json")
+    @CEntryPoint(name = "mesmo_script_native_from_json")
     public static int nativeScriptFromJson(IsolateThread thread, CCharPointer jsonPtr) {
         try {
             String json = NativeString.toJavaString(jsonPtr);
             if (json == null || json.isEmpty()) {
                 ErrorState.set("JSON is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             NativeScript script = NativeScript.deserializeJson(json);
@@ -53,32 +53,32 @@ public final class ScriptApi {
             result.put("cbor_hex", HexUtil.encodeHexString(script.serialize()));
 
             ResultState.set(com.bloxbean.cardano.bridge.util.JsonHelper.toJson(result));
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_SERIALIZATION;
+            return ErrorCodes.MESMO_ERROR_SERIALIZATION;
         }
     }
 
     /**
      * Computes a script hash (policy id) from a script's CBOR.
      *
-     * <p>Exported as {@code ccl_script_hash}. The hash is Blake2b-224 of {@code (typeByte || scriptBytes)},
+     * <p>Exported as {@code mesmo_script_hash}. The hash is Blake2b-224 of {@code (typeByte || scriptBytes)},
      * where {@code scriptType} is the language tag: {@code 0}=native, {@code 1}=Plutus V1,
      * {@code 2}=Plutus V2, {@code 3}=Plutus V3. On success the result is the 28-byte hash as hex.
      *
      * @param thread           the current isolate thread
      * @param scriptCborHexPtr the script as CBOR hex
      * @param scriptType       language tag (0=native, 1=PlutusV1, 2=PlutusV2, 3=PlutusV3)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_SERIALIZATION}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_SERIALIZATION}
      */
-    @CEntryPoint(name = "ccl_script_hash")
+    @CEntryPoint(name = "mesmo_script_hash")
     public static int scriptHash(IsolateThread thread, CCharPointer scriptCborHexPtr, int scriptType) {
         try {
             String scriptCborHex = NativeString.toJavaString(scriptCborHexPtr);
             if (scriptCborHex == null || scriptCborHex.isEmpty()) {
                 ErrorState.set("Script CBOR hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             byte[] scriptBytes = HexUtil.decodeHexString(scriptCborHex);
@@ -90,10 +90,10 @@ public final class ScriptApi {
             byte[] hash = Blake2bUtil.blake2bHash224(prefixed);
             ResultState.set(HexUtil.encodeHexString(hash));
 
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_SERIALIZATION;
+            return ErrorCodes.MESMO_ERROR_SERIALIZATION;
         }
     }
 }

@@ -1,6 +1,6 @@
-// TypeScript declarations for @bloxbean/cardano-client-lib.
+// TypeScript declarations for @bloxbean/mesmo.
 //
-// These mirror the runtime surface of `src/index.js` exactly: a `CclBridge` with *namespaced* APIs
+// These mirror the runtime surface of `src/index.js` exactly: a `MesmoBridge` with *namespaced* APIs
 // (`bridge.accounts.create(...)`, `bridge.quicktx.build(...)`, …). `test/types.test-d.ts` compiles
 // against this file (`bun run typecheck`) so the two cannot drift apart.
 
@@ -102,19 +102,19 @@ export type TransactionJson = Record<string, unknown>;
 // --- Errors --------------------------------------------------------------------------------------
 
 /** Thrown when the native library returns a non-zero status. */
-export declare class CclError extends Error {
+export declare class MesmoError extends Error {
     code: number;
     constructor(code: number, message: string);
 }
 
-/** Thrown when a {@link CclBridge} is used after `close()`. */
-export declare class CclClosedError extends Error {
+/** Thrown when a {@link MesmoBridge} is used after `close()`. */
+export declare class MesmoClosedError extends Error {
     constructor();
 }
 
 // --- Namespaces ----------------------------------------------------------------------------------
 //
-// Reached through a CclBridge instance: `bridge.account`, `bridge.address`, … They are not
+// Reached through a MesmoBridge instance: `bridge.account`, `bridge.address`, … They are not
 // constructible from outside, so they are declared as interfaces (no runtime export) — except
 // QuickTxApi, which the module does export.
 
@@ -186,7 +186,7 @@ export declare class Account {
 
 /** Managed-accounts namespace (`bridge.accounts`). */
 export declare class AccountsApi {
-    constructor(bridge: CclBridge);
+    constructor(bridge: MesmoBridge);
     /** The mnemonic crosses the FFI boundary once, here; no later operation needs it. */
     fromMnemonic(mnemonic: string, network: Network, accountIndex?: number, addressIndex?: number): Account;
     /** Fresh 24-word account; no secret in the result — export the phrase once, deliberately. */
@@ -229,7 +229,7 @@ export interface ScriptApi {
 }
 
 export declare class QuickTxApi {
-    constructor(bridge: CclBridge);
+    constructor(bridge: MesmoBridge);
 
     /**
      * Build an unsigned transaction from a CCL TxPlan (YAML), fully offline.
@@ -264,8 +264,8 @@ export declare class QuickTxApi {
 
 // --- The bridge ----------------------------------------------------------------------------------
 
-export declare class CclBridge {
-    /** @param libPath directory containing libccl.{dylib,so,dll}; falls back to CCL_LIB_PATH, the bundled copy, then the platform package. */
+export declare class MesmoBridge {
+    /** @param libPath directory containing libmesmo.{dylib,so,dll}; falls back to MESMO_LIB_PATH, the bundled copy, then the platform package. */
     constructor(libPath?: string);
 
     readonly accounts: AccountsApi;
@@ -279,10 +279,10 @@ export declare class CclBridge {
     /** The native library's version string. */
     version(): string;
 
-    /** Tear down the GraalVM isolate. Idempotent; any later call throws {@link CclClosedError}. */
+    /** Tear down the GraalVM isolate. Idempotent; any later call throws {@link MesmoClosedError}. */
     close(): void;
 
-    /** Enables `using bridge = new CclBridge()`. */
+    /** Enables `using bridge = new MesmoBridge()`. */
     [Symbol.dispose](): void;
 }
 
@@ -349,14 +349,14 @@ export declare function platformSuffix(): string;
 
 // --- Status codes ---------------------------------------------------------------------------------
 
-export declare const CCL_SUCCESS: 0;
-export declare const CCL_ERROR_GENERAL: -1;
-export declare const CCL_ERROR_INVALID_ARGUMENT: -2;
-export declare const CCL_ERROR_SERIALIZATION: -3;
-export declare const CCL_ERROR_CRYPTO: -4;
-export declare const CCL_ERROR_INVALID_NETWORK: -5;
-export declare const CCL_ERROR_INVALID_MNEMONIC: -6;
-export declare const CCL_ERROR_INVALID_ADDRESS: -7;
-export declare const CCL_ERROR_INSUFFICIENT_FUNDS: -8;
-export declare const CCL_ERROR_INVALID_TRANSACTION: -9;
-export declare const CCL_ERROR_TX_BUILD: -10;
+export declare const MESMO_SUCCESS: 0;
+export declare const MESMO_ERROR_GENERAL: -1;
+export declare const MESMO_ERROR_INVALID_ARGUMENT: -2;
+export declare const MESMO_ERROR_SERIALIZATION: -3;
+export declare const MESMO_ERROR_CRYPTO: -4;
+export declare const MESMO_ERROR_INVALID_NETWORK: -5;
+export declare const MESMO_ERROR_INVALID_MNEMONIC: -6;
+export declare const MESMO_ERROR_INVALID_ADDRESS: -7;
+export declare const MESMO_ERROR_INSUFFICIENT_FUNDS: -8;
+export declare const MESMO_ERROR_INVALID_TRANSACTION: -9;
+export declare const MESMO_ERROR_TX_BUILD: -10;

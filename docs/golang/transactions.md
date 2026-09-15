@@ -7,11 +7,11 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```go
-bridge, err := ccl.New()
+bridge, err := mesmo.New()
 if err != nil { log.Fatal(err) }
 defer bridge.Close()
 
-provider := ccl.NewYaciProvider("")   // or a BlockfrostProvider, or your own
+provider := mesmo.NewYaciProvider("")   // or a BlockfrostProvider, or your own
 
 // 1. Describe — TxPlan YAML (see the intent catalog)
 yaml := fmt.Sprintf(`
@@ -32,9 +32,9 @@ result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
 // (or bridge.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+acct, _ := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
-signed, err := acct.SignTx(result.TxCbor, ccl.RolePayment)
+signed, err := acct.SignTx(result.TxCbor, mesmo.RolePayment)
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
 txBytes, _ := hex.DecodeString(signed)
@@ -47,7 +47,7 @@ resp, err := http.Post(submitURL+"/tx/submit", "application/cbor", bytes.NewRead
 
 | Transaction contains | Roles |
 |---|---|
-| Payments, metadata, minting, Plutus operations | `ccl.RolePayment` |
+| Payments, metadata, minting, Plutus operations | `mesmo.RolePayment` |
 | `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `RolePayment\|RoleStake` |
 | `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `RolePayment\|RoleDRep` |
 | `governance_proposal` | `RolePayment` |
@@ -73,7 +73,7 @@ transaction:
 `, sender, account.StakeAddress)
 
 reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
-signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleStake)
+signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 // submit signedReg; wait for inclusion before the next step
 
 delegYaml := fmt.Sprintf(`
@@ -88,7 +88,7 @@ transaction:
 `, sender, account.StakeAddress)
 
 deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
-signedDeleg, err := acct.SignTx(deleg.TxCbor, ccl.RolePayment|ccl.RoleStake)
+signedDeleg, err := acct.SignTx(deleg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
 ## Worked example: DRep registration, then vote
@@ -112,7 +112,7 @@ transaction:
 `, sender, drep.PublicKeyHash, anchorHash)
 
 reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
-signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleDRep)
+signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleDRep)
 ```
 
 To vote on a governance action, the action id is the proposal transaction's hash plus its index (a proposal you submit yourself returns its hash from `Build` — `result.TxHash`). Sign the `voting` transaction with `RolePayment\|RoleDRep`.
@@ -136,7 +136,7 @@ transaction:
 `, sender, receiver)
 
 mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
-signedMint, err := acct.SignTx(mint.TxCbor, ccl.RolePayment)
+signedMint, err := acct.SignTx(mint.TxCbor, mesmo.RolePayment)
 ```
 
 An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed policy needs the corresponding key's witness.
@@ -152,7 +152,7 @@ result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sende
 To cost against a real node instead, pass an evaluator — `BuildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```go
-evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
+evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
 result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
 ```
 
@@ -163,7 +163,7 @@ result, err := bridge.QuickTx.Build(plutusMintYaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```
 
-For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with its `data_hash`) **plus** a separate UTXO for fee/collateral in `utxos` — see the [catalog entry](../quicktx.md#plutus-scripts) and the end-to-end lock-then-spend flow in [`wrappers/go/ccl/script_spend_test.go`](../../wrappers/go/ccl/script_spend_test.go).
+For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with its `data_hash`) **plus** a separate UTXO for fee/collateral in `utxos` — see the [catalog entry](../quicktx.md#plutus-scripts) and the end-to-end lock-then-spend flow in [`wrappers/go/mesmo/script_spend_test.go`](../../wrappers/go/mesmo/script_spend_test.go).
 
 ## Errors you'll meet
 

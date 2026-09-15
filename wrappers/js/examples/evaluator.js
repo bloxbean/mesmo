@@ -5,16 +5,16 @@
 //   1. the offline default — the bridge computes the units in-process with Scalus (no network); and
 //   2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 //
-// libccl never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
+// libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
 // wrapper: buildWith runs a two-pass (draft -> evaluate -> rebuild).
 //
 // Run from wrappers/js:
 //
 //   LIB_DIR=../../core/build/native/nativeCompile
-//   CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//   MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //     bun examples/evaluator.js
 import { readFileSync } from 'fs';
-import { CclBridge, BlockfrostEvaluator } from '../src/index.js'; // BlockfrostEvaluator: see snippet below
+import { MesmoBridge, BlockfrostEvaluator } from '../src/index.js'; // BlockfrostEvaluator: see snippet below
 
 // Shared fixtures: an always-succeeds mint (TxPlan YAML), the sender's UTXOs, and protocol
 // parameters *with cost models* (Scalus needs them to run the UPLC machine).
@@ -30,7 +30,7 @@ const provider = {
   protocolParams: async () => params,
 };
 
-const bridge = new CclBridge();
+const bridge = new MesmoBridge();
 try {
   // 1) Offline default: no evaluator -> the bridge runs the validator with Scalus and stamps the
   //    computed units. Just works, no network.

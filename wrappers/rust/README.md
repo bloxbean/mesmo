@@ -1,9 +1,9 @@
-# Cardano Client Bindings — Rust
+# Mesmo — Rust
 
 Rust bindings for [Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib)
-via the Cardano Client Bindings native library.
+via the Mesmo native library.
 
-> Part of the [Cardano Client Bindings](../../README.md) project. See the
+> Part of the [Mesmo](../../README.md) project. See the
 > [top-level README](../../README.md) for the full API reference and
 > [`docs/quicktx.md`](../../docs/quicktx.md) for transaction building.
 
@@ -12,7 +12,7 @@ via the Cardano Client Bindings native library.
 - Rust (stable, 2021 edition).
 
 The native library is **fetched automatically at build time** — no separate download and no
-`CCL_LIB_PATH` / `DYLD_LIBRARY_PATH` / `LD_LIBRARY_PATH` needed.
+`MESMO_LIB_PATH` / `DYLD_LIBRARY_PATH` / `LD_LIBRARY_PATH` needed.
 
 ## Installing
 
@@ -20,11 +20,11 @@ The native library is **fetched automatically at build time** — no separate do
 cargo add cardano-client-lib          # published as cardano-client-lib, imported as `ccl`
 ```
 
-`build.rs` sources `libccl.*` for your target — in priority order: `CCL_LIB_PATH` (a dir), the
+`build.rs` sources `libmesmo.*` for your target — in priority order: `MESMO_LIB_PATH` (a dir), the
 in-tree monorepo build, or **downloaded from the GitHub release** — then stages it and sets an
 `rpath`, so both linking and runtime "just work" with **no environment variables**.
 
-- Override the release tag it fetches from with `CCL_LIB_VERSION`.
+- Override the release tag it fetches from with `MESMO_LIB_VERSION`.
 - crates.io can't host the ~50 MB binary, so the crate carries only source + `build.rs`; the lib is
   pulled at build time (needs network on the first build). See
   [ADR-0012](../../docs/adr/0012-native-lib-bundled-in-wrapper-packages.md).
@@ -37,13 +37,13 @@ From `wrappers/rust`, **no env vars required**:
 cargo run --example account
 ```
 
-For development against a locally built library, point `CCL_LIB_PATH` at it (optional — the in-tree
+For development against a locally built library, point `MESMO_LIB_PATH` at it (optional — the in-tree
 build is found automatically):
 
 ```bash
 ./gradlew :core:nativeCompile            # build from source (needs Oracle GraalVM 25.0.3), or
 make download-lib                        # download a pre-built binary
-CCL_LIB_PATH=../../core/build/native/nativeCompile cargo run --example account
+MESMO_LIB_PATH=../../core/build/native/nativeCompile cargo run --example account
 ```
 
 The [`examples/`](examples/) directory contains:
@@ -57,10 +57,10 @@ The [`examples/`](examples/) directory contains:
 ## Quick start
 
 ```rust
-use ccl::{Bridge, Network};
+use mesmo::{Bridge, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bridge = Bridge::new()?; // loads libccl, starts a GraalVM isolate
+    let bridge = Bridge::new()?; // loads libmesmo, starts a GraalVM isolate
 
     // Managed account handle (ADR-0016): info is public data only.
     let account = bridge.accounts().create(Network::Testnet)?;
@@ -88,7 +88,7 @@ let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params)?; // -> TxR
 ```
 
 Methods that need a network take the `Network` enum — `Network::Mainnet` or `Network::Testnet` — so a transposed argument is a compile error rather than a
-key silently derived on the wrong network. Errors are `ccl::CclError`.
+key silently derived on the wrong network. Errors are `mesmo::MesmoError`.
 
 > **`Network` is not Cardano's on-chain network id.** Its discriminants are CCL's own enum ordinals
 > (`Mainnet = 0`, `Testnet = 1`). Cardano's on-chain network id is the
@@ -108,7 +108,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
-use ccl::providers::BlockfrostProvider; // or YaciProvider
+use mesmo::providers::BlockfrostProvider; // or YaciProvider
 
 let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
 let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
@@ -128,12 +128,12 @@ let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?;
 ```
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
-`TransactionEvaluator`; `build_with` runs a two-pass (draft → evaluate → rebuild). libccl never
+`TransactionEvaluator`; `build_with` runs a two-pass (draft → evaluate → rebuild). libmesmo never
 makes HTTP calls ([ADR-0013](../../docs/adr/0013-transaction-evaluators.md)), so remote evaluation
 lives here in the wrapper (also behind the `providers` feature):
 
 ```rust
-use ccl::providers::BlockfrostEvaluator;
+use mesmo::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new("proj_id", "preprod")?;
 let result = bridge.quicktx().build_with(&yaml, &provider, &[sender], 0, Some(&evaluator))?;

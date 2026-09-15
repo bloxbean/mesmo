@@ -24,7 +24,7 @@ import org.graalvm.nativeimage.c.type.CCharPointer;
  * Cryptographic primitives: Blake2b hashing, BIP-39 mnemonics, and Ed25519 sign/verify.
  *
  * <p>Hashing and signing take/return <em>hex-encoded</em> bytes. See
- * {@link com.bloxbean.cardano.bridge.CclBridge} for the calling convention. Every entry point here
+ * {@link com.bloxbean.cardano.bridge.MesmoBridge} for the calling convention. Every entry point here
  * is a static GraalVM {@code @CEntryPoint}.
  */
 public final class CryptoApi {
@@ -34,73 +34,73 @@ public final class CryptoApi {
     /**
      * Computes a Blake2b-256 hash.
      *
-     * <p>Exported as {@code ccl_crypto_blake2b_256}. Hex in, hex out; the result is a 32-byte digest
+     * <p>Exported as {@code mesmo_crypto_blake2b_256}. Hex in, hex out; the result is a 32-byte digest
      * (64 hex chars).
      *
      * @param thread     the current isolate thread
      * @param dataHexPtr the input bytes as hex (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_blake2b_256")
+    @CEntryPoint(name = "mesmo_crypto_blake2b_256")
     public static int blake2b256(IsolateThread thread, CCharPointer dataHexPtr) {
         try {
             String dataHex = NativeString.toJavaString(dataHexPtr);
             if (dataHex == null || dataHex.isEmpty()) {
                 ErrorState.set("Data hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             byte[] data = HexUtil.decodeHexString(dataHex);
             byte[] hash = Blake2bUtil.blake2bHash256(data);
             ResultState.set(HexUtil.encodeHexString(hash));
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 
     /**
      * Computes a Blake2b-224 hash (the size used for Cardano credential/key hashes).
      *
-     * <p>Exported as {@code ccl_crypto_blake2b_224}. Hex in, hex out; the result is a 28-byte digest
+     * <p>Exported as {@code mesmo_crypto_blake2b_224}. Hex in, hex out; the result is a 28-byte digest
      * (56 hex chars).
      *
      * @param thread     the current isolate thread
      * @param dataHexPtr the input bytes as hex (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_blake2b_224")
+    @CEntryPoint(name = "mesmo_crypto_blake2b_224")
     public static int blake2b224(IsolateThread thread, CCharPointer dataHexPtr) {
         try {
             String dataHex = NativeString.toJavaString(dataHexPtr);
             if (dataHex == null || dataHex.isEmpty()) {
                 ErrorState.set("Data hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             byte[] data = HexUtil.decodeHexString(dataHex);
             byte[] hash = Blake2bUtil.blake2bHash224(data);
             ResultState.set(HexUtil.encodeHexString(hash));
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 
     /**
      * Generates a new BIP-39 mnemonic.
      *
-     * <p>Exported as {@code ccl_crypto_generate_mnemonic}. On success the result is the
+     * <p>Exported as {@code mesmo_crypto_generate_mnemonic}. On success the result is the
      * space-separated mnemonic phrase.
      *
      * @param thread    the current isolate thread
      * @param wordCount number of words: 12, 15, 18, 21, or 24
-     * @return {@link ErrorCodes#CCL_SUCCESS}, {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT}
-     *         (bad word count), or {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, {@link ErrorCodes#MESMO_ERROR_INVALID_ARGUMENT}
+     *         (bad word count), or {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_generate_mnemonic")
+    @CEntryPoint(name = "mesmo_crypto_generate_mnemonic")
     public static int generateMnemonic(IsolateThread thread, int wordCount) {
         try {
             Words words;
@@ -112,43 +112,43 @@ public final class CryptoApi {
                 case 24: words = Words.TWENTY_FOUR; break;
                 default:
                     ErrorState.set("Invalid word count. Must be 12, 15, 18, 21, or 24");
-                    return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                    return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             String mnemonic = MnemonicUtil.generateNew(words);
             ResultState.set(mnemonic);
 
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 
     /**
      * Validates a BIP-39 mnemonic (word list and checksum).
      *
-     * <p>Exported as {@code ccl_crypto_validate_mnemonic}. Reported via the status code only (no
+     * <p>Exported as {@code mesmo_crypto_validate_mnemonic}. Reported via the status code only (no
      * result string).
      *
      * @param thread      the current isolate thread
      * @param mnemonicPtr the mnemonic phrase to validate (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS} (valid) or {@link ErrorCodes#CCL_ERROR_INVALID_MNEMONIC}
+     * @return {@link ErrorCodes#MESMO_SUCCESS} (valid) or {@link ErrorCodes#MESMO_ERROR_INVALID_MNEMONIC}
      */
-    @CEntryPoint(name = "ccl_crypto_validate_mnemonic")
+    @CEntryPoint(name = "mesmo_crypto_validate_mnemonic")
     public static int validateMnemonic(IsolateThread thread, CCharPointer mnemonicPtr) {
         try {
             String mnemonic = NativeString.toJavaString(mnemonicPtr);
             if (mnemonic == null || mnemonic.isEmpty()) {
                 ErrorState.set("Mnemonic is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             MnemonicUtil.validateMnemonic(mnemonic);
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_INVALID_MNEMONIC;
+            return ErrorCodes.MESMO_ERROR_INVALID_MNEMONIC;
         }
     }
 
@@ -159,22 +159,22 @@ public final class CryptoApi {
      *   <li><b>32 bytes (64 hex chars)</b> — a standard Ed25519 <em>seed</em>: it is SHA-512
      *       hashed and clamped per RFC 8032 before signing.</li>
      *   <li><b>64 bytes (128 hex chars)</b> — a BIP32-Ed25519 <em>extended</em> key (kL‖kR), as
-     *       returned by {@code ccl_crypto_derive_key}: kL is already the final clamped scalar, so
+     *       returned by {@code mesmo_crypto_derive_key}: kL is already the final clamped scalar, so
      *       CCL's {@code signExtended} is used. Never pass the first half of an extended key as a
      *       seed — the clamping would be applied twice and the signature would verify against a
      *       different public key.</li>
      * </ul>
      *
-     * <p>Exported as {@code ccl_crypto_sign}. On success the result is the hex-encoded 64-byte
-     * signature, verifiable with {@code ccl_crypto_verify} against the key's public key.
+     * <p>Exported as {@code mesmo_crypto_sign}. On success the result is the hex-encoded 64-byte
+     * signature, verifiable with {@code mesmo_crypto_verify} against the key's public key.
      *
      * @param thread        the current isolate thread
      * @param messageHexPtr the message bytes as hex (UTF-8 C string)
      * @param skHexPtr      the secret key as hex: 64 hex chars (seed) or 128 hex chars (extended)
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT} /
-     *         {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_INVALID_ARGUMENT} /
+     *         {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_sign")
+    @CEntryPoint(name = "mesmo_crypto_sign")
     public static int sign(IsolateThread thread, CCharPointer messageHexPtr, CCharPointer skHexPtr) {
         try {
             String messageHex = NativeString.toJavaString(messageHexPtr);
@@ -182,11 +182,11 @@ public final class CryptoApi {
 
             if (messageHex == null || messageHex.isEmpty()) {
                 ErrorState.set("Message hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             if (skHex == null || skHex.isEmpty()) {
                 ErrorState.set("Secret key hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             byte[] message = HexUtil.decodeHexString(messageHex);
@@ -201,30 +201,30 @@ public final class CryptoApi {
             } else {
                 ErrorState.set("Secret key must be 32 bytes (Ed25519 seed) or 64 bytes "
                         + "(BIP32-Ed25519 extended key); got " + sk.length + " bytes");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             ResultState.set(HexUtil.encodeHexString(signature));
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 
     /**
      * Verifies an Ed25519 signature.
      *
-     * <p>Exported as {@code ccl_crypto_verify}. Reported via the status code only:
-     * {@link ErrorCodes#CCL_SUCCESS} if the signature is valid,
-     * {@link ErrorCodes#CCL_ERROR_CRYPTO} if it is not.
+     * <p>Exported as {@code mesmo_crypto_verify}. Reported via the status code only:
+     * {@link ErrorCodes#MESMO_SUCCESS} if the signature is valid,
+     * {@link ErrorCodes#MESMO_ERROR_CRYPTO} if it is not.
      *
      * @param thread          the current isolate thread
      * @param signatureHexPtr the 64-byte signature as hex (UTF-8 C string)
      * @param messageHexPtr   the message bytes as hex (UTF-8 C string)
      * @param pkHexPtr        the 32-byte Ed25519 public key as hex (UTF-8 C string)
-     * @return {@link ErrorCodes#CCL_SUCCESS} (valid) or {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS} (valid) or {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_verify")
+    @CEntryPoint(name = "mesmo_crypto_verify")
     public static int verify(IsolateThread thread, CCharPointer signatureHexPtr,
                              CCharPointer messageHexPtr, CCharPointer pkHexPtr) {
         try {
@@ -234,15 +234,15 @@ public final class CryptoApi {
 
             if (signatureHex == null || signatureHex.isEmpty()) {
                 ErrorState.set("Signature hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             if (messageHex == null || messageHex.isEmpty()) {
                 ErrorState.set("Message hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             if (pkHex == null || pkHex.isEmpty()) {
                 ErrorState.set("Public key hex is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
 
             byte[] signature = HexUtil.decodeHexString(signatureHex);
@@ -251,18 +251,18 @@ public final class CryptoApi {
             boolean valid = CryptoConfiguration.INSTANCE.getSigningProvider().verify(signature, message, pk);
 
             if (valid) {
-                return ErrorCodes.CCL_SUCCESS;
+                return ErrorCodes.MESMO_SUCCESS;
             } else {
                 ErrorState.set("Signature verification failed");
-                return ErrorCodes.CCL_ERROR_CRYPTO;
+                return ErrorCodes.MESMO_ERROR_CRYPTO;
             }
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 
-    // CIP-1852 role indices accepted by ccl_crypto_derive_key.
+    // CIP-1852 role indices accepted by mesmo_crypto_derive_key.
     private static final Map<String, Integer> DERIVE_ROLES = Map.of(
             "payment", 0,
             "change", 1,
@@ -276,7 +276,7 @@ public final class CryptoApi {
      * "give me raw key material" utility — deliberately a pure crypto function, not an operation on
      * a managed account handle (handles sign; they never hand out key bytes).
      *
-     * <p>Exported as {@code ccl_crypto_derive_key}. On success the result is a JSON object:
+     * <p>Exported as {@code mesmo_crypto_derive_key}. On success the result is a JSON object:
      * <pre>{@code {"path","private_key","public_key","public_key_hash"}}</pre>
      * For the governance roles ({@code drep}, {@code committee_cold}, {@code committee_hot}) the
      * result additionally carries the CIP-105 bech32 encodings {@code bech32_verification_key}
@@ -284,7 +284,7 @@ public final class CryptoApi {
      * {@code bech32_verification_key_hash} ({@code …_vkh1…}) — the forms cardano-cli and GovTool
      * accept for registration.
      * {@code private_key} is the hex-encoded 64-byte extended BIP32-Ed25519 private key — pass it
-     * <b>whole</b> to {@code ccl_crypto_sign} (which detects the extended form by length); its
+     * <b>whole</b> to {@code mesmo_crypto_sign} (which detects the extended form by length); its
      * first half is a clamped scalar, not a seed, and must never be used as one;
      * {@code public_key} is the 32-byte verification key; {@code public_key_hash} its blake2b-224
      * hash — for the committee roles this is the credential used in committee certificates.
@@ -298,34 +298,34 @@ public final class CryptoApi {
      * @param addressIndex HD address index within the role
      * @param rolePtr      one of {@code payment}, {@code change}, {@code stake}, {@code drep},
      *                     {@code committee_cold}, {@code committee_hot}
-     * @return {@link ErrorCodes#CCL_SUCCESS}, or {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT} /
-     *         {@link ErrorCodes#CCL_ERROR_INVALID_MNEMONIC} / {@link ErrorCodes#CCL_ERROR_CRYPTO}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}, or {@link ErrorCodes#MESMO_ERROR_INVALID_ARGUMENT} /
+     *         {@link ErrorCodes#MESMO_ERROR_INVALID_MNEMONIC} / {@link ErrorCodes#MESMO_ERROR_CRYPTO}
      */
-    @CEntryPoint(name = "ccl_crypto_derive_key")
+    @CEntryPoint(name = "mesmo_crypto_derive_key")
     public static int deriveKey(IsolateThread thread, CCharPointer mnemonicPtr,
                                 int accountIndex, int addressIndex, CCharPointer rolePtr) {
         try {
             String mnemonic = NativeString.toJavaString(mnemonicPtr);
             if (mnemonic == null || mnemonic.isEmpty()) {
                 ErrorState.set("Mnemonic is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             String role = NativeString.toJavaString(rolePtr);
             Integer roleIndex = role == null ? null : DERIVE_ROLES.get(role);
             if (roleIndex == null) {
                 ErrorState.set("Unknown role: " + role + " (expected one of "
                         + String.join(", ", DERIVE_ROLES.keySet().stream().sorted().toList()) + ")");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             if (accountIndex < 0 || addressIndex < 0) {
                 ErrorState.set("Account and address indices must be >= 0");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             try {
                 MnemonicUtil.validateMnemonic(mnemonic);
             } catch (Exception e) {
                 ErrorState.set("Invalid mnemonic: " + e.getMessage());
-                return ErrorCodes.CCL_ERROR_INVALID_MNEMONIC;
+                return ErrorCodes.MESMO_ERROR_INVALID_MNEMONIC;
             }
 
             DerivationPath path = DerivationPath.builder()
@@ -365,10 +365,10 @@ public final class CryptoApi {
                 default -> { /* payment/change/stake: no CIP-105 encoding */ }
             }
             ResultState.set(JsonHelper.toJson(result));
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (Exception e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_CRYPTO;
+            return ErrorCodes.MESMO_ERROR_CRYPTO;
         }
     }
 }

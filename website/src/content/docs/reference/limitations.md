@@ -7,7 +7,7 @@ An honest list — read this before building on the bindings. Items are marked *
 
 ## Offline by design
 
-**By design.** The native library is offline, stateless, and side-effect-free: it makes **no network calls and never submits a transaction**. You supply chain data (UTXOs, protocol parameters) and submit the signed CBOR yourself with any HTTP client. Optional wrapper-side providers (Yaci DevKit, Blockfrost) and remote evaluators exist as conveniences — networking lives in the wrappers, never in `libccl`. Backend modules like Blockfrost/Koios/Ogmios clients are intentionally out of scope.
+**By design.** The native library is offline, stateless, and side-effect-free: it makes **no network calls and never submits a transaction**. You supply chain data (UTXOs, protocol parameters) and submit the signed CBOR yourself with any HTTP client. Optional wrapper-side providers (Yaci DevKit, Blockfrost) and remote evaluators exist as conveniences — networking lives in the wrappers, never in `libmesmo`. Backend modules like Blockfrost/Koios/Ogmios clients are intentionally out of scope.
 
 ## JavaScript runs on Bun only
 
@@ -32,14 +32,14 @@ Plutus transactions build fully offline: when you supply no execution units, the
 
 ## Threading models differ per language
 
-- **Python**: one `CclLib` may be shared across threads — each OS thread attaches to the isolate lazily.
+- **Python**: one `MesmoLib` may be shared across threads — each OS thread attaches to the isolate lazily.
 - **Go**: all native calls are **serialized** onto one dedicated OS thread per `Bridge` (GraalVM isolates are thread-affine and goroutines migrate). Correctness over raw concurrency; use multiple `Bridge` instances for parallelism.
-- After `close()`, calls fail with a catchable error (e.g. Python's `CclClosedError`) — this guards against passing a stale isolate handle to the native side, which would abort the whole process.
+- After `close()`, calls fail with a catchable error (e.g. Python's `MesmoClosedError`) — this guards against passing a stale isolate handle to the native side, which would abort the whole process.
 
 ## Format & versioning caveats
 
 - **Pre-1.0, tracking a preview CCL.** The bindings target CCL `0.8.0-pre4`; the TxPlan schema is CCL's and will be re-pinned when CCL `0.8.0` stabilizes. Expect breaking changes before 1.0.
-- **Wrapper ↔ library version lock.** The wrapper and native library must match on base semver; a mismatch fails fast at load (`CCL_SKIP_VERSION_CHECK=1` overrides at your own risk).
+- **Wrapper ↔ library version lock.** The wrapper and native library must match on base semver; a mismatch fails fast at load (`MESMO_SKIP_VERSION_CHECK=1` overrides at your own risk).
 - **Network enum ≠ on-chain network id.** `Network.MAINNET == 0` but a mainnet address's on-chain `network_id` is `1`. Never feed `address.info()["network_id"]` back into an API that takes a `network`.
 - **Quantities are strings.** Chain data carries amounts as strings (`"quantity": "5000000"`) to avoid 2^53 float truncation — mind this in JavaScript especially.
 

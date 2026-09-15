@@ -2,7 +2,7 @@
 //! (wrappers/python/tests/test_transaction.py). Rust previously had almost no dedicated Tx unit
 //! tests; this adds the input-count assertion and the malformed / invalid-hex error cases.
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use serde_json::Value;
 
 // A known valid transaction CBOR hex (built from Java tests).

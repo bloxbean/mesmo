@@ -1,4 +1,4 @@
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_account_create_mainnet(ccl):
@@ -44,29 +44,29 @@ def test_account_drep_id(ccl):
 # --- Negative / Error Tests ---
 
 def test_account_from_invalid_mnemonic(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.accounts.from_mnemonic(
             "invalid words that are not a valid mnemonic phrase at all", Network.MAINNET)
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected
 
 
 def test_account_from_empty_mnemonic(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.accounts.from_mnemonic("", Network.MAINNET)
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected
 
 
 def test_account_sign_tx_invalid_cbor(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     with ccl.accounts.create(Network.TESTNET) as acct:
         try:
             acct.sign_tx("deadbeef")
-            assert False, "Should have raised CclError"
-        except CclError:
+            assert False, "Should have raised MesmoError"
+        except MesmoError:
             pass  # expected

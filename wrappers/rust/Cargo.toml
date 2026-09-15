@@ -1,21 +1,21 @@
 [package]
-name = "cardano-client-lib"
+name = "mesmo"
 version = "0.1.0-pre6"
 edition = "2021"
 description = "Rust bindings for Cardano Client Lib (CCL) via GraalVM native library"
 license = "MIT"
-repository = "https://github.com/bloxbean/cardano-client-bindings"
-homepage = "https://github.com/bloxbean/cardano-client-bindings"
-documentation = "https://docs.rs/cardano-client-lib"
+repository = "https://github.com/bloxbean/mesmo"
+homepage = "https://github.com/bloxbean/mesmo"
+documentation = "https://docs.rs/mesmo"
 readme = "README.md"
 authors = ["bloxbean"]
 keywords = ["cardano", "cardano-client", "cardano-client-lib", "blockchain"]
 categories = ["api-bindings", "cryptography::cryptocurrencies"]
 
-# Published as `cardano-client-lib`, but imported as `ccl` (e.g. `use ccl::...`) — keep the short
+# Published as `cardano-client-lib`, but imported as `ccl` (e.g. `use mesmo::...`) — keep the short
 # crate identifier stable while the registry/dist name is descriptive.
 [lib]
-name = "ccl"
+name = "mesmo"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

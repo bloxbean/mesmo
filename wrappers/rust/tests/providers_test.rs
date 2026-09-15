@@ -5,8 +5,8 @@
 //! offline build. The live Yaci round-trip is covered by the DevKit integration tests.
 #![cfg(feature = "providers")]
 
-use ccl::providers::{BlockfrostProvider, ChainDataProvider};
-use ccl::{Bridge, Result};
+use mesmo::providers::{BlockfrostProvider, ChainDataProvider};
+use mesmo::{Bridge, Result};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;

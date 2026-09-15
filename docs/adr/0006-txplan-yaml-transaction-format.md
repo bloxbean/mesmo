@@ -17,7 +17,7 @@ the point at which it costs nothing.
 
 ## Decision
 
-Adopt CCL **TxPlan (YAML)** as the transaction-building input. `ccl_quicktx_build` takes a TxPlan YAML
+Adopt CCL **TxPlan (YAML)** as the transaction-building input. `mesmo_quicktx_build` takes a TxPlan YAML
 document plus caller-supplied chain data ([ADR-0002](0002-offline-stateless-no-provider.md)) and returns
 the result as **YAML** (`tx_cbor`, `tx_hash`, `fee`). Delete the bespoke spec, its mappers, the provider
 path, and all per-language fluent builders; wrappers become thin pass-throughs

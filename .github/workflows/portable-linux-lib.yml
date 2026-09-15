@@ -1,6 +1,6 @@
 name: Portable Linux lib (glibc baseline)
 
-# Guards the distro-portability of the shipped libccl.so on both Linux arches. native-image can't emit
+# Guards the distro-portability of the shipped libmesmo.so on both Linux arches. native-image can't emit
 # a static library (oracle/graal#3053), so portability is achieved by building the .so against an OLD
 # glibc baseline: inside manylinux_2_28 the resulting lib references no symbol newer than GLIBC_2.17, so
 # it runs on RHEL/CentOS 7+, Amazon Linux 2, Ubuntu 18.04+, Debian 9+ and every newer distro. See
@@ -16,7 +16,7 @@ on:
 
 jobs:
   glibc-baseline:
-    name: Build libccl.so (${{ matrix.arch }}, manylinux_2_28)
+    name: Build libmesmo.so (${{ matrix.arch }}, manylinux_2_28)
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -70,7 +70,7 @@ jobs:
       - name: Assert glibc floor (<= 2.28)
         run: |
           set -eux
-          SO=core/build/native/nativeCompile/libccl.so
+          SO=core/build/native/nativeCompile/libmesmo.so
           test -f "$SO"
           objdump -T "$SO" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -uV > /tmp/syms.txt
           echo "---- GLIBC symbol versions required ----"; cat /tmp/syms.txt
@@ -78,31 +78,31 @@ jobs:
           echo "---- Max required: GLIBC_$MAX (guarantee: <= $BASELINE) ----"
           HIGHER=$(printf '%s\n%s\n' "$MAX" "$BASELINE" | sort -V | tail -1)
           if [ "$HIGHER" != "$BASELINE" ]; then
-            echo "FAIL: libccl.so requires GLIBC_$MAX, newer than baseline GLIBC_$BASELINE"
+            echo "FAIL: libmesmo.so requires GLIBC_$MAX, newer than baseline GLIBC_$BASELINE"
             exit 1
           fi
-          echo "PASS: libccl.so runs on any system with glibc >= $MAX"
+          echo "PASS: libmesmo.so runs on any system with glibc >= $MAX"
 
-      - name: Compile the smoke harness against libccl.so
+      - name: Compile the smoke harness against libmesmo.so
         run: |
           set -eux
           ND=core/build/native/nativeCompile
-          gcc native-test/src/smoke.c -I"$ND" -L"$ND" -lccl -Wl,-rpath,'$ORIGIN' -o "$ND/smoke"
+          gcc native-test/src/smoke.c -I"$ND" -L"$ND" -lmesmo -Wl,-rpath,'$ORIGIN' -o "$ND/smoke"
 
       - name: Stage runnable artifact (lib + harness together)
         run: |
           set -eux
           mkdir -p dist
-          cp core/build/native/nativeCompile/libccl.so dist/
+          cp core/build/native/nativeCompile/libmesmo.so dist/
           cp core/build/native/nativeCompile/smoke dist/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: libccl-glibc-baseline-${{ matrix.arch }}
+          name: libmesmo-glibc-baseline-${{ matrix.arch }}
           path: dist/
 
   run-on-old-distro:
-    name: Run libccl.so on glibc 2.17 (centos:7, ${{ matrix.arch }})
+    name: Run libmesmo.so on glibc 2.17 (centos:7, ${{ matrix.arch }})
     needs: glibc-baseline
     strategy:
       fail-fast: false
@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: libccl-glibc-baseline-${{ matrix.arch }}
+          name: libmesmo-glibc-baseline-${{ matrix.arch }}
           path: dist
 
       # Run the prebuilt binary inside centos:7 (glibc 2.17) WITHOUT installing anything. This is a
@@ -131,8 +131,8 @@ jobs:
           docker run --rm -v "$PWD/dist:/work" -w /work centos:7 bash -c '
             set -eux
             ldd --version | head -1
-            echo "---- libccl.so shared-lib deps on this host ----"
-            ldd ./libccl.so
+            echo "---- libmesmo.so shared-lib deps on this host ----"
+            ldd ./libmesmo.so
             echo "---- running harness ----"
             ./smoke
           '

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-wrapper @CEntryPoint parity check.
 
-The native lib (`libccl`) exports a set of `ccl_*` `@CEntryPoint` functions. Every language wrapper
+The native lib (`libmesmo`) exports a set of `mesmo_*` `@CEntryPoint` functions. Every language wrapper
 must bind *all* of them, or that wrapper silently loses API surface when an entry point is added or
 renamed. This check extracts the canonical set from the core Java sources and asserts each wrapper's
 FFI bindings match it exactly. Run from anywhere; exits non-zero on any mismatch.
@@ -15,20 +15,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Where each wrapper declares its FFI bindings, and the pattern that yields the bound `ccl_*` names.
+# Where each wrapper declares its FFI bindings, and the pattern that yields the bound `mesmo_*` names.
 # Patterns are anchored to line-start (with MULTILINE) so a commented-out binding does not count.
 WRAPPERS = {
-    "python": (ROOT / "wrappers/python/ccl/_ffi.py", r"^\s*lib\.(ccl_[a-z0-9_]+)\.argtypes"),
-    "js":     (ROOT / "wrappers/js/src/index.js",    r"^\s*(ccl_[a-z0-9_]+):"),
-    "rust":   (ROOT / "wrappers/rust/src/ffi.rs",    r"^\s*pub fn (ccl_[a-z0-9_]+)"),
-    "go":     (ROOT / "wrappers/go/ccl/ffi.go",      r'^\s*reg\(&\w+, "(ccl_[a-z0-9_]+)"'),
+    "python": (ROOT / "wrappers/python/mesmo/_ffi.py", r"^\s*lib\.(mesmo_[a-z0-9_]+)\.argtypes"),
+    "js":     (ROOT / "wrappers/js/src/index.js",    r"^\s*(mesmo_[a-z0-9_]+):"),
+    "rust":   (ROOT / "wrappers/rust/src/ffi.rs",    r"^\s*pub fn (mesmo_[a-z0-9_]+)"),
+    "go":     (ROOT / "wrappers/go/mesmo/ffi.go",      r'^\s*reg\(&\w+, "(mesmo_[a-z0-9_]+)"'),
 }
 
 
 def canonical_entrypoints() -> set[str]:
     names: set[str] = set()
     for java in (ROOT / "core/src/main/java").rglob("*.java"):
-        names |= set(re.findall(r'@CEntryPoint\(name = "(ccl_[a-z0-9_]+)"', java.read_text()))
+        names |= set(re.findall(r'@CEntryPoint\(name = "(mesmo_[a-z0-9_]+)"', java.read_text()))
     return names
 
 

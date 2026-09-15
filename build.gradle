@@ -58,17 +58,17 @@ def versionTargets = [
                 Pattern.compile('^version = "([^"]+)"$', Pattern.MULTILINE),
                 releaseVersion),
         versionTarget(
-                'wrappers/python/ccl/_ffi.py',
+                'wrappers/python/mesmo/_ffi.py',
                 'Python native-library compatibility version',
                 Pattern.compile('^EXPECTED_LIB_VERSION = "([^"]+)"$', Pattern.MULTILINE),
                 baseReleaseVersion),
         versionTarget(
-                'wrappers/go/ccl/loader.go',
+                'wrappers/go/mesmo/loader.go',
                 'Go native-library release pin',
                 Pattern.compile('^const defaultLibVersion = "([^"]+)"$', Pattern.MULTILINE),
                 "v${releaseVersion}"),
         versionTarget(
-                'wrappers/go/ccl/ccl.go',
+                'wrappers/go/mesmo/mesmo.go',
                 'Go native-library compatibility version',
                 Pattern.compile('^const expectedLibVersion = "([^"]+)"$', Pattern.MULTILINE),
                 baseReleaseVersion)
@@ -76,7 +76,7 @@ def versionTargets = [
 
 def jsPackageFile = file('wrappers/js/package.json')
 def jsPackage = new JsonSlurper().parse(jsPackageFile)
-def platformPackagePrefix = '@bloxbean/cardano-client-lib-'
+def platformPackagePrefix = '@bloxbean/mesmo-'
 def platformPackages = (jsPackage.optionalDependencies ?: [:]).keySet()
         .findAll { it.startsWith(platformPackagePrefix) }
         .sort()

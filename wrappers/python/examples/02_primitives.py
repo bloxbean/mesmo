@@ -3,15 +3,15 @@
 Run from the repo root:
 
     LIB_DIR=core/build/native/nativeCompile
-    PYTHONPATH=wrappers/python CCL_LIB_PATH=$LIB_DIR \
+    PYTHONPATH=wrappers/python MESMO_LIB_PATH=$LIB_DIR \
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/02_primitives.py
 """
-from ccl import CclLib, Network
+from mesmo import MesmoLib, Network
 
 
 def main():
-    lib = CclLib()
+    lib = MesmoLib()
     try:
         # --- Mnemonics ---
         mnemonic = lib.crypto.generate_mnemonic(24)

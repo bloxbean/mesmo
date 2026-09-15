@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from ccl._ffi import CclError
-from ccl.network import Network
+from mesmo._ffi import MesmoError
+from mesmo.network import Network
 
 FIXTURES = Path(__file__).resolve().parents[3] / "test-fixtures" / "quicktx-intents"
 
@@ -70,7 +70,7 @@ def test_sign_with_stake_key(ccl):
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
     built = ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
 
-    from ccl import SigningRole
+    from mesmo import SigningRole
     with ccl.accounts.from_mnemonic(INTENT_MNEMONIC, Network.TESTNET) as acct:
         signed_payment = acct.sign_tx(built["tx_cbor"])
         signed_stake = acct.sign_tx(built["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
@@ -82,7 +82,7 @@ def test_plutus_mint(ccl):
     utxos = [{"tx_hash": "a" * 64, "output_index": 0, "address": SENDER,
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
     _assert_built(ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
-    with pytest.raises(CclError):
+    with pytest.raises(MesmoError):
         ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
 
 
@@ -95,5 +95,5 @@ def test_plutus_spend(ccl):
          "amount": [{"unit": "lovelace", "quantity": "2000000000"}]},
     ]
     _assert_built(ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
-    with pytest.raises(CclError):
+    with pytest.raises(MesmoError):
         ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)

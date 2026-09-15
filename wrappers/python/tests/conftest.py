@@ -1,10 +1,10 @@
 import pytest
-from ccl._ffi import CclLib
+from mesmo._ffi import MesmoLib
 
 
 @pytest.fixture(scope="session")
 def ccl():
-    """Create a shared CclLib instance for all tests."""
-    lib = CclLib()
+    """Create a shared MesmoLib instance for all tests."""
+    lib = MesmoLib()
     yield lib
     lib.close()

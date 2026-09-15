@@ -17,7 +17,7 @@ import org.graalvm.nativeimage.c.type.CCharPointer;
  * available UTXOs and protocol parameters — as JSON. Nothing is fetched and nothing is submitted;
  * the result is the unsigned transaction CBOR.
  *
- * <p>See {@link com.bloxbean.cardano.bridge.CclBridge} for the calling convention. The single entry
+ * <p>See {@link com.bloxbean.cardano.bridge.MesmoBridge} for the calling convention. The single entry
  * point here is a static GraalVM {@code @CEntryPoint}.
  */
 public final class QuickTxApi {
@@ -29,13 +29,13 @@ public final class QuickTxApi {
     /**
      * Builds an unsigned transaction from a TxPlan YAML document and caller-supplied chain data.
      *
-     * <p>Exported as {@code ccl_quicktx_build}. {@code yaml} is the TxPlan transaction definition;
+     * <p>Exported as {@code mesmo_quicktx_build}. {@code yaml} is the TxPlan transaction definition;
      * {@code utxos_json} is a JSON array of the sender's UTXOs and {@code protocol_params_json} a
      * JSON protocol-parameters object (both standard CCL data models). On success the result is a
      * JSON object:
      * <pre>{@code {"tx_cbor","tx_hash","fee"}}</pre>
      * where {@code tx_cbor} is the unsigned transaction; sign it with
-     * {@code ccl_account_sign_tx_handle} / {@code ccl_tx_sign_with_secret_key} and submit it
+     * {@code mesmo_account_sign_tx_handle} / {@code mesmo_tx_sign_with_secret_key} and submit it
      * yourself.
      *
      * <p>For Plutus script transactions, pass the redeemers' execution units in
@@ -43,7 +43,7 @@ public final class QuickTxApi {
      * transaction order). The caller computes these with any UPLC evaluator (Ogmios, Blockfrost,
      * Aiken, Scalus) and passes them in, just like UTXOs and protocol parameters. Pass {@code null}
      * (or an empty array) for non-script transactions. A script transaction with no execution units
-     * fails with {@link ErrorCodes#CCL_ERROR_TX_BUILD}.
+     * fails with {@link ErrorCodes#MESMO_ERROR_TX_BUILD}.
      *
      * <p>{@code additional_signers} budgets vkey witnesses for fee estimation, beyond those the
      * input UTXOs imply (one per sender): {@code 0} for a plain payment, {@code 1} for a stake or
@@ -58,44 +58,44 @@ public final class QuickTxApi {
      * @param protocolParamsJsonPtr JSON protocol parameters (UTF-8 C string)
      * @param execUnitsJsonPtr      JSON array of redeemer execution units, or null (UTF-8 C string)
      * @param additionalSigners     signer count beyond the input-UTXO-implied witnesses (≥ 0)
-     * @return {@link ErrorCodes#CCL_SUCCESS}; on failure
-     *         {@link ErrorCodes#CCL_ERROR_INVALID_ARGUMENT},
-     *         {@link ErrorCodes#CCL_ERROR_INSUFFICIENT_FUNDS}, or
-     *         {@link ErrorCodes#CCL_ERROR_TX_BUILD}
+     * @return {@link ErrorCodes#MESMO_SUCCESS}; on failure
+     *         {@link ErrorCodes#MESMO_ERROR_INVALID_ARGUMENT},
+     *         {@link ErrorCodes#MESMO_ERROR_INSUFFICIENT_FUNDS}, or
+     *         {@link ErrorCodes#MESMO_ERROR_TX_BUILD}
      */
-    @CEntryPoint(name = "ccl_quicktx_build")
+    @CEntryPoint(name = "mesmo_quicktx_build")
     public static int build(IsolateThread thread, CCharPointer yamlPtr,
                             CCharPointer utxosJsonPtr, CCharPointer protocolParamsJsonPtr,
                             CCharPointer execUnitsJsonPtr, int additionalSigners) {
         try {
             if (additionalSigners < 0) {
                 ErrorState.set("additional_signers must be >= 0");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             String yaml = NativeString.toJavaString(yamlPtr);
             if (yaml == null || yaml.isEmpty()) {
                 ErrorState.set("TxPlan YAML is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             String utxosJson = NativeString.toJavaString(utxosJsonPtr);
             String protocolParamsJson = NativeString.toJavaString(protocolParamsJsonPtr);
             if (protocolParamsJson == null || protocolParamsJson.isEmpty()) {
                 ErrorState.set("Protocol parameters JSON is required");
-                return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+                return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
             }
             String execUnitsJson = NativeString.toJavaString(execUnitsJsonPtr);
 
             String resultJson = service.buildTransaction(yaml, utxosJson, protocolParamsJson, execUnitsJson, additionalSigners);
             ResultState.set(resultJson);
-            return ErrorCodes.CCL_SUCCESS;
+            return ErrorCodes.MESMO_SUCCESS;
         } catch (IllegalArgumentException e) {
             ErrorState.set(e.getMessage());
-            return ErrorCodes.CCL_ERROR_INVALID_ARGUMENT;
+            return ErrorCodes.MESMO_ERROR_INVALID_ARGUMENT;
         } catch (Exception e) {
             String msg = e.getMessage();
             if (msg != null && msg.toLowerCase().contains("not enough")) {
                 ErrorState.set(msg);
-                return ErrorCodes.CCL_ERROR_INSUFFICIENT_FUNDS;
+                return ErrorCodes.MESMO_ERROR_INSUFFICIENT_FUNDS;
             }
             // Include the root cause — wrapped exceptions (e.g. YAML deserialization) otherwise
             // hide the actual problem behind a generic message.
@@ -105,7 +105,7 @@ public final class QuickTxApi {
                       .append(": ").append(c.getMessage());
             }
             ErrorState.set(detail.toString());
-            return ErrorCodes.CCL_ERROR_TX_BUILD;
+            return ErrorCodes.MESMO_ERROR_TX_BUILD;
         }
     }
 }

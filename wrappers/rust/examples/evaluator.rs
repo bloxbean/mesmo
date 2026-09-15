@@ -5,7 +5,7 @@
 //!   1. the offline default — the bridge computes the units in-process with Scalus (no network); and
 //!   2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 //!
-//! libccl never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
+//! libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
 //! wrapper: `build_with` runs a two-pass (draft -> evaluate -> rebuild). Needs the `providers` feature.
 //!
 //! Run from wrappers/rust:
@@ -15,8 +15,8 @@
 //! DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //!   cargo run --example evaluator --features providers
 //! ```
-use ccl::providers::ChainDataProvider;
-use ccl::{Bridge, Result};
+use mesmo::providers::ChainDataProvider;
+use mesmo::{Bridge, Result};
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     // 2) Remote evaluator (illustrative — needs a Blockfrost project id). The two-pass builds a
     //    draft, POSTs it to /utils/txs/evaluate, and rebuilds with the returned units:
     //
-    //    use ccl::providers::BlockfrostEvaluator;
+    //    use mesmo::providers::BlockfrostEvaluator;
     //    let evaluator = BlockfrostEvaluator::new("preprod_your_project_id", "preprod")?;
     //    let result = bridge.quicktx().build_with(&yaml, &provider, &sender, Some(&evaluator))?;
     //

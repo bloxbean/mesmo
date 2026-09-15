@@ -3,11 +3,11 @@
 // Run from wrappers/js:
 //
 //   LIB_DIR=../../core/build/native/nativeCompile
-//   CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//   MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //     bun examples/account.js
-import { CclBridge, TESTNET } from '../src/index.js';
+import { MesmoBridge, TESTNET } from '../src/index.js';
 
-const bridge = new CclBridge();
+const bridge = new MesmoBridge();
 try {
   // 1. Create a brand-new testnet account (managed handle; the recovery phrase is
   //    exported once, deliberately — it is never part of the account's info).

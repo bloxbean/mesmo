@@ -9,9 +9,9 @@
 // compiling, tsc reports the unused directive and the check fails.
 
 import {
-    CclBridge,
-    CclError,
-    CclClosedError,
+    MesmoBridge,
+    MesmoError,
+    MesmoClosedError,
     QuickTxApi,
     YaciProvider,
     BlockfrostProvider,
@@ -24,8 +24,8 @@ import {
     platformSuffix,
     MAINNET,
     TESTNET,
-    CCL_SUCCESS,
-    CCL_ERROR_TX_BUILD,
+    MESMO_SUCCESS,
+    MESMO_ERROR_TX_BUILD,
     type Network,
     type Account,
     type AccountPublicInfo,
@@ -47,15 +47,15 @@ declare function assignable<T>(): <U extends T>(value: U) => void;
 
 expectType<0>(MAINNET);
 expectType<1>(TESTNET);
-expectType<0>(CCL_SUCCESS);
-expectType<-10>(CCL_ERROR_TX_BUILD);
+expectType<0>(MESMO_SUCCESS);
+expectType<-10>(MESMO_ERROR_TX_BUILD);
 assignable<Network>()(MAINNET);
 assignable<Network>()(TESTNET);
 
 // --- Lifecycle -----------------------------------------------------------------------------------
 
-const bridge: CclBridge = new CclBridge();
-const bridgeWithPath: CclBridge = new CclBridge('/opt/ccl/lib');
+const bridge: MesmoBridge = new MesmoBridge();
+const bridgeWithPath: MesmoBridge = new MesmoBridge('/opt/ccl/lib');
 expectType<string>(bridge.version());
 expectType<void>(bridge.close());
 expectType<void>(bridge[Symbol.dispose]());
@@ -191,10 +191,10 @@ new BlockfrostProvider('id', { network: 'testnet' });
 
 // --- errors and lib resolution -------------------------------------------------------------------
 
-const err: CclError = new CclError(CCL_ERROR_TX_BUILD, 'boom');
+const err: MesmoError = new MesmoError(MESMO_ERROR_TX_BUILD, 'boom');
 expectType<number>(err.code);
 expectType<string>(err.message);
-expectType<CclClosedError>(new CclClosedError());
+expectType<MesmoClosedError>(new MesmoClosedError());
 expectType<string>(resolveLibFile());
 expectType<string>(resolveLibFile('/opt/ccl/lib'));
 expectType<string>(platformSuffix());

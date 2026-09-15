@@ -1,4 +1,4 @@
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_address_info(ccl):
@@ -33,18 +33,18 @@ def test_address_validate(ccl):
 # --- Negative / Error Tests ---
 
 def test_address_info_invalid(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.address.info("not_a_valid_address")
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected
 
 
 def test_address_from_bytes_invalid(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.address.from_bytes("zzzz")
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected

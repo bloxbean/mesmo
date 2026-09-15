@@ -28,18 +28,18 @@ jobs:
         shell: bash
         run: |
           cd core/build/native/nativeCompile
-          # On Windows native-image also emits an import library (libccl.lib) needed
+          # On Windows native-image also emits an import library (libmesmo.lib) needed
           # to link against the DLL; include it when present.
           EXTRA=""
-          [ -f libccl.lib ] && EXTRA="libccl.lib"
-          tar czf cardano-client-lib-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz \
-            libccl.${{ matrix.ext }} libccl.h graal_isolate.h $EXTRA
+          [ -f libmesmo.lib ] && EXTRA="libmesmo.lib"
+          tar czf mesmo-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz \
+            libmesmo.${{ matrix.ext }} libmesmo.h graal_isolate.h $EXTRA
       - uses: actions/upload-artifact@v4
         with:
-          name: cardano-client-lib-${{ matrix.platform }}
-          path: core/build/native/nativeCompile/cardano-client-lib-*.tar.gz
+          name: mesmo-${{ matrix.platform }}
+          path: core/build/native/nativeCompile/mesmo-*.tar.gz
 
-  # Linux: built in an OLD-glibc container (manylinux_2_28) so the shipped libccl.so runs on
+  # Linux: built in an OLD-glibc container (manylinux_2_28) so the shipped libmesmo.so runs on
   # glibc >= 2.17 (RHEL/CentOS 7+, Amazon Linux 2, Ubuntu 18.04+, Debian 9+) instead of only the
   # very newest distros. Portability is verified continuously by portable-linux-lib.yml; here we
   # re-assert the floor before shipping. See docs/adr/0008-linux-glibc-baseline-portability.md.
@@ -79,22 +79,22 @@ jobs:
       - name: Assert glibc floor (<= 2.28)
         run: |
           set -eux
-          SO=core/build/native/nativeCompile/libccl.so
+          SO=core/build/native/nativeCompile/libmesmo.so
           MAX=$(objdump -T "$SO" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' | sed 's/GLIBC_//' | sort -V | tail -1)
-          echo "libccl.so max required: GLIBC_$MAX"
+          echo "libmesmo.so max required: GLIBC_$MAX"
           HIGHER=$(printf '%s\n2.28\n' "$MAX" | sort -V | tail -1)
           [ "$HIGHER" = "2.28" ] || { echo "FAIL: requires GLIBC_$MAX > 2.28"; exit 1; }
       - name: Package
         run: |
           cd core/build/native/nativeCompile
-          tar czf cardano-client-lib-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz \
-            libccl.so libccl.h graal_isolate.h
+          tar czf mesmo-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz \
+            libmesmo.so libmesmo.h graal_isolate.h
       - uses: actions/upload-artifact@v4
         with:
-          name: cardano-client-lib-${{ matrix.platform }}
-          path: core/build/native/nativeCompile/cardano-client-lib-*.tar.gz
+          name: mesmo-${{ matrix.platform }}
+          path: core/build/native/nativeCompile/mesmo-*.tar.gz
 
-  # Linux/musl: a libccl.so linked against musl (via native-image --libc=musl + a musl toolchain), so
+  # Linux/musl: a libmesmo.so linked against musl (via native-image --libc=musl + a musl toolchain), so
   # it loads on Alpine / musl-based images that the glibc-baseline .so can't. Guarded on every PR by
   # musl-alpine.yml (build + a functional run inside Alpine). See docs/adr/0008.
   # x86_64 only: GraalVM's --libc=musl hardcodes the x86_64-linux-musl-gcc compiler name and doesn't
@@ -132,12 +132,12 @@ jobs:
       - name: Package
         run: |
           cd core/build/native/nativeCompile
-          tar czf cardano-client-lib-${{ github.ref_name }}-linux-musl-x86_64.tar.gz \
-            libccl.so libccl.h graal_isolate.h
+          tar czf mesmo-${{ github.ref_name }}-linux-musl-x86_64.tar.gz \
+            libmesmo.so libmesmo.h graal_isolate.h
       - uses: actions/upload-artifact@v4
         with:
-          name: cardano-client-lib-linux-musl-x86_64
-          path: core/build/native/nativeCompile/cardano-client-lib-*.tar.gz
+          name: mesmo-linux-musl-x86_64
+          path: core/build/native/nativeCompile/mesmo-*.tar.gz
 
   release:
     needs: [build-native, build-linux, build-musl]
@@ -149,11 +149,11 @@ jobs:
         with:
           merge-multiple: true
       - name: Generate checksums
-        run: sha256sum cardano-client-lib-*.tar.gz > SHA256SUMS
+        run: sha256sum mesmo-*.tar.gz > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            cardano-client-lib-*.tar.gz
+            mesmo-*.tar.gz
             SHA256SUMS
           generate_release_notes: true
 
@@ -176,5 +176,5 @@ jobs:
       - name: Verify Go loader release asset
         working-directory: wrappers/go
         env:
-          CCL_VERIFY_RELEASE_ASSET: '1'
-        run: go test ./ccl -run '^TestReleaseAssetURLResolves$' -count=1 -v
+          MESMO_VERIFY_RELEASE_ASSET: '1'
+        run: go test ./mesmo -run '^TestReleaseAssetURLResolves$' -count=1 -v

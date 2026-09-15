@@ -318,7 +318,7 @@ class AccountServiceTest {
             for (String corrupt : new String[]{"zz", "abc"}) { // non-hex; odd length
                 var e = assertThrows(IllegalStateException.class,
                         () -> AccountService.signTx(handle, corrupt, AccountService.ROLE_PAYMENT),
-                        "corrupt hex must map to CCL_ERROR_INVALID_TRANSACTION like corrupt CBOR");
+                        "corrupt hex must map to MESMO_ERROR_INVALID_TRANSACTION like corrupt CBOR");
                 assertTrue(e.getMessage().startsWith("Transaction signing failed"));
             }
         } finally {

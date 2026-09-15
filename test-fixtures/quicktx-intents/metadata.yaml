@@ -14,4 +14,4 @@ transaction:
     - type: metadata
       metadata: |
         "674":
-          msg: "Hello from Cardano Client Bindings"
+          msg: "Hello from Mesmo"

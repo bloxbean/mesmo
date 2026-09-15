@@ -1,4 +1,4 @@
-rootProject.name = 'cardano-client-bindings'
+rootProject.name = 'mesmo'
 
 include 'core'
 include 'native-test'

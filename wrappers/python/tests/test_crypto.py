@@ -1,4 +1,4 @@
-from ccl.network import Network
+from mesmo.network import Network
 
 
 def test_crypto_blake2b_256(ccl):
@@ -63,18 +63,18 @@ def test_version(ccl):
 # --- Negative / Error Tests ---
 
 def test_crypto_blake2b_256_invalid_hex(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.crypto.blake2b_256("not_valid_hex!")
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected
 
 
 def test_crypto_sign_invalid_key(ccl):
-    from ccl._ffi import CclError
+    from mesmo._ffi import MesmoError
     try:
         ccl.crypto.sign("68656c6c6f", "zz" * 32)
-        assert False, "Should have raised CclError"
-    except CclError:
+        assert False, "Should have raised MesmoError"
+    except MesmoError:
         pass  # expected

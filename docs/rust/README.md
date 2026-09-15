@@ -1,6 +1,6 @@
 # Cardano Client Lib for Rust
 
-The `cardano-client-lib` crate (imported as `ccl`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libccl`, a GraalVM native-image build of CCL fetched automatically at build time.
+The `mesmo` crate (imported as `ccl`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libmesmo`, a GraalVM native-image build of CCL fetched automatically at build time.
 
 ## Documentation
 
@@ -27,23 +27,23 @@ Until then, use a git dependency:
 
 ```toml
 [dependencies]
-cardano-client-lib = { git = "https://github.com/bloxbean/cardano-client-bindings", package = "cardano-client-lib" }
+cardano-client-lib = { git = "https://github.com/bloxbean/mesmo", package = "cardano-client-lib" }
 ```
 
-The import name is `ccl` regardless: `use ccl::{Bridge, Network};`.
+The import name is `ccl` regardless: `use mesmo::{Bridge, Network};`.
 
-**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libccl` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `CCL_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-obtained).
+**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libmesmo` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `MESMO_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-obtained).
 
 Features:
 
 | Feature | Default | Adds |
 |---|---|---|
-| `providers` | off | `ccl::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
+| `providers` | off | `mesmo::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
 
 ## Quick start
 
 ```rust
-use ccl::{Bridge, Network};
+use mesmo::{Bridge, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge = Bridge::new()?; // torn down automatically on drop (RAII)
@@ -90,7 +90,7 @@ let signed = sender.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?; // sender =
 With a provider (requires the `providers` feature), fetching the chain data is one call:
 
 ```rust
-use ccl::providers::YaciProvider;
+use mesmo::providers::YaciProvider;
 
 let provider = YaciProvider::default(); // local Yaci DevKit
 let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;

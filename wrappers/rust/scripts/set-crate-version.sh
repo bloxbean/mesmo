@@ -6,7 +6,7 @@
 # Cargo.toml `version` is the *only* Rust version site. Both of the things that have to agree with
 # it follow from it automatically, so there is nothing else to stamp:
 #   - the version-skew check's expected version — reads CARGO_PKG_VERSION;
-#   - the GitHub release tag build.rs fetches libccl from — derived as v<CARGO_PKG_VERSION>.
+#   - the GitHub release tag build.rs fetches libmesmo from — derived as v<CARGO_PKG_VERSION>.
 #
 # This is the narrow publish-CI helper. For a checked-in release bump across every wrapper, edit
 # gradle.properties and run `./gradlew syncVersions` from the repository root.
@@ -28,5 +28,5 @@ CARGO_TOML="$DIR/Cargo.toml"
 # (`serde = { version = "1" }`), so this anchor can't touch them. Replace the first match only.
 perl -0pi -e "s/^version = \"[^\"]*\"/version = \"$VERSION\"/m" "$CARGO_TOML"
 
-echo "stamped: Cargo.toml version=$VERSION (build.rs derives the libccl release tag v$VERSION from it)"
+echo "stamped: Cargo.toml version=$VERSION (build.rs derives the libmesmo release tag v$VERSION from it)"
 grep -m1 '^version = ' "$CARGO_TOML"

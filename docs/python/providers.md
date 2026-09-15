@@ -3,7 +3,7 @@
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences (stdlib `urllib`, no extra dependencies) for feeding `quicktx.build_with` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `quicktx.build` directly.
 
 ```python
-from ccl import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
+from mesmo import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
 ```
 
 ## ChainDataProvider

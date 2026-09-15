@@ -1,25 +1,25 @@
 # Python API Reference
 
 ```python
-from ccl import CclLib, Network, CclError, CclClosedError
+from mesmo import MesmoLib, Network, MesmoError, MesmoClosedError
 ```
 
-All functionality hangs off a `CclLib` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
+All functionality hangs off a `MesmoLib` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
 
-## CclLib
+## MesmoLib
 
 ```python
-CclLib(lib_path=None)          # lib_path: directory containing libccl, overrides auto-resolution
+MesmoLib(lib_path=None)          # lib_path: directory containing libmesmo, overrides auto-resolution
 lib.version() -> str
 lib.close() -> None            # idempotent
-# context manager: with CclLib() as lib: ...
+# context manager: with MesmoLib() as lib: ...
 ```
 
 Constructing loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are attributes: `lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`, `lib.script`, `lib.quicktx`.
 
-**Lifecycle.** `close()` detaches all attached threads and tears down the isolate; it is idempotent and also runs on `__exit__`/`__del__`. Any call after `close()` raises `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable exception.
+**Lifecycle.** `close()` detaches all attached threads and tears down the isolate; it is idempotent and also runs on `__exit__`/`__del__`. Any call after `close()` raises `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable exception.
 
-**Threading.** One `CclLib` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
+**Threading.** One `MesmoLib` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
 
 ## Networks
 
@@ -37,27 +37,27 @@ Every method that derives keys or signs requires a `network` argument. Omitting 
 
 | Exception | When |
 |---|---|
-| `CclError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"CCL Error <code>: <message>"`. |
-| `CclClosedError` (a `RuntimeError`) | Any API call after `close()`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"CCL Error <code>: <message>"`. |
+| `MesmoClosedError` (a `RuntimeError`) | Any API call after `close()`. |
 | `TypeError` / `ValueError` | Missing / out-of-range `network` argument. |
 | `OSError` | Native library could not be loaded. |
 | `RuntimeError` | Isolate creation failure or wrapper/native version mismatch. |
 
-Error codes on `CclError.code` (also available as `CclLib.CCL_ERROR_*` constants):
+Error codes on `MesmoError.code` (also available as `MesmoLib.MESMO_ERROR_*` constants):
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle (raised as `CclInvalidHandleError`) |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle (raised as `CclInvalidHandleError`) |
 
 Predicate methods (`address.validate`, `crypto.validate_mnemonic`, `crypto.verify`) return `False` instead of raising.
 
@@ -67,7 +67,7 @@ Handle-based accounts (ADR-0016): open once, then operate without the mnemonic �
 account API.
 
 ```python
-from ccl import SigningRole, CclInvalidHandleError
+from mesmo import SigningRole, CclInvalidHandleError
 
 with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:   # or lib.accounts.create(...)
     acct.info                                    # public data only — never the mnemonic

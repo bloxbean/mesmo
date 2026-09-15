@@ -14,10 +14,10 @@ stop them. The parameter is named `network`, never `network_id`, for exactly thi
 
 import pytest
 
-from ccl import Network
+from mesmo import Network
 
 
-def test_members_are_ccl_ordinals():
+def test_members_are_mesmo_ordinals():
     assert (Network.MAINNET, Network.TESTNET) == (0, 1)
 
 

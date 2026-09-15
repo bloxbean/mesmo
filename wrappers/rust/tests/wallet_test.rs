@@ -2,7 +2,7 @@
 //! address is one CIP-1852 payment leaf — one handle per leaf. The mainnet create / restore /
 //! enumeration paths live in integration_test.rs; this adds the testnet stake-address prefix case.
 
-use ccl::Bridge;
+use mesmo::Bridge;
 
 fn bridge() -> Bridge {
     Bridge::new().expect("Failed to create bridge")
@@ -13,7 +13,7 @@ fn test_wallet_create_testnet() {
     let b = bridge();
     let acct = b
         .accounts()
-        .create(ccl::Network::Testnet)
+        .create(mesmo::Network::Testnet)
         .expect("Failed to create account");
     let info = acct.info().expect("Failed to get info");
     assert!(info["stake_address"]

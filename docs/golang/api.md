@@ -3,7 +3,7 @@
 Everything lives in package `ccl`:
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
 ## Bridge
@@ -53,14 +53,14 @@ Account operations (`Accounts`) require a `Network` value; an out-of-range value
 ## Errors
 
 ```go
-type CclError struct {
+type MesmoError struct {
 	Code    int
 	Message string
 }
-func (e *CclError) Error() string  // "CCL Error <code>: <message>"
+func (e *MesmoError) Error() string  // "CCL Error <code>: <message>"
 ```
 
-Native failures surface as `*CclError` — match with `errors.As`. Error codes:
+Native failures surface as `*MesmoError` — match with `errors.As`. Error codes:
 
 | Constant | Code | Meaning |
 |---|---|---|
@@ -84,11 +84,11 @@ Handle-based accounts (ADR-0016): open once, then operate without the mnemonic �
 account API.
 
 ```go
-acct, err := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)  // or bridge.Accounts.Create(...)
+acct, err := bridge.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)  // or bridge.Accounts.Create(...)
 defer acct.Close()
 
 info, _ := acct.Info()                            // *AccountPublicInfo — never the mnemonic
-signed, err := acct.SignTx(txCbor, ccl.RolePayment|ccl.RoleStake)
+signed, err := acct.SignTx(txCbor, mesmo.RolePayment|mesmo.RoleStake)
 // after Close: further use fails with ErrInvalidHandle (-11)
 ```
 

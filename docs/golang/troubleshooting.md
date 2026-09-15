@@ -2,13 +2,13 @@
 
 ## How the native library is found
 
-The `ccl` package resolves `libccl.dylib` / `libccl.so` / `libccl.dll` at runtime, once per process, in this order:
+The `ccl` package resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at runtime, once per process, in this order:
 
-1. **`CCL_LIB_PATH`** — a directory containing the library, or the library file itself. If set but the file isn't there, resolution fails hard (no fallback) — this is the way to run against a locally built library.
-2. **The per-version cache**: `os.UserCacheDir()/cardano-client-bindings/<version>/` (e.g. `~/Library/Caches/...` on macOS, `~/.cache/...` on Linux).
+1. **`MESMO_LIB_PATH`** — a directory containing the library, or the library file itself. If set but the file isn't there, resolution fails hard (no fallback) — this is the way to run against a locally built library.
+2. **The per-version cache**: `os.UserCacheDir()/mesmo/<version>/` (e.g. `~/Library/Caches/...` on macOS, `~/.cache/...` on Linux).
 3. **A one-time download** of the release tarball from GitHub releases, extracted atomically into the cache.
 
-The downloaded release tag is pinned in the wrapper (kept in lockstep with the wrapper version); override it with `CCL_LIB_VERSION` (e.g. `CCL_LIB_VERSION=v0.1.0-pre4`).
+The downloaded release tag is pinned in the wrapper (kept in lockstep with the wrapper version); override it with `MESMO_LIB_VERSION` (e.g. `MESMO_LIB_VERSION=v0.1.0-pre4`).
 
 On Linux, musl (Alpine) is detected automatically by checking for the musl dynamic loader, and the `linux-musl-x86_64` artifact is downloaded instead of the glibc one.
 
@@ -16,31 +16,31 @@ Environment variables:
 
 | Variable | Effect |
 |---|---|
-| `CCL_LIB_PATH` | Use a local library instead of the cache/download |
-| `CCL_LIB_VERSION` | Override the pinned release tag to download |
-| `CCL_SKIP_VERSION_CHECK` | Skip the wrapper ↔ native-lib version compatibility check |
+| `MESMO_LIB_PATH` | Use a local library instead of the cache/download |
+| `MESMO_LIB_VERSION` | Override the pinned release tag to download |
+| `MESMO_SKIP_VERSION_CHECK` | Skip the wrapper ↔ native-lib version compatibility check |
 
 ## Common errors
 
-### `CCL_LIB_PATH set but ... not found`
+### `MESMO_LIB_PATH set but ... not found`
 
-`CCL_LIB_PATH` is authoritative: when set, nothing else is tried. Point it at the directory that actually contains `libccl.so`/`libccl.dylib` (typically `core/build/native/nativeCompile` in a source checkout), or unset it to use the downloaded library.
+`MESMO_LIB_PATH` is authoritative: when set, nothing else is tried. Point it at the directory that actually contains `libmesmo.so`/`libmesmo.dylib` (typically `core/build/native/nativeCompile` in a source checkout), or unset it to use the downloaded library.
 
 ### Download fails on first use
 
-The first `ccl.New()` needs network access to GitHub releases (a one-time, per-version download). In restricted environments, either pre-populate the cache directory, or build from source and set `CCL_LIB_PATH`. The download is atomic (temp file + rename), so a killed process can't leave a corrupt library behind.
+The first `mesmo.New()` needs network access to GitHub releases (a one-time, per-version download). In restricted environments, either pre-populate the cache directory, or build from source and set `MESMO_LIB_PATH`. The download is atomic (temp file + rename), so a killed process can't leave a corrupt library behind.
 
-### `no prebuilt libccl for <GOOS>/<GOARCH>`
+### `no prebuilt libmesmo for <GOOS>/<GOARCH>`
 
-No prebuilt artifact exists for your platform (see matrix below). Build from source and set `CCL_LIB_PATH`.
+No prebuilt artifact exists for your platform (see matrix below). Build from source and set `MESMO_LIB_PATH`.
 
 ### Version mismatch on `New()`
 
-The wrapper and the native library must match on base semver. This usually means `CCL_LIB_PATH` points at a stale build, or `CCL_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `CCL_SKIP_VERSION_CHECK=1`.
+The wrapper and the native library must match on base semver. This usually means `MESMO_LIB_PATH` points at a stale build, or `MESMO_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
 ### `ccl: bridge is closed`
 
-Something called the bridge after `Close()`. Check with `errors.Is(err, ccl.ErrBridgeClosed)`. Keep the bridge alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
+Something called the bridge after `Close()`. Check with `errors.Is(err, mesmo.ErrBridgeClosed)`. Keep the bridge alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
 
 ### `CCL Error -10: ...` from `QuickTx.Build`
 
@@ -59,11 +59,11 @@ Early revisions of the module had a stale internal pin that broke `go get`. Upda
 Needed only on platforms without a prebuilt library or for development against the bridge itself:
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
 cd cardano-client-bindings
 sdk install java 25.0.3-graal        # GraalVM with native-image
-./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libccl.*
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 ```
 
 ## Platform support

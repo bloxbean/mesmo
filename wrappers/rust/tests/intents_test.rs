@@ -5,10 +5,10 @@
 //! Mirrors the Go `intents_test.go` for cross-wrapper parity.
 //!
 //! Run from wrappers/rust:
-//!   CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!     cargo test --test intents_test -- --test-threads=1
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};

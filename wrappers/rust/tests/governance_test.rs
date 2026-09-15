@@ -3,7 +3,7 @@
 //! committee ids and credentials) is public data on the managed account's info; raw governance
 //! key material comes from crypto::derive_key.
 
-use ccl::Bridge;
+use mesmo::Bridge;
 use serde_json::Value;
 
 fn bridge() -> Bridge {
@@ -13,7 +13,7 @@ fn bridge() -> Bridge {
 fn managed_mnemonic(bridge: &Bridge) -> (Value, String) {
     let acct = bridge
         .accounts()
-        .create(ccl::Network::Mainnet)
+        .create(mesmo::Network::Mainnet)
         .expect("Failed to create account");
     let info = acct.info().expect("Failed to get info");
     let phrase = acct

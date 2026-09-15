@@ -2,7 +2,7 @@
 //! (wrappers/python/tests/test_crypto.py). Covers exact Blake2b vectors, the 12-word mnemonic path,
 //! and the negative / error cases (invalid hex, invalid signing key).
 
-use ccl::Bridge;
+use mesmo::Bridge;
 
 fn bridge() -> Bridge {
     Bridge::new().expect("Failed to create bridge")

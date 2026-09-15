@@ -8,7 +8,7 @@ Significant decisions are recorded as [Architecture Decision Records](https://gi
 | Decision | ADR |
 |---|---|
 | CCL compiled to a native shared library with a C ABI (GraalVM native-image); no JVM at runtime | [0001](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0001-native-shared-library-ffi.md) |
-| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libccl` | [0002](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
+| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libmesmo` | [0002](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
 | Four thin language wrappers over one uniform FFI | [0003](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0003-four-language-wrappers-uniform-ffi.md) |
 | Bun is the only supported JavaScript runtime | [0004](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0004-bun-only-javascript-runtime.md) |
 | Toolchain pinned to Oracle GraalVM 25.0.3 | [0005](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0005-oracle-graalvm-25.md) |
@@ -26,4 +26,4 @@ Significant decisions are recorded as [Architecture Decision Records](https://gi
 
 ## The architecture in one paragraph
 
-CCL (Java) is compiled by GraalVM native-image into `libccl`, exposing `ccl_*` entry points over a C ABI where data crosses as C strings (JSON/YAML/hex). Four thin wrappers — Python (ctypes), Go (purego), Rust (FFI), JS (Bun FFI) — bind the same entry-point set, verified by a CI parity check. The core is strictly offline; anything that touches the network (chain-data providers, remote evaluators) lives in the wrappers using each language's own HTTP stack. Transactions are described in CCL's TxPlan YAML and built offline, with Plutus execution units computed in-process by the embedded Scalus evaluator unless supplied or delegated to a remote evaluator.
+CCL (Java) is compiled by GraalVM native-image into `libmesmo`, exposing `mesmo_*` entry points over a C ABI where data crosses as C strings (JSON/YAML/hex). Four thin wrappers — Python (ctypes), Go (purego), Rust (FFI), JS (Bun FFI) — bind the same entry-point set, verified by a CI parity check. The core is strictly offline; anything that touches the network (chain-data providers, remote evaluators) lives in the wrappers using each language's own HTTP stack. Transactions are described in CCL's TxPlan YAML and built offline, with Plutus execution units computed in-process by the embedded Scalus evaluator unless supplied or delegated to a remote evaluator.
