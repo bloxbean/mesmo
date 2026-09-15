@@ -13,7 +13,7 @@
 # Afterwards, configure the trusted publisher for each package printed by this script:
 #   Package -> Settings -> Trusted Publisher -> GitHub Actions
 #     Organization or user: bloxbean
-#     Repository:           cardano-client-bindings
+#     Repository:           mesmo
 #     Workflow filename:    publish-js.yml
 #     Environment:          release
 #     Allowed action:       npm publish

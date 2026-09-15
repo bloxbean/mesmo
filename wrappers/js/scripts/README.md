@@ -73,7 +73,7 @@ Configure:
 
 ```text
 Organization or user: bloxbean
-Repository:           cardano-client-bindings
+Repository:           mesmo
 Workflow filename:    publish-js.yml
 Environment:          release
 Allowed action:       npm publish

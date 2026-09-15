@@ -60,7 +60,7 @@ Needed only on platforms without a prebuilt library or for development against t
 
 ```bash
 git clone https://github.com/bloxbean/mesmo
-cd cardano-client-bindings
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
 ./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
 export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile

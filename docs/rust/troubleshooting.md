@@ -5,7 +5,7 @@
 `build.rs` sources `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at **build time**, in this order:
 
 1. **`MESMO_LIB_PATH`** — an explicit directory containing a locally built library.
-2. **In-tree build** — `core/build/native/nativeCompile`, when developing inside the `cardano-client-bindings` repository.
+2. **In-tree build** — `core/build/native/nativeCompile`, when developing inside the `mesmo` repository.
 3. **GitHub release download** — the prebuilt library for your target platform, fetched with `curl` and cached in the crate's build directory.
 
 The downloaded release tag is pinned in `build.rs` (kept in lockstep with the crate version); override it with the `MESMO_LIB_VERSION` environment variable.
@@ -52,7 +52,7 @@ Needed only on platforms without a prebuilt library or for development against t
 
 ```bash
 git clone https://github.com/bloxbean/mesmo
-cd cardano-client-bindings
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
 ./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
 export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile

@@ -37,7 +37,7 @@ def versionTargets = [
                 'wrappers/rust/Cargo.lock',
                 'Rust lockfile package version',
                 Pattern.compile(
-                        '^\\[\\[package\\]\\]\\Rname = "cardano-client-lib"\\Rversion = "([^"]+)"',
+                        '^\\[\\[package\\]\\]\\Rname = "mesmo"\\Rversion = "([^"]+)"',
                         Pattern.MULTILINE),
                 releaseVersion),
         versionTarget(

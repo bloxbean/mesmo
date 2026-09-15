@@ -130,7 +130,7 @@ func resolveLibPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("locate cache dir: %w", err)
 	}
-	dst := filepath.Join(cacheRoot, "cardano-client-bindings", libVersion(), name)
+	dst := filepath.Join(cacheRoot, "mesmo", libVersion(), name)
 	if fileExists(dst) {
 		return dst, nil
 	}
