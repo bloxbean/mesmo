@@ -80,7 +80,7 @@ type MesmoError struct {
 }
 
 func (e *MesmoError) Error() string {
-	return fmt.Sprintf("CCL Error %d: %s", e.Code, e.Message)
+	return fmt.Sprintf("Mesmo error %d: %s", e.Code, e.Message)
 }
 
 // AddressInfo contains address parsing result.

@@ -57,7 +57,7 @@ type MesmoError struct {
 	Code    int
 	Message string
 }
-func (e *MesmoError) Error() string  // "CCL Error <code>: <message>"
+func (e *MesmoError) Error() string  // "Mesmo error <code>: <message>"
 ```
 
 Native failures surface as `*MesmoError` — match with `errors.As`. Error codes:

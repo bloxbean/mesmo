@@ -38,13 +38,13 @@ Something called the instance after `close()` (or after its `with` block ended).
 
 The `network` argument is required and validated — there is no default (a silent mainnet default was removed deliberately). Pass `Network.MAINNET` or `Network.TESTNET`.
 
-### `CCL Error -10: ...` from `quicktx.build`
+### `Mesmo error -10: ...` from `quicktx.build`
 
 `MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../quicktx.md)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
 
 ### `tx.from_json` / `plutus.data_to_json` / `plutus.data_from_json` fail
 

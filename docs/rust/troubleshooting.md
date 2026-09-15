@@ -38,13 +38,13 @@ The crate and the native library must match on base semver. This usually means `
 
 Deliberate. The GraalVM isolate thread inside `Mesmo` is bound to the OS thread that created it — moving it would corrupt the VM, so `Mesmo` is `!Send`/`!Sync` and the compiler stops you. Create one `Mesmo` per thread (e.g. in a `thread_local!`, or construct inside each worker).
 
-### `CCL Error -10: ...` from `quicktx().build`
+### `Mesmo error -10: ...` from `quicktx().build`
 
 `MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../quicktx.md)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
 
 ## Building the native library from source
 

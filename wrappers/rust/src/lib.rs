@@ -85,7 +85,7 @@ pub struct MesmoError {
 
 impl std::fmt::Display for MesmoError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CCL Error {}: {}", self.code, self.message)
+        write!(f, "Mesmo error {}: {}", self.code, self.message)
     }
 }
 

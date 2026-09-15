@@ -37,7 +37,7 @@ Every method that derives keys or signs requires a `network` argument. Omitting 
 
 | Exception | When |
 |---|---|
-| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"CCL Error <code>: <message>"`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"Mesmo error <code>: <message>"`. |
 | `MesmoClosedError` (a `RuntimeError`) | Any API call after `close()`. |
 | `TypeError` / `ValueError` | Missing / out-of-range `network` argument. |
 | `OSError` | Native library could not be loaded. |

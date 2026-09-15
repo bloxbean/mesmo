@@ -42,13 +42,13 @@ The wrapper and the native library must match on base semver. This usually means
 
 Something called Mesmo after `Close()`. Check with `errors.Is(err, mesmo.ErrClosed)`. Keep Mesmo alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
 
-### `CCL Error -10: ...` from `QuickTx.Build`
+### `Mesmo error -10: ...` from `QuickTx.Build`
 
 `ErrTxBuild` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../quicktx.md)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`ErrInsufficientFunds`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`ErrInsufficientFunds`) means the supplied UTXOs can't cover outputs + fee.
 
 ### Old `go get` errors (module not found)
 

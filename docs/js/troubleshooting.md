@@ -43,13 +43,13 @@ The wrapper and the native library must match on base semver. This appears when 
 
 Something called Mesmo after `close()`. This error is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole process. Keep calls inside Mesmo's `try`/`using` scope, or create a new lib.
 
-### `CCL Error -10: ...` from `quicktx.build`
+### `Mesmo error -10: ...` from `quicktx.build`
 
 `MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../quicktx.md)).
 - A Plutus transaction with wrong/missing execution units.
-- Check `CCL Error -8` too: `INSUFFICIENT_FUNDS` means the supplied UTXOs can't cover outputs + fee.
+- Check `Mesmo error -8` too: `INSUFFICIENT_FUNDS` means the supplied UTXOs can't cover outputs + fee.
 
 ### `PPViewHashesDontMatch` when submitting a Plutus transaction
 

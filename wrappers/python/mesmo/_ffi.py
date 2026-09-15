@@ -356,7 +356,7 @@ class MesmoError(Exception):
     def __init__(self, code, message):
         self.code = code
         self.message = message
-        super().__init__(f"CCL Error {code}: {message}")
+        super().__init__(f"Mesmo error {code}: {message}")
 
 
 class CclInvalidHandleError(MesmoError):

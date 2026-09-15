@@ -71,7 +71,7 @@ function checkNetwork(network) {
 
 export class MesmoError extends Error {
   constructor(code, message) {
-    super(`CCL Error ${code}: ${message}`);
+    super(`Mesmo error ${code}: ${message}`);
     this.name = 'MesmoError';
     this.code = code;
   }

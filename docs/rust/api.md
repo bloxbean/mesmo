@@ -43,7 +43,7 @@ impl Network { pub fn as_i32(self) -> i32 }  // Mainnet=0, Testnet=1
 ## Errors
 
 ```rust
-pub struct MesmoError { pub code: i32, pub message: String }  // Display: "CCL Error {code}: {message}"
+pub struct MesmoError { pub code: i32, pub message: String }  // Display: "Mesmo error {code}: {message}"
 pub type Result<T> = std::result::Result<T, MesmoError>;
 ```
 

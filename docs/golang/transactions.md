@@ -167,6 +167,6 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 ## Errors you'll meet
 
-- `CCL Error -10` (`ErrTxBuild`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../quicktx.md#intent-catalog--verified-shapes).
-- `CCL Error -8` (`ErrInsufficientFunds`) — the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -10` (`ErrTxBuild`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../quicktx.md#intent-catalog--verified-shapes).
+- `Mesmo error -8` (`ErrInsufficientFunds`) — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.
