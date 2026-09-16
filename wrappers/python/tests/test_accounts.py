@@ -2,8 +2,8 @@
 mnemonic-per-call path, one-shot recovery-phrase export, and secret hygiene. Fully offline."""
 import pytest
 
-from ccl import CclInvalidHandleError, Network, SigningRole
-from ccl._ffi import CclError
+from mesmo import CclInvalidHandleError, Network, SigningRole
+from mesmo._ffi import MesmoError
 
 TEST_MNEMONIC = "test walk nut penalty hip pave soap entry language right filter choice"
 
@@ -17,7 +17,7 @@ PROTOCOL_PARAMS = {
 }
 
 
-def _unsigned_stake_reg(ccl, sender_info):
+def _unsigned_stake_reg(mesmo, sender_info):
     yaml = f"""
 version: 1.0
 transaction:
@@ -29,14 +29,14 @@ transaction:
 """
     utxos = [{"tx_hash": "a" * 64, "output_index": 0, "address": sender_info["base_address"],
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
-    return ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, additional_signers=1)["tx_cbor"]
+    return mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, additional_signers=1)["tx_cbor"]
 
 
-def test_open_info_matches_pinned_derivation(ccl):
+def test_open_info_matches_pinned_derivation(mesmo):
     # Pinned CIP-1852 derivation for the standard CCL test mnemonic at testnet 0/0. The
     # mnemonic-path equivalence proof lives in the core's AccountKeyDerivationParityTest;
     # these literals guard the wrapper against derivation regressions.
-    with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
+    with mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
         info = acct.info
         assert info["base_address"] == (
             "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer"
@@ -53,9 +53,9 @@ def test_open_info_matches_pinned_derivation(ccl):
         assert "mnemonic" not in info
 
 
-def test_sign_is_deterministic_and_mask_order_free(ccl):
-    with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
-        unsigned = _unsigned_stake_reg(ccl, acct.info)
+def test_sign_is_deterministic_and_mask_order_free(mesmo):
+    with mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
+        unsigned = _unsigned_stake_reg(mesmo, acct.info)
 
         # Deterministic: signing twice yields byte-identical output.
         assert acct.sign_tx(unsigned) == acct.sign_tx(unsigned)
@@ -67,15 +67,15 @@ def test_sign_is_deterministic_and_mask_order_free(ccl):
             acct.sign_tx(unsigned, SigningRole.PAYMENT | SigningRole.STAKE)
 
 
-def test_empty_role_mask_rejected(ccl):
-    with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
-        unsigned = _unsigned_stake_reg(ccl, acct.info)
-        with pytest.raises(CclError):
+def test_empty_role_mask_rejected(mesmo):
+    with mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
+        unsigned = _unsigned_stake_reg(mesmo, acct.info)
+        with pytest.raises(MesmoError):
             acct.sign_tx(unsigned, 0)
 
 
-def test_lifecycle_close_idempotent_use_after_close_typed(ccl):
-    acct = ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
+def test_lifecycle_close_idempotent_use_after_close_typed(mesmo):
+    acct = mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
     acct.close()
     acct.close()  # idempotent
     with pytest.raises(CclInvalidHandleError):
@@ -84,34 +84,34 @@ def test_lifecycle_close_idempotent_use_after_close_typed(ccl):
         acct.sign_tx("84a400", SigningRole.PAYMENT)
 
 
-def test_create_export_once_and_restore(ccl):
-    with ccl.accounts.create(Network.TESTNET) as acct:
+def test_create_export_once_and_restore(mesmo):
+    with mesmo.accounts.create(Network.TESTNET) as acct:
         base = acct.info["base_address"]
         phrase = acct.export_recovery_phrase()
         assert len(phrase.split()) == 24
-        with ccl.accounts.from_mnemonic(phrase, Network.TESTNET) as restored:
+        with mesmo.accounts.from_mnemonic(phrase, Network.TESTNET) as restored:
             assert restored.info["base_address"] == base
-        with pytest.raises(CclError):
+        with pytest.raises(MesmoError):
             acct.export_recovery_phrase()  # one-shot
 
 
-def test_export_on_imported_account_fails(ccl):
-    with ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
-        with pytest.raises(CclError):
+def test_export_on_imported_account_fails(mesmo):
+    with mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET) as acct:
+        with pytest.raises(MesmoError):
             acct.export_recovery_phrase()
 
 
-def test_repr_never_contains_secrets(ccl):
-    with ccl.accounts.create(Network.TESTNET) as acct:
+def test_repr_never_contains_secrets(mesmo):
+    with mesmo.accounts.create(Network.TESTNET) as acct:
         assert "addr" not in repr(acct)  # not even public data, just the handle
         phrase = acct.export_recovery_phrase()
         assert phrase.split()[0] not in repr(acct)
-    assert repr(acct) == "<ccl.Account closed>"
+    assert repr(acct) == "<mesmo.Account closed>"
 
 
-def test_two_handles_same_leaf_independent_lifecycle(ccl):
-    a = ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
-    b = ccl.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
+def test_two_handles_same_leaf_independent_lifecycle(mesmo):
+    a = mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
+    b = mesmo.accounts.from_mnemonic(TEST_MNEMONIC, Network.TESTNET)
     try:
         assert a.info["base_address"] == b.info["base_address"]
         a.close()
@@ -134,20 +134,20 @@ def test_two_handles_same_leaf_independent_lifecycle(ccl):
 BLAKE2B_HELLO = "8b7ca7d27d9fc55fa30abfe515b3afb24e3fe89fdd02e2ac92bca2c96680642e"
 
 
-def test_close_never_drains_the_pending_result_slot(ccl):
-    acct = ccl.accounts.create(Network.TESTNET)
+def test_close_never_drains_the_pending_result_slot(mesmo):
+    acct = mesmo.accounts.create(Network.TESTNET)
 
     # Park a known result in the slot without fetching it — exactly how it sits
     # between a native call's return and its result read.
-    rc = ccl._lib.ccl_crypto_blake2b_256(ccl._thread, b"48656c6c6f")  # "Hello"
+    rc = mesmo._lib.mesmo_crypto_blake2b_256(mesmo._thread, b"48656c6c6f")  # "Hello"
     assert rc == 0
 
     acct.close()  # must not consume the parked result
 
-    assert ccl._get_result() == BLAKE2B_HELLO
+    assert mesmo._get_result() == BLAKE2B_HELLO
 
 
-def test_gc_finalizer_cannot_steal_an_inflight_result(ccl):
+def test_gc_finalizer_cannot_steal_an_inflight_result(mesmo):
     """The production bug shape: cyclic GC finalizes a dead Account mid-call."""
     import gc
 
@@ -156,51 +156,51 @@ def test_gc_finalizer_cannot_steal_an_inflight_result(ccl):
 
     holder = Cycle()
     holder.self_ref = holder  # unreachable cycle: only gc.collect() can reap it
-    holder.account = ccl.accounts.create(Network.TESTNET)
+    holder.account = mesmo.accounts.create(Network.TESTNET)
     del holder
 
-    rc = ccl._lib.ccl_crypto_blake2b_256(ccl._thread, b"48656c6c6f")
+    rc = mesmo._lib.mesmo_crypto_blake2b_256(mesmo._thread, b"48656c6c6f")
     assert rc == 0
 
     gc.collect()  # runs Account.__del__ -> close() with the result parked
 
-    assert ccl._get_result() == BLAKE2B_HELLO
+    assert mesmo._get_result() == BLAKE2B_HELLO
 
 
-def test_sign_tx_error_codes_are_typed_and_consistent(ccl):
+def test_sign_tx_error_codes_are_typed_and_consistent(mesmo):
     """Closed-handle recovery keys on CclInvalidHandleError (-11), and corrupt input maps to
     -9 (invalid transaction) whether the corruption is bad hex or bad CBOR — never -2."""
     import pytest
-    from ccl import CclInvalidHandleError
-    from ccl._ffi import CclError
+    from mesmo import CclInvalidHandleError
+    from mesmo._ffi import MesmoError
 
-    acct = ccl.accounts.create(Network.TESTNET)
+    acct = mesmo.accounts.create(Network.TESTNET)
     acct.close()
     with pytest.raises(CclInvalidHandleError):
         acct.sign_tx("", 0)
 
-    with ccl.accounts.create(Network.TESTNET) as live:
+    with mesmo.accounts.create(Network.TESTNET) as live:
         for corrupt in ("zz", "abc"):  # non-hex; odd length
-            with pytest.raises(CclError) as excinfo:
+            with pytest.raises(MesmoError) as excinfo:
                 live.sign_tx(corrupt)
             assert excinfo.value.code == -9, f"{corrupt!r} → {excinfo.value.code}"
 
 
 def test_foreign_handle_from_another_isolate_is_rejected():
-    """Two bridges = two isolates. If every isolate counts handles from 1, bridge A's handle
-    aliases a real account on bridge B, and signing through the C ABI with the wrong
-    bridge/handle pairing silently uses the WRONG KEYS instead of failing with -11. The
+    """Two instances = two isolates. If every isolate counts handles from 1, lib A's handle
+    aliases a real account on lib B, and signing through the C ABI with the wrong
+    lib/handle pairing silently uses the WRONG KEYS instead of failing with -11. The
     handle spaces must be disjoint (per-isolate randomized) so the documented foreign-handle
     failure actually happens."""
-    from ccl._ffi import CclLib
+    from mesmo._ffi import Mesmo
 
-    lib1, lib2 = CclLib(), CclLib()
+    lib1, lib2 = Mesmo(), Mesmo()
     try:
         a1 = lib1.accounts.create(Network.TESTNET)
         a2 = lib2.accounts.create(Network.TESTNET)  # same allocation order on both isolates
 
         # Pass lib1's handle to lib2 through the raw ABI — the exact wrong-pairing mistake.
-        rc = lib2._lib.ccl_account_get_info(lib2._thread, a1._handle)
+        rc = lib2._lib.mesmo_account_get_info(lib2._thread, a1._handle)
         assert rc == -11, (
             f"foreign handle returned rc={rc}: it aliased a real account on the other "
             f"isolate (handles: lib1={a1._handle}, lib2={a2._handle})")

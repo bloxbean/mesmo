@@ -1,7 +1,7 @@
 name: Publish npm packages
 
-# Publishes the per-platform npm packages (@bloxbean/cardano-client-lib-<platform>) plus the main
-# @bloxbean/cardano-client-lib package (see docs/adr/0012) on a v* tag via npm trusted publishing
+# Publishes the per-platform npm packages (@bloxbean/mesmo-<platform>) plus the main
+# @bloxbean/mesmo package (see docs/adr/0012) on a v* tag via npm trusted publishing
 # (OIDC, no token secret). The build/validation jobs live in build-js-packages.yml (run on PRs by
 # publish-js-dry-run.yml); workflow_dispatch runs them here as a manual dry run (artifacts only,
 # publish skipped).
@@ -67,7 +67,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -eux
-          rm -f wrappers/js/libs/libccl.*
+          rm -f wrappers/js/libs/libmesmo.*
           NPM_TAG=latest
           case "$PKG_VERSION" in
             *-preview*|*-pre*|*-alpha*) NPM_TAG=preview ;;

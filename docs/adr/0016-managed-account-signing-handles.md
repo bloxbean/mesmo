@@ -51,10 +51,10 @@ material improvement.
 
 This decision interacts with three accepted ADRs:
 
-- [ADR-0002](0002-offline-stateless-no-provider.md) keeps `libccl` offline, stateless, and free of
+- [ADR-0002](0002-offline-stateless-no-provider.md) keeps `libmesmo` offline, stateless, and free of
   provider/network configuration. That rule remains. This ADR carves a narrow, explicit exception
   for caller-created, in-memory signing capabilities: it supersedes ADR-0002 only where ADR-0002
-  says that `libccl` holds no key/account state.
+  says that `libmesmo` holds no key/account state.
 - [ADR-0003](0003-four-language-wrappers-uniform-ffi.md) requires a common thin C ABI. Account objects
   must therefore be native resources surfaced idiomatically by thin wrappers, not four independent
   account implementations.
@@ -74,11 +74,11 @@ The C ABI will create/import an account once and return an opaque integer handle
 surface is:
 
 ```c
-ccl_account_create_handle(..., uint64_t *out_handle);
-ccl_account_open_mnemonic(..., uint64_t *out_handle);
-ccl_account_get_info(..., uint64_t handle);
-ccl_account_sign(..., uint64_t handle, const char *tx_cbor, uint32_t role_mask);
-ccl_account_close(..., uint64_t handle);
+mesmo_account_create_handle(..., uint64_t *out_handle);
+mesmo_account_open_mnemonic(..., uint64_t *out_handle);
+mesmo_account_get_info(..., uint64_t handle);
+mesmo_account_sign(..., uint64_t handle, const char *tx_cbor, uint32_t role_mask);
+mesmo_account_close(..., uint64_t handle);
 ```
 
 Exact names and result mechanics may change during implementation, but these invariants will not:
@@ -86,14 +86,14 @@ Exact names and result mechanics may change during implementation, but these inv
 - The handle is an opaque identifier, not a raw pointer exposed to wrappers.
 - Network, account index, and address index are fixed when the Account is opened. Signing takes a
   transaction and typed role selection, not mnemonic/network/path arguments.
-- Handles are scoped to one bridge/GraalVM isolate and allocated from a per-isolate randomized
-  62-bit space. Foreign, closed, and stale handles fail with a normal CCL error rather than
+- Handles are scoped to one Mesmo/GraalVM isolate and allocated from a per-isolate randomized
+  62-bit space. Foreign, closed, and stale handles fail with a normal Mesmo error rather than
   accessing another object — foreign-handle detection is *statistical* (collision odds ~2⁻⁶²), not
   structural; a fixed counter would make cross-isolate collisions certain and let a foreign handle
   silently alias a real account, which the wrong-pairing regression test pins against.
-- `close` is explicit and idempotent. Closing a bridge closes and clears all accounts that belong to
+- `close` is explicit and idempotent. Closing a Mesmo closes and clears all accounts that belong to
   it. Wrapper finalizers are fallback protection, never the primary lifecycle mechanism.
-- Go Account calls use the Bridge's existing dedicated OS-thread executor in accordance with
+- Go Account calls use the Mesmo's existing dedicated OS-thread executor in accordance with
   [ADR-0010](0010-go-isolate-thread-affinity.md).
 - Account objects expose public account metadata and operations such as payment/stake addresses,
   public keys, DRep/governance identifiers, and payment/stake/DRep/committee signing without
@@ -169,7 +169,7 @@ Each wrapper will expose an idiomatic transaction signer abstraction:
 | JavaScript/TypeScript | `Account` object | `close()` / `Symbol.dispose` | `TransactionSigner` interface |
 | Python | `Account` object/context manager | `close()` / `with` | `Protocol` or equivalent |
 | Rust | `Account` (owned handle) | `Drop` plus explicit close where useful | trait |
-| Go | `*Account` tied to `*Bridge` | explicit `Close()` | interface |
+| Go | `*Account` tied to `*Mesmo` | explicit `Close()` | interface |
 
 The following representative API sketches establish the intended ownership, lifecycle, and signing
 shape. Final names may change to remain idiomatic, but mnemonic/network/path arguments must not return
@@ -178,13 +178,13 @@ to the per-transaction signing call.
 #### JavaScript / TypeScript
 
 ```javascript
-const sender = bridge.accounts.fromMnemonic(mnemonic, TESTNET, {
+const sender = lib.accounts.fromMnemonic(mnemonic, TESTNET, {
   accountIndex: 0,
   addressIndex: 0,
 });
 
 try {
-  const built = bridge.quicktx.build(plan, utxos, protocolParams);
+  const built = lib.quicktx.build(plan, utxos, protocolParams);
   const signed = sender.signTx(built.tx_cbor);
 
   const governanceSigned = sender.signTx(built.tx_cbor, {
@@ -202,13 +202,13 @@ cannot guarantee removal of copies previously made as JavaScript strings.
 #### Python
 
 ```python
-with bridge.accounts.from_mnemonic(
+with lib.accounts.from_mnemonic(
     mnemonic,
     Network.TESTNET,
     account_index=0,
     address_index=0,
 ) as sender:
-    built = bridge.quicktx.build(plan, utxos, protocol_params)
+    built = lib.quicktx.build(plan, utxos, protocol_params)
     signed = sender.sign_tx(built["tx_cbor"])
 
     governance_signed = sender.sign_tx(
@@ -224,26 +224,26 @@ while documenting that earlier `str` and native copies may remain.
 #### Rust
 
 ```rust
-let sender = bridge.accounts().from_mnemonic(
+let sender = lib.accounts().from_mnemonic(
     &mnemonic,
     Network::Testnet,
     AccountPath::new(0, 0),
 )?;
 
-let built = bridge.quicktx().build(&plan, &utxos, &params, None)?;
+let built = lib.quicktx().build(&plan, &utxos, &params, None)?;
 let signed = sender.sign_tx(&built.tx_cbor, &[SigningRole::Payment])?;
 ```
 
-The Rust Account will be an **owned value holding shared ownership of the bridge's isolate state**
-(reference-counted internally), not a type that borrows the Bridge with a lifetime parameter
-(`Account<'bridge>`). Validity is enforced at runtime, exactly as the handle invariants above
-require for every wrapper: a call on an Account whose Bridge has been closed — or whose own handle
-was closed — fails with a normal CCL error rather than touching freed native memory. `Drop` closes
+The Rust Account will be an **owned value holding shared ownership of Mesmo's isolate state**
+(reference-counted internally), not a type that borrows the Mesmo with a lifetime parameter
+(`Account<'Mesmo>`). Validity is enforced at runtime, exactly as the handle invariants above
+require for every wrapper: a call on an Account whose Mesmo has been closed — or whose own handle
+was closed — fails with a normal Mesmo error rather than touching freed native memory. `Drop` closes
 the native handle; explicit close remains available.
 
-Rationale for owned over borrowed: a borrowed `Account<'bridge>` cannot be stored in the same
-struct as its `Bridge` (a self-referential borrow), which is precisely what long-lived applications
-want to do, and it forces `'static`/global-Bridge workarounds in threaded and async code. Owned
+Rationale for owned over borrowed: a borrowed `Account<'Mesmo>` cannot be stored in the same
+struct as its `Mesmo` (a self-referential borrow), which is precisely what long-lived applications
+want to do, and it forces `'static`/global-Mesmo workarounds in threaded and async code. Owned
 handles keep Rust's failure model identical to Python, Go, and JavaScript (same stale-handle error,
 same negative tests), and the choice is wrapper-internal: it can be revisited in a breaking crate
 release without touching the C ABI or other wrappers.
@@ -255,21 +255,21 @@ by this decision.
 #### Go
 
 ```go
-sender, err := bridge.Accounts.FromMnemonic(
+sender, err := lib.Accounts.FromMnemonic(
 	mnemonic,
-	ccl.Testnet,
-	ccl.AccountPath{Account: 0, Address: 0},
+	mesmo.Testnet,
+	mesmo.AccountPath{Account: 0, Address: 0},
 )
 if err != nil {
 	return err
 }
 defer sender.Close()
 
-built, err := bridge.QuickTx.Build(plan, utxos, params, nil)
+built, err := lib.QuickTx.Build(plan, utxos, params, nil)
 if err != nil {
 	return err
 }
-signed, err := sender.SignTx(built.TxCbor, ccl.Payment)
+signed, err := sender.SignTx(built.TxCbor, mesmo.Payment)
 ```
 
 Go will use a typed `SigningRole`, not variadic strings. Secret import/export should prefer a mutable
@@ -278,7 +278,7 @@ finalizer may only be a fallback.
 
 Implementations for hardware wallets, browser/CIP-30 wallets, KMS/remote services, and air-gapped
 workflows are outside the initial implementation, but the abstraction must allow them without
-requiring a mnemonic to enter `libccl`.
+requiring a mnemonic to enter `libmesmo`.
 
 ### QuickTx remains unsigned by default
 
@@ -334,7 +334,7 @@ all-wrapper release requirements in `RELEASING.md` and ADR-0015.
 
 Explicitly out of scope for this ADR are key persistence at rest, OS keychains, hardware-wallet
 protocol implementations, remote signer authentication, transaction submission, and network/provider
-state inside `libccl`.
+state inside `libmesmo`.
 
 ## Consequences
 
@@ -346,8 +346,8 @@ state inside `libccl`.
   browser, hardware, remote, multisig, and offline signers without redesigning transaction building.
 - **More accurate fee planning:** signer roles/count become part of build context instead of being
   inferred independently from the later signing call.
-- **Native state is introduced:** `libccl` must maintain an isolate-local resource registry, validate
-  handles, clean up deterministically, and test use-after-close and bridge-close behavior. This is an
+- **Native state is introduced:** `libmesmo` must maintain an isolate-local resource registry, validate
+  handles, clean up deterministically, and test use-after-close and Mesmo-close behavior. This is an
   intentional exception to the broad wording of ADR-0002, but it does not introduce network or
   provider state.
 - **Secrets live longer in one place:** a reusable Account retains signing authority until closed.
@@ -357,8 +357,8 @@ state inside `libccl`.
   copies prevent a universal guarantee. The design reduces exposure but does not provide an enclave.
 - **API and ABI migration cost:** core lifecycle code, four wrapper object models, tests, examples,
   documentation, and package versions must change together.
-- **Concurrency remains bridge-scoped:** accounts do not make a Bridge concurrently callable. In Go,
-  calls remain serialized on its isolate thread; other wrappers retain their existing Bridge rules.
+- **Concurrency remains Mesmo-scoped:** accounts do not make a Mesmo concurrently callable. In Go,
+  calls remain serialized on its isolate thread; other wrappers retain their existing Mesmo rules.
 - **Revisit if:** CCL adds a dedicated destroyable/zeroizing key container, GraalVM offers a safer
   cross-language object-handle mechanism, or supported external signers make native software-key
   custody unnecessary.

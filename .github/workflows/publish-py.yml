@@ -1,6 +1,6 @@
 name: Publish Python wheels
 
-# Publishes the platform wheels (one per supported target, each bundling that platform's libccl.*,
+# Publishes the platform wheels (one per supported target, each bundling that platform's libmesmo.*,
 # see docs/adr/0012-native-lib-bundled-in-wrapper-packages.md) to PyPI on a v* tag via PyPI trusted
 # publishing (OIDC — no API token secret). The build/validation jobs live in build-py-wheels.yml (run
 # on PRs by publish-py-dry-run.yml); workflow_dispatch runs them here as a manual dry run (artifacts

@@ -8,10 +8,10 @@ Each guide covers installation, a quick start, the full API reference, a transac
 
 | Language | Guide | Package |
 |---|---|---|
-| JavaScript (Bun) | [docs/js](js/README.md) | `@bloxbean/cardano-client-lib` (npm) |
-| Go | [docs/golang](golang/README.md) | `github.com/bloxbean/cardano-client-bindings/wrappers/go` |
-| Rust | [docs/rust](rust/README.md) | `cardano-client-lib` (crate, imported as `ccl`) |
-| Python | [docs/python](python/README.md) | `cardano-client-lib` (PyPI, imported as `ccl`) |
+| JavaScript (Bun) | [docs/js](js/README.md) | `@bloxbean/mesmo` (npm) |
+| Go | [docs/golang](golang/README.md) | `github.com/bloxbean/mesmo/wrappers/go` |
+| Rust | [docs/rust](rust/README.md) | `cardano-client-lib` (crate, imported as `mesmo`) |
+| Python | [docs/python](python/README.md) | `cardano-client-lib` (PyPI, imported as `mesmo`) |
 
 The four wrappers expose the same functionality with the same semantics — same API groups (account, address, crypto, tx, plutus, script, gov, wallet, quicktx), same error codes, same [TxPlan YAML](quicktx.md) transaction format — differing only in language idiom (see [ADR-0015](adr/0015-no-reference-wrapper-parity.md)).
 

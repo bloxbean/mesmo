@@ -3,7 +3,7 @@
 //! Each test builds an intent's TxPlan offline (from the shared `test-fixtures/quicktx-intents`
 //! fixtures, with the devnet's real UTXOs + protocol parameters), signs it with the right key roles,
 //! submits it to the devnet, and asserts the node accepted it (and, where meaningful, that the
-//! intended on-chain effect landed). This proves the bridge produces node-acceptable transactions —
+//! intended on-chain effect landed). This proves the lib produces node-acceptable transactions —
 //! not just buildable CBOR.
 //!
 //! Mirrors the Go `intents_integration_test.go` suite one-for-one, using the fixed intent account the
@@ -16,12 +16,12 @@
 //! - Native library built: ./gradlew :core:nativeCompile
 //!
 //! Run from wrappers/rust:
-//!   CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!     cargo test --features providers --test intents_integration_test -- --test-threads=1
 
 mod common;
 
-use ccl::Bridge;
+use mesmo::Mesmo;
 use common::*;
 use serde_json::json;
 
@@ -32,21 +32,21 @@ fn test_integration_managed_account_handle_sign_submit() {
     if skip_if_no_devkit() {
         return;
     }
-    use ccl::accounts::SigningRole;
-    let bridge = Bridge::new().expect("create bridge");
+    use mesmo::accounts::SigningRole;
+    let lib = Mesmo::new().expect("create lib");
     devkit_reset();
     wait_for_block();
     devkit_topup(INTENT_SENDER, 6000);
     wait_for_block();
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let pp = devnet_pp();
-    let built = bridge
+    let built = lib
         .quicktx()
         .build(&read_fixture("stake_registration.yaml"), &utxos, &pp, None, 1)
         .expect("build");
-    let acct = bridge
+    let acct = lib
         .accounts()
-        .from_mnemonic(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0)
+        .from_mnemonic(INTENT_MNEMONIC, mesmo::Network::Testnet, 0, 0)
         .expect("open account");
     let signed = acct
         .sign_tx(&built.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)
@@ -60,8 +60,8 @@ fn test_integration_stake_registration() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
-    build_sign_submit(&bridge, "stake_registration.yaml", None, &["payment", "stake"]);
+    let lib = Mesmo::new().expect("create lib");
+    build_sign_submit(&lib, "stake_registration.yaml", None, &["payment", "stake"]);
 }
 
 // Register a DRep (payment + drep witness). Mirrors TestIntegrationDRepRegistration.
@@ -70,8 +70,8 @@ fn test_integration_drep_registration() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
-    build_sign_submit(&bridge, "drep_registration.yaml", None, &["payment", "drep"]);
+    let lib = Mesmo::new().expect("create lib");
+    build_sign_submit(&lib, "drep_registration.yaml", None, &["payment", "drep"]);
 }
 
 // Negative test: a DRep registration certificate must be witnessed by the DRep key, so signing with
@@ -89,15 +89,15 @@ fn test_integration_drep_key_required() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let u = devkit_get_utxos(INTENT_SENDER);
-    let built = bridge
+    let built = lib
         .quicktx()
         .build(&read_fixture("drep_registration.yaml"), &u, &pp, None, 1)
         .expect("build");
 
     // Sign with the payment key ONLY (sign_tx), omitting the DRep-key witness.
-    let signed_payment_only = intent_sign(&bridge, &built.tx_cbor, &["payment"]);
+    let signed_payment_only = intent_sign(&lib, &built.tx_cbor, &["payment"]);
     if devkit_try_submit(&signed_payment_only).is_ok() {
         panic!(
             "the node accepted a DRep registration signed with the payment key only; \
@@ -121,7 +121,7 @@ fn test_integration_donation() {
     devkit_topup(INTENT_SENDER, 6000);
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let pp = devnet_pp();
     let base_yaml = read_fixture("donation.yaml");
@@ -133,8 +133,8 @@ fn test_integration_donation() {
             "current_treasury_value: 0",
             &format!("current_treasury_value: {}", treasury),
         );
-        let result = bridge.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build");
-        let signed = intent_sign(&bridge, &result.tx_cbor, &["payment"]);
+        let result = lib.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build");
+        let signed = intent_sign(&lib, &result.tx_cbor, &["payment"]);
         match devkit_try_submit(&signed) {
             Ok(tx_hash) => {
                 assert!(!tx_hash.is_empty(), "empty tx hash from submit");
@@ -166,13 +166,13 @@ fn test_integration_info_proposal() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let utxos = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &utxos, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &utxos, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let utxos2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("governance_proposal.yaml"), &utxos2, &pp, None, &["payment"]);
+    sign_submit(&lib, &read_fixture("governance_proposal.yaml"), &utxos2, &pp, None, &["payment"]);
 }
 
 // A transaction carrying transaction metadata. Mirrors TestIntegrationMetadata.
@@ -181,8 +181,8 @@ fn test_integration_metadata() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
-    build_sign_submit(&bridge, "metadata.yaml", None, &["payment"]);
+    let lib = Mesmo::new().expect("create lib");
+    build_sign_submit(&lib, "metadata.yaml", None, &["payment"]);
 }
 
 // Mint under an empty-ScriptAll native policy that needs no signature, so the fee payer alone can
@@ -192,8 +192,8 @@ fn test_integration_native_mint() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
-    build_sign_submit(&bridge, "minting.yaml", None, &["payment"]);
+    let lib = Mesmo::new().expect("create lib");
+    build_sign_submit(&lib, "minting.yaml", None, &["payment"]);
     assert_minted_asset_at(MINT_RECEIVER);
 }
 
@@ -204,9 +204,9 @@ fn test_integration_plutus_mint() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let exec = plutus_exec_units();
-    build_sign_submit(&bridge, "plutus/script_minting.yaml", Some(&exec), &["payment"]);
+    build_sign_submit(&lib, "plutus/script_minting.yaml", Some(&exec), &["payment"]);
     assert_minted_asset_at(MINT_RECEIVER);
 }
 
@@ -217,9 +217,9 @@ fn test_integration_voting_delegation() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     setup_then_submit(
-        &bridge,
+        &lib,
         "stake_registration.yaml",
         &["payment", "stake"],
         "voting_delegation.yaml",
@@ -233,9 +233,9 @@ fn test_integration_drep_update() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     setup_then_submit(
-        &bridge,
+        &lib,
         "drep_registration.yaml",
         &["payment", "drep"],
         "drep_update.yaml",
@@ -250,9 +250,9 @@ fn test_integration_drep_deregistration() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     setup_then_submit(
-        &bridge,
+        &lib,
         "drep_registration.yaml",
         &["payment", "drep"],
         "drep_deregistration.yaml",
@@ -274,17 +274,17 @@ fn test_integration_stake_withdrawal() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("voting_delegation.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("voting_delegation.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u3 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_withdrawal.yaml"), &u3, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_withdrawal.yaml"), &u3, &pp, None, &["payment", "stake"]);
 }
 
 // Cast a vote. A vote needs a registered DRep (the voter), a registered stake address (the proposal's
@@ -302,23 +302,23 @@ fn test_integration_voting() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("drep_registration.yaml"), &u, &pp, None, &["payment", "drep"]);
+    sign_submit(&lib, &read_fixture("drep_registration.yaml"), &u, &pp, None, &["payment", "drep"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     // Submit an info proposal; its build-result tx hash is the gov action id we vote on.
     let u3 = devkit_get_utxos(INTENT_SENDER);
-    let proposal = bridge
+    let proposal = lib
         .quicktx()
         .build(&read_fixture("governance_proposal.yaml"), &u3, &pp, None, 0)
         .expect("build proposal");
     let action_tx_hash = proposal.tx_hash.clone();
-    let signed_proposal = intent_sign(&bridge, &proposal.tx_cbor, &["payment"]);
+    let signed_proposal = intent_sign(&lib, &proposal.tx_cbor, &["payment"]);
     if let Err(e) = devkit_try_submit(&signed_proposal) {
         panic!("submit proposal: {}", e);
     }
@@ -327,7 +327,7 @@ fn test_integration_voting() {
     // Vote on the proposal we just submitted.
     let u4 = devkit_get_utxos(INTENT_SENDER);
     let vote_yaml = read_fixture("voting.yaml").replace(GOV_ACTION_PLACEHOLDER, &action_tx_hash);
-    sign_submit(&bridge, &vote_yaml, &u4, &pp, None, &["payment", "drep"]);
+    sign_submit(&lib, &vote_yaml, &u4, &pp, None, &["payment", "drep"]);
 }
 
 // Delegate stake to a pool. Register the stake address, register a pool keyed to the account, then
@@ -345,18 +345,18 @@ fn test_integration_stake_delegation() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u3 = devkit_get_utxos(INTENT_SENDER);
     let deleg_yaml = read_fixture("stake_delegation.yaml").replace(POOL_PLACEHOLDER, ACCOUNT_POOL_ID);
-    sign_submit(&bridge, &deleg_yaml, &u3, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &deleg_yaml, &u3, &pp, None, &["payment", "stake"]);
 }
 
 // Register a stake pool. The fixture keys the pool to the account's stake key (operator, owner,
@@ -367,9 +367,9 @@ fn test_integration_pool_registration() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     setup_then_submit(
-        &bridge,
+        &lib,
         "stake_registration.yaml",
         &["payment", "stake"],
         "pool_registration.yaml",
@@ -391,11 +391,11 @@ fn test_integration_plutus_spend() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     // Step 1: lock 10 ADA at the script address with the datum hash.
     let utxos = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("plutus/plutus_lock.yaml"), &utxos, &pp, None, &["payment"]);
+    sign_submit(&lib, &read_fixture("plutus/plutus_lock.yaml"), &utxos, &pp, None, &["payment"]);
     wait_for_block();
 
     // Step 2: find the locked UTXO at the script address.
@@ -429,7 +429,7 @@ fn test_integration_plutus_spend() {
     }
 
     let exec = plutus_exec_units();
-    sign_submit(&bridge, &spend_yaml, &spend_utxos, &pp, Some(&exec), &["payment"]);
+    sign_submit(&lib, &spend_yaml, &spend_utxos, &pp, Some(&exec), &["payment"]);
 
     // Confirm the spend actually consumed the locked script UTXO.
     assert_utxo_consumed(SCRIPT_ADDR, &lock_hash);
@@ -443,9 +443,9 @@ fn test_integration_stake_deregistration() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     setup_then_submit(
-        &bridge,
+        &lib,
         "stake_registration.yaml",
         &["payment", "stake"],
         "stake_deregistration.yaml",
@@ -468,13 +468,13 @@ fn test_integration_pool_retirement() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let epoch = devkit_current_epoch();
@@ -483,7 +483,7 @@ fn test_integration_pool_retirement() {
         .replace("retirement_epoch: 500", &format!("retirement_epoch: {}", epoch + 2));
 
     let u3 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &retire_yaml, &u3, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &retire_yaml, &u3, &pp, None, &["payment", "stake"]);
 }
 
 // The Aiken redeemer_check validator (test-fixtures/aiken/redeemer-check) passes iff the redeemer
@@ -493,14 +493,14 @@ fn test_integration_aiken_mint_accepts() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let exec = plutus_exec_units();
-    build_sign_submit(&bridge, "plutus/aiken_mint_pass.yaml", Some(&exec), &["payment"]);
+    build_sign_submit(&lib, "plutus/aiken_mint_pass.yaml", Some(&exec), &["payment"]);
     assert_minted_asset_at(MINT_RECEIVER);
 }
 
 // Negative validation: redeemer 0 makes the same validator evaluate to false, so phase-2 validation
-// fails and the node must reject the tx. Exec units are supplied manually — the bridge's
+// fails and the node must reject the tx. Exec units are supplied manually — the lib's
 // StaticTransactionEvaluator stamps them without running the script, which is exactly what lets a
 // validation-failing tx reach the node.
 #[test]
@@ -514,14 +514,14 @@ fn test_integration_aiken_mint_rejects() {
     wait_for_block();
     let pp = devnet_pp();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let exec = plutus_exec_units();
-    let result = bridge
+    let result = lib
         .quicktx()
         .build(&read_fixture("plutus/aiken_mint_fail.yaml"), &utxos, &pp, Some(&exec), 0)
         .expect("build");
-    let signed = intent_sign(&bridge, &result.tx_cbor, &["payment"]);
+    let signed = intent_sign(&lib, &result.tx_cbor, &["payment"]);
     assert!(
         devkit_try_submit(&signed).is_err(),
         "the node accepted a mint whose validator must reject (redeemer 0); \
@@ -539,16 +539,16 @@ fn test_integration_stake_deposit_round_trip() {
     }
     let pp = reset_and_fund(6000);
     let key_deposit = pp_lovelace(&pp, "key_deposit");
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let start = balance_at(INTENT_SENDER);
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    let fee1 = sign_submit_fee(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    let fee1 = sign_submit_fee(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
     assert_eq!(balance_at(INTENT_SENDER), start - fee1 - key_deposit);
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    let fee2 = sign_submit_fee(&bridge, &read_fixture("stake_deregistration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    let fee2 = sign_submit_fee(&lib, &read_fixture("stake_deregistration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
     assert_eq!(balance_at(INTENT_SENDER), start - fee1 - fee2); // deposit refunded
 }
@@ -561,11 +561,11 @@ fn test_integration_drep_deposit_effect() {
     }
     let pp = reset_and_fund(6000);
     let drep_deposit = pp_lovelace(&pp, "drep_deposit");
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let start = balance_at(INTENT_SENDER);
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    let fee = sign_submit_fee(&bridge, &read_fixture("drep_registration.yaml"), &u, &pp, None, &["payment", "drep"]);
+    let fee = sign_submit_fee(&lib, &read_fixture("drep_registration.yaml"), &u, &pp, None, &["payment", "drep"]);
     wait_for_block();
     assert_eq!(balance_at(INTENT_SENDER), start - fee - drep_deposit);
 }
@@ -580,15 +580,15 @@ fn test_integration_proposal_deposit_effect() {
     let pp = reset_and_fund(6000);
     let key_deposit = pp_lovelace(&pp, "key_deposit");
     let gov_deposit = pp_lovelace(&pp, "gov_action_deposit");
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let start = balance_at(INTENT_SENDER);
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    let fee1 = sign_submit_fee(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    let fee1 = sign_submit_fee(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    let fee2 = sign_submit_fee(&bridge, &read_fixture("governance_proposal.yaml"), &u2, &pp, None, &["payment"]);
+    let fee2 = sign_submit_fee(&lib, &read_fixture("governance_proposal.yaml"), &u2, &pp, None, &["payment"]);
     wait_for_block();
 
     assert_eq!(balance_at(INTENT_SENDER), start - fee1 - key_deposit - fee2 - gov_deposit);
@@ -603,15 +603,15 @@ fn test_integration_pool_deposit_effect() {
     let pp = reset_and_fund(6000);
     let key_deposit = pp_lovelace(&pp, "key_deposit");
     let pool_deposit = pp_lovelace(&pp, "pool_deposit");
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let start = balance_at(INTENT_SENDER);
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    let fee1 = sign_submit_fee(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    let fee1 = sign_submit_fee(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    let fee2 = sign_submit_fee(&bridge, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    let fee2 = sign_submit_fee(&lib, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     assert_eq!(balance_at(INTENT_SENDER), start - fee1 - key_deposit - fee2 - pool_deposit);
@@ -626,7 +626,7 @@ fn test_integration_collect_from() {
         return;
     }
     let pp = reset_and_fund(6000);
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let target_hash = utxos[0]["tx_hash"].as_str().expect("utxo tx_hash").to_string();
@@ -636,7 +636,7 @@ fn test_integration_collect_from() {
     if target_idx != 0 {
         yaml = yaml.replacen("output_index: 0", &format!("output_index: {}", target_idx), 1);
     }
-    sign_submit(&bridge, &yaml, &utxos, &pp, None, &["payment"]);
+    sign_submit(&lib, &yaml, &utxos, &pp, None, &["payment"]);
 }
 
 // reference_input: a read-only reference input (CIP-31) must resolve to a real UTXO; fund the
@@ -652,7 +652,7 @@ fn test_integration_reference_input() {
     devkit_topup(INTENT_SENDER2, 5);
     wait_for_block();
     let pp = devnet_pp();
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     let ref_utxos = devkit_get_utxos(INTENT_SENDER2);
     let ref_hash = ref_utxos[0]["tx_hash"].as_str().expect("ref tx_hash").to_string();
@@ -660,7 +660,7 @@ fn test_integration_reference_input() {
     let yaml = read_fixture("reference_input.yaml").replace(&"c".repeat(64), &ref_hash);
 
     let utxos = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &yaml, &utxos, &pp, None, &["payment"]);
+    sign_submit(&lib, &yaml, &utxos, &pp, None, &["payment"]);
     wait_for_block();
 
     assert_eq!(balance_at(INTENT_SENDER2), ref_balance); // referenced, not spent
@@ -678,15 +678,15 @@ fn test_integration_native_script_spend() {
         return;
     }
     let pp = reset_and_fund(6000);
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     // Build a native script the sender's payment key satisfies, and its script address.
     let info: serde_json::Value =
-        serde_json::from_str(&bridge.address().info(INTENT_SENDER).expect("address info"))
+        serde_json::from_str(&lib.address().info(INTENT_SENDER).expect("address info"))
             .expect("parse info");
     let key_hash = info["payment_credential_hash"].as_str().expect("payment cred");
     let script: serde_json::Value = serde_json::from_str(
-        &bridge
+        &lib
             .script()
             .native_from_json(&format!(r#"{{"type":"sig","keyHash":"{}"}}"#, key_hash))
             .expect("native script"),
@@ -696,7 +696,7 @@ fn test_integration_native_script_spend() {
     // native_from_json's cbor_hex is the hash preimage (leading 0x00 language tag); the TxPlan
     // native_script block wants the bare script CBOR.
     let cbor_hex = &script["cbor_hex"].as_str().expect("cbor_hex")[2..];
-    let script_address = bridge
+    let script_address = lib
         .address()
         .from_bytes(&format!("70{}", script_hash)) // testnet script enterprise
         .expect("script address");
@@ -720,7 +720,7 @@ transaction:
         script_address = script_address
     );
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &lock_yaml, &u, &pp, None, &["payment"]);
+    sign_submit(&lib, &lock_yaml, &u, &pp, None, &["payment"]);
     wait_for_block();
 
     // Step 2: spend the locked UTXO with the native script attached.
@@ -766,7 +766,7 @@ transaction:
             .clone(),
     );
     let spend_utxos = serde_json::Value::Array(spend_utxos);
-    sign_submit_n(&bridge, &spend_yaml, &spend_utxos, &pp, None, &["payment"], 1);
+    sign_submit_n(&lib, &spend_yaml, &spend_utxos, &pp, None, &["payment"], 1);
 
     assert_utxo_consumed(&script_address, &lock_hash);
 }
@@ -778,18 +778,18 @@ fn test_integration_pool_update() {
         return;
     }
     let pp = reset_and_fund(6000);
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("stake_registration.yaml"), &u, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("pool_registration.yaml"), &u2, &pp, None, &["payment", "stake"]);
     wait_for_block();
 
     let u3 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(&bridge, &read_fixture("pool_update.yaml"), &u3, &pp, None, &["payment", "stake"]);
+    sign_submit(&lib, &read_fixture("pool_update.yaml"), &u3, &pp, None, &["payment", "stake"]);
 }
 
 // compose: two senders' intents composed into ONE transaction, signed once per sender's payment
@@ -805,7 +805,7 @@ fn test_integration_compose_two_senders() {
     devkit_topup(INTENT_SENDER2, 6000);
     wait_for_block();
     let pp = devnet_pp();
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
 
     let mut utxos = devkit_get_utxos(INTENT_SENDER)
         .as_array()
@@ -819,12 +819,12 @@ fn test_integration_compose_two_senders() {
     );
     let utxos = serde_json::Value::Array(utxos);
 
-    let result = bridge
+    let result = lib
         .quicktx()
         .build(&read_fixture("compose.yaml"), &utxos, &pp, None, 0)
         .expect("build");
-    let once = intent_sign(&bridge, &result.tx_cbor, &["payment"]);
-    let twice = intent_sign_at(&bridge, 1, &once, &["payment"]);
+    let once = intent_sign(&lib, &result.tx_cbor, &["payment"]);
+    let twice = intent_sign_at(&lib, 1, &once, &["payment"]);
     devkit_try_submit(&twice).expect("submit");
     wait_for_block();
 
@@ -833,7 +833,7 @@ fn test_integration_compose_two_senders() {
 }
 
 // The offline Scalus evaluator is the DEFAULT costing path: when a caller supplies no execution
-// units, libccl computes them in-process (ADR-0013). Every other Plutus test supplies units
+// units, libmesmo computes them in-process (ADR-0013). Every other Plutus test supplies units
 // manually (they must, to submit a failing script), so this is the only test proving the node
 // accepts Scalus-computed budgets end-to-end — the path out-of-the-box users are on.
 #[test]
@@ -841,7 +841,7 @@ fn test_integration_scalus_computed_units() {
     if skip_if_no_devkit() {
         return;
     }
-    let bridge = Bridge::new().expect("create bridge");
-    build_sign_submit(&bridge, "plutus/script_minting.yaml", None, &["payment"]);
+    let lib = Mesmo::new().expect("create lib");
+    build_sign_submit(&lib, "plutus/script_minting.yaml", None, &["payment"]);
     assert_minted_asset_at(MINT_RECEIVER);
 }

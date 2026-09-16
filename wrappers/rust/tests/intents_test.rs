@@ -5,10 +5,10 @@
 //! Mirrors the Go `intents_test.go` for cross-wrapper parity.
 //!
 //! Run from wrappers/rust:
-//!   CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!     cargo test --test intents_test -- --test-threads=1
 
-use ccl::Bridge;
+use mesmo::Mesmo;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -48,7 +48,7 @@ fn utxos() -> Value {
 
 #[test]
 fn intents_build_e2e() {
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let pp = protocol_params();
     let u = utxos();
 
@@ -59,7 +59,7 @@ fn intents_build_e2e() {
             continue;
         }
         let yaml = fs::read_to_string(&path).unwrap();
-        let result = bridge
+        let result = lib
             .quicktx()
             .build(&yaml, &u, &pp, None, 1)
             .unwrap_or_else(|e| panic!("build {:?}: {:?}", path.file_name().unwrap(), e));
@@ -72,20 +72,20 @@ fn intents_build_e2e() {
 
 #[test]
 fn plutus_mint_e2e() {
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let yaml = fs::read_to_string(fixtures_dir().join("plutus/script_minting.yaml")).unwrap();
     let u = json!([{"tx_hash": "a".repeat(64), "output_index": 0, "address": SENDER,
                     "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]);
     let exec = json!([{"mem": 2000000, "steps": 500000000}]);
 
-    let result = bridge.quicktx().build(&yaml, &u, &protocol_params(), Some(&exec), 0).expect("mint");
+    let result = lib.quicktx().build(&yaml, &u, &protocol_params(), Some(&exec), 0).expect("mint");
     assert_eq!(result.tx_hash.len(), 64);
-    assert!(bridge.quicktx().build(&yaml, &u, &protocol_params(), None, 0).is_err());
+    assert!(lib.quicktx().build(&yaml, &u, &protocol_params(), None, 0).is_err());
 }
 
 #[test]
 fn plutus_spend_e2e() {
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let yaml = fs::read_to_string(fixtures_dir().join("plutus/script_collect_from.yaml")).unwrap();
     let u = json!([
         {"tx_hash": SCRIPT_TX_HASH, "output_index": 0, "address": SCRIPT_ADDR,
@@ -95,7 +95,7 @@ fn plutus_spend_e2e() {
     ]);
     let exec = json!([{"mem": 2000000, "steps": 500000000}]);
 
-    let result = bridge.quicktx().build(&yaml, &u, &protocol_params(), Some(&exec), 0).expect("spend");
+    let result = lib.quicktx().build(&yaml, &u, &protocol_params(), Some(&exec), 0).expect("spend");
     assert_eq!(result.tx_hash.len(), 64);
-    assert!(bridge.quicktx().build(&yaml, &u, &protocol_params(), None, 0).is_err());
+    assert!(lib.quicktx().build(&yaml, &u, &protocol_params(), None, 0).is_err());
 }

@@ -1,18 +1,18 @@
 # JavaScript API Reference
 
-All functionality hangs off a `CclBridge` instance. Import what you need from the package root:
+All functionality hangs off a `Mesmo` instance. Import what you need from the package root:
 
 ```js
 import {
-  CclBridge, CclError, CclClosedError,
+  Mesmo, MesmoError, MesmoClosedError,
   MAINNET, TESTNET,
   YaciProvider, BlockfrostProvider, BlockfrostEvaluator,
-} from "@bloxbean/cardano-client-lib";
+} from "@bloxbean/mesmo";
 ```
 
 The package ships TypeScript definitions (`index.d.ts`) for every class, method, and result shape shown below.
 
-## CclBridge
+## Mesmo
 
 ```ts
 constructor(libPath?: string)
@@ -21,15 +21,15 @@ close(): void
 [Symbol.dispose](): void
 ```
 
-Constructing a bridge loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`, `bridge.script`, `bridge.quicktx`.
+Constructing a Mesmo loads the native library (see [resolution order](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`, `lib.script`, `lib.quicktx`.
 
-**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
+**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
 
 ```js
-using bridge = new CclBridge();   // closed automatically at end of scope
+using lib = new Mesmo();   // closed automatically at end of scope
 ```
 
-**Threading.** A bridge is bound to the thread that created it. In Bun's single-threaded model this rarely matters; if you use workers, create one bridge per worker.
+**Threading.** A Mesmo is bound to the thread that created it. In Bun's single-threaded model this rarely matters; if you use workers, create one Mesmo per worker.
 
 ## Networks
 
@@ -46,45 +46,45 @@ Every method that derives keys (`account.*`, `wallet.*`, `gov.*`) requires a `ne
 
 | Class | When |
 |---|---|
-| `CclError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
-| `CclClosedError` | Any API call after `close()`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
+| `MesmoClosedError` | Any API call after `close()`. |
 | `TypeError` / `RangeError` | Missing / out-of-range `network` argument. |
 | `Error` | Library load failure, isolate creation failure, version mismatch, provider HTTP failures. |
 
-Error codes on `CclError.code`:
+Error codes on `MesmoError.code`:
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
 
 Validation-style methods (`address.validate`, `crypto.validateMnemonic`, `crypto.verify`) return `false` instead of throwing.
 
-## bridge.accounts — managed accounts
+## lib.accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
 
 ```javascript
-import { SigningRole } from '@bloxbean/cardano-client-lib';
+import { SigningRole } from '@bloxbean/mesmo';
 
-const acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);   // or bridge.accounts.create(...)
+const acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);   // or lib.accounts.create(...)
 try {
   acct.info;                                     // public data only — never the mnemonic
   const signed = acct.signTx(txCbor, SigningRole.PAYMENT | SigningRole.STAKE);
 } finally {
   acct.close();                                  // or: using acct = ... (Symbol.dispose)
 }
-// after close: further use throws CclError with code -11
+// after close: further use throws MesmoError with code -11
 ```
 
 - `fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0)` — the mnemonic crosses the
@@ -104,7 +104,7 @@ try {
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.address
+## lib.address
 
 ```ts
 info(bech32: string): AddressInfo
@@ -115,7 +115,7 @@ fromBytes(hexBytes: string): string // bech32
 
 `AddressInfo` = `{ type, network_id, payment_credential_hash?, delegation_credential_hash?, is_pubkey_payment, is_script_payment }`. `type` is e.g. `"Base"`, `"Enterprise"`, `"Pointer"`, `"Reward"`. `network_id` is the genuine on-chain id (mainnet = 1).
 
-## bridge.crypto
+## lib.crypto
 
 ```ts
 blake2b256(dataHex: string): string
@@ -135,12 +135,12 @@ accept for registration). Key derivation is network-independent. Prefer managed
 accounts for signing — handles never expose key bytes.
 
 ```js
-const digest = bridge.crypto.blake2b256("48656c6c6f");          // "Hello"
-const sk = bridge.crypto.deriveKey(mnemonic).private_key; // pass the extended key whole
-const sig = bridge.crypto.sign("68656c6c6f", sk);
+const digest = lib.crypto.blake2b256("48656c6c6f");          // "Hello"
+const sk = lib.crypto.deriveKey(mnemonic).private_key; // pass the extended key whole
+const sig = lib.crypto.sign("68656c6c6f", sk);
 ```
 
-## bridge.tx
+## lib.tx
 
 ```ts
 hash(txCborHex: string): string
@@ -152,7 +152,7 @@ deserialize(txCborHex: string): TransactionJson   // parsed object
 
 `toJson` returns a JSON **string**; `deserialize` returns the parsed object (with a `body` field holding inputs/outputs/fee). `signWithSecretKey` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `account.signTx`.
 
-## bridge.plutus
+## lib.plutus
 
 ```ts
 dataHash(datumCborHex: string): string    // 64 hex chars
@@ -161,10 +161,10 @@ dataFromJson(json: string): string        // CBOR hex
 ```
 
 ```js
-bridge.plutus.dataHash("182a");   // hash of PlutusData int 42
+lib.plutus.dataHash("182a");   // hash of PlutusData int 42
 ```
 
-## bridge.script
+## lib.script
 
 ```ts
 nativeFromJson(json: string): string           // JSON: { policy_id, script_hash, cbor_hex }
@@ -174,7 +174,7 @@ hash(scriptCborHex: string, scriptType = 0): string
 `scriptType`: `0` native, `1` PlutusV1, `2` PlutusV2, `3` PlutusV3.
 
 ```js
-const script = JSON.parse(bridge.script.nativeFromJson(JSON.stringify({ type: "sig", keyHash })));
+const script = JSON.parse(lib.script.nativeFromJson(JSON.stringify({ type: "sig", keyHash })));
 // script.policy_id, script.script_hash, script.cbor_hex
 ```
 
@@ -182,11 +182,11 @@ const script = JSON.parse(bridge.script.nativeFromJson(JSON.stringify({ type: "s
 
 There is no separate gov/wallet API. Governance *identity* (DRep id, committee ids and credentials)
 is public data on `acct.info`; governance *signing* uses `signTx` with the `DREP`/`COMMITTEE_*`
-roles; raw governance key material comes from `bridge.crypto.deriveKey`. An HD wallet is one
+roles; raw governance key material comes from `lib.crypto.deriveKey`. An HD wallet is one
 recovery phrase with one managed handle per CIP-1852 payment leaf — pass `addressIndex` to
-`bridge.accounts.fromMnemonic` to enumerate addresses.
+`lib.accounts.fromMnemonic` to enumerate addresses.
 
-## bridge.quicktx
+## lib.quicktx
 
 ```ts
 build(txplanYaml: string, utxos: Utxo[], protocolParams: ProtocolParams,
@@ -206,8 +206,8 @@ buildWith(txplanYaml: string, provider: ChainDataProvider, senders: string[],
 - **`buildWith`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```js
-const result = bridge.quicktx.build(yaml, utxos, params);
-const plutusResult = bridge.quicktx.build(yaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
+const result = lib.quicktx.build(yaml, utxos, params);
+const plutusResult = lib.quicktx.build(yaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
 ```
 
 ## Utility exports

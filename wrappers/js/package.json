@@ -1,16 +1,16 @@
 {
-  "name": "@bloxbean/cardano-client-lib",
+  "name": "@bloxbean/mesmo",
   "version": "0.1.0-pre6",
   "description": "JavaScript bindings for Cardano Client Lib (CCL) via GraalVM native library",
   "license": "MIT",
-  "homepage": "https://github.com/bloxbean/cardano-client-bindings",
+  "homepage": "https://github.com/bloxbean/mesmo",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bloxbean/cardano-client-bindings.git",
+    "url": "git+https://github.com/bloxbean/mesmo.git",
     "directory": "wrappers/js"
   },
   "bugs": {
-    "url": "https://github.com/bloxbean/cardano-client-bindings/issues"
+    "url": "https://github.com/bloxbean/mesmo/issues"
   },
   "author": "bloxbean",
   "keywords": [
@@ -27,7 +27,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "bun test test/ccl.test.js",
+    "test": "bun test test/mesmo.test.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -35,11 +35,11 @@
     "yaml": "^2.3.0"
   },
   "optionalDependencies": {
-    "@bloxbean/cardano-client-lib-linux-x86_64": "0.1.0-pre6",
-    "@bloxbean/cardano-client-lib-linux-aarch64": "0.1.0-pre6",
-    "@bloxbean/cardano-client-lib-linux-musl-x86_64": "0.1.0-pre6",
-    "@bloxbean/cardano-client-lib-macos-aarch64": "0.1.0-pre6",
-    "@bloxbean/cardano-client-lib-windows-x86_64": "0.1.0-pre6"
+    "@bloxbean/mesmo-linux-x86_64": "0.1.0-pre6",
+    "@bloxbean/mesmo-linux-aarch64": "0.1.0-pre6",
+    "@bloxbean/mesmo-linux-musl-x86_64": "0.1.0-pre6",
+    "@bloxbean/mesmo-macos-aarch64": "0.1.0-pre6",
+    "@bloxbean/mesmo-windows-x86_64": "0.1.0-pre6"
   },
   "engines": {
     "bun": ">=1.0.0"

@@ -1,4 +1,4 @@
-# ADR-0002: Offline, stateless bridge — caller-supplied chain data, no HTTP provider in libccl
+# ADR-0002: Offline, stateless Mesmo — caller-supplied chain data, no HTTP provider in libmesmo
 
 - **Status:** Accepted
 - **Date:** 2026-02-11
@@ -14,16 +14,16 @@ every host language already has excellent HTTP clients.
 
 ## Decision
 
-`libccl` is **offline, stateless, and side-effect-free**: it makes no network calls and never submits.
+`libmesmo` is **offline, stateless, and side-effect-free**: it makes no network calls and never submits.
 The **caller supplies all chain data** as explicit inputs (UTxOs, protocol parameters; exec units for
 Plutus). One deliberate, narrow exception to statelessness exists — managed Account handles
-([ADR-0016](0016-managed-account-signing-handles.md)): `libccl` may hold caller-created, in-memory
+([ADR-0016](0016-managed-account-signing-handles.md)): `libmesmo` may hold caller-created, in-memory
 signing capabilities (account-level keys) behind opaque handles, scoped to one isolate and released
 by an explicit `close`. Everything else stands: no network calls, no providers, no configuration,
 caller-supplied chain data, no submission. HTTP provider modules are **out of scope for the native
 lib**. Optional convenience helpers
 that *fetch* this data may live in the **wrappers** ([ADR-0003](0003-four-language-wrappers-uniform-ffi.md)),
-using each language's own HTTP client — never inside `libccl`.
+using each language's own HTTP client — never inside `libmesmo`.
 
 ## Consequences
 
@@ -39,6 +39,6 @@ using each language's own HTTP client — never inside `libccl`.
 
 ## Alternatives considered
 
-- **Built-in HTTP provider in libccl** — rejected: state, networking, and secrets inside an FFI lib.
+- **Built-in HTTP provider in libmesmo** — rejected: state, networking, and secrets inside an FFI lib.
 - **Provider as a separate native module** — possible future, but wrapper-side helpers are preferred
   to keep the core pure.

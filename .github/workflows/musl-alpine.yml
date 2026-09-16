@@ -1,6 +1,6 @@
 name: musl / Alpine lib
 
-# Builds + guards the musl variant of libccl.so, so it loads and runs on Alpine / musl-based images
+# Builds + guards the musl variant of libmesmo.so, so it loads and runs on Alpine / musl-based images
 # (the common Docker base) — the glibc-baseline .so (portable-linux-lib.yml) cannot load there.
 #
 # native-image's musl support is documented for static executables; it also works for our shared
@@ -21,7 +21,7 @@ on:
 
 jobs:
   musl:
-    name: Build libccl.so (musl, x86_64) + run on Alpine
+    name: Build libmesmo.so (musl, x86_64) + run on Alpine
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -52,13 +52,13 @@ jobs:
           sudo make install
           sudo cp /usr/local/musl/lib/libz.a /usr/lib/x86_64-linux-musl/ 2>/dev/null || true
 
-      - name: Build libccl.so against musl (--libc=musl)
+      - name: Build libmesmo.so against musl (--libc=musl)
         run: ./gradlew :core:nativeCompile -PmuslBuild --no-daemon --stacktrace
 
       - name: Inspect the built .so
         run: |
           set -eux
-          SO=core/build/native/nativeCompile/libccl.so
+          SO=core/build/native/nativeCompile/libmesmo.so
           file "$SO"
           # musl links libc.so (glibc would be libc.so.6); assert it's the musl variant.
           readelf -d "$SO" | grep -E 'NEEDED'
@@ -67,24 +67,24 @@ jobs:
       - name: Functional run test (create isolate + call an entry point) on Alpine
         run: |
           set -eux
-          # A real run, not just dlopen: bring up the GraalVM isolate and call ccl_version.
+          # A real run, not just dlopen: bring up the GraalVM isolate and call mesmo_version.
           cat > musl_smoke.c <<'C'
           #include <dlfcn.h>
           #include <stdio.h>
           typedef int  (*create_isolate_t)(void*, void**, void**);
-          typedef int  (*ccl_version_t)(void*);
-          typedef char*(*ccl_get_result_t)(void*);
+          typedef int  (*mesmo_version_t)(void*);
+          typedef char*(*mesmo_get_result_t)(void*);
           int main(void) {
-            void *h = dlopen("/out/libccl.so", RTLD_NOW);
+            void *h = dlopen("/out/libmesmo.so", RTLD_NOW);
             if (!h) { printf("FAIL dlopen: %s\n", dlerror()); return 1; }
             create_isolate_t create = (create_isolate_t)dlsym(h, "graal_create_isolate");
-            ccl_version_t version   = (ccl_version_t)dlsym(h, "ccl_version");
-            ccl_get_result_t result = (ccl_get_result_t)dlsym(h, "ccl_get_result");
+            mesmo_version_t version   = (mesmo_version_t)dlsym(h, "mesmo_version");
+            mesmo_get_result_t result = (mesmo_get_result_t)dlsym(h, "mesmo_get_result");
             if (!create || !version || !result) { printf("FAIL dlsym\n"); return 1; }
             void *iso = 0, *thr = 0;
             if (create(0, &iso, &thr) != 0) { printf("FAIL create_isolate\n"); return 1; }
-            if (version(thr) != 0)          { printf("FAIL ccl_version\n"); return 1; }
-            printf("OK: libccl runs on Alpine/musl — version=%s\n", result(thr));
+            if (version(thr) != 0)          { printf("FAIL mesmo_version\n"); return 1; }
+            printf("OK: libmesmo runs on Alpine/musl — version=%s\n", result(thr));
             return 0;
           }
           C
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -eux
           # Proves the wrapper auto-selection end-to-end on a real musl system: the loaders must
-          # resolve slug=linux-musl-x86_64 and load the musl lib with NO CCL_LIB_PATH. The lib is
+          # resolve slug=linux-musl-x86_64 and load the musl lib with NO MESMO_LIB_PATH. The lib is
           # seeded (Go cache) / in-tree (Rust) here, standing in for the release download.
           docker run --rm -v "$PWD:/w" -w /w \
             -v "$PWD/core/build/native/nativeCompile:/out" alpine:3.20 sh -c '
@@ -110,23 +110,23 @@ jobs:
               # the example loads the seeded musl lib with no env vars. Read the cache dir from the
               # wrapper'"'"'s own pinned version rather than hardcoding it, so a version bump cannot
               # silently turn this into a network download (or a miss) without anyone noticing.
-              GOVER=$(sed -n '"'"'s/.*defaultLibVersion = "\(.*\)".*/\1/p'"'"' wrappers/go/ccl/loader.go)
-              CACHE="$HOME/.cache/cardano-client-bindings/$GOVER"
-              mkdir -p "$CACHE"; cp /out/libccl.so "$CACHE/libccl.so"
+              GOVER=$(sed -n '"'"'s/.*defaultLibVersion = "\(.*\)".*/\1/p'"'"' wrappers/go/mesmo/loader.go)
+              CACHE="$HOME/.cache/mesmo/$GOVER"
+              mkdir -p "$CACHE"; cp /out/libmesmo.so "$CACHE/libmesmo.so"
               ( cd wrappers/go
-                env -u CCL_LIB_PATH go test -run "PlatformSlug|Musl" ./ccl/
-                env -u CCL_LIB_PATH CGO_ENABLED=0 go run ./examples/account | head -1 )
+                env -u MESMO_LIB_PATH go test -run "PlatformSlug|Musl" ./mesmo/
+                env -u MESMO_LIB_PATH CGO_ENABLED=0 go run ./examples/account | head -1 )
 
               # Rust — build-time musl detection: Alpine targets x86_64-unknown-linux-musl, so build.rs
               # picks linux-musl-x86_64; it uses the in-tree musl lib and the example runs.
               ( cd wrappers/rust
-                env -u CCL_LIB_PATH cargo run --quiet --example account | head -1 )
+                env -u MESMO_LIB_PATH cargo run --quiet --example account | head -1 )
 
-              echo "OK: Go + Rust auto-selected + ran the musl libccl on Alpine, no CCL_LIB_PATH"
+              echo "OK: Go + Rust auto-selected + ran the musl libmesmo on Alpine, no MESMO_LIB_PATH"
             '
 
       # Python and JS are the two wrappers that *bundle* the lib rather than fetching it from the
-      # release, so a musl libccl existing on the release does nothing for them — they need a musl
+      # release, so a musl libmesmo existing on the release does nothing for them — they need a musl
       # artifact of their own (a musllinux wheel; a linux-musl-x86_64 npm package). Both are now
       # built, and these steps prove they actually work on Alpine, which is the only way to know the
       # artifact is right rather than merely present.
@@ -139,14 +139,14 @@ jobs:
               apk add --no-cache python3 py3-pip >/dev/null
 
               # Bundle the musl lib exactly as the wheel build does, then build + install + load the
-              # wheel on Alpine. This proves the musl libccl works through the wheel path — the thing
+              # wheel on Alpine. This proves the musl libmesmo works through the wheel path — the thing
               # that was missing. It deliberately does NOT assert a musllinux_* platform tag: `python
               # -m build` emits the legacy linux_x86_64 tag, and the PEP 600 musllinux tag (which
               # PyPI requires) is applied by auditwheel at *publish* time — same as manylinux for the
               # glibc wheels, and same as this repos existing glibc wheel verification, which asserts
               # load, not tag. That repair step belongs to the Python publish workflow (PR #15).
-              mkdir -p wrappers/python/ccl/_libs
-              cp /out/libccl.so wrappers/python/ccl/_libs/libccl.so
+              mkdir -p wrappers/python/mesmo/_libs
+              cp /out/libmesmo.so wrappers/python/mesmo/_libs/libmesmo.so
 
               # --no-isolation builds with *this* venv backend, so setuptools+wheel must be present
               # here (installing only `build` leaves "Cannot import setuptools.build_meta").
@@ -163,7 +163,7 @@ jobs:
               # single-quoted docker sh -c.
               python3 -m venv /tmp/wheelvenv
               /tmp/wheelvenv/bin/pip install --quiet "$WHEEL"
-              cd /tmp && env -u CCL_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import ccl; lib = ccl.CclLib(); assert lib.version(); lib.accounts.create(ccl.CclLib.TESTNET).close(); print(\"OK: wheel bundling the musl lib works on Alpine, no CCL_LIB_PATH\")"
+              cd /tmp && env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH /tmp/wheelvenv/bin/python -c "import mesmo; lib = mesmo.Mesmo(); assert lib.version(); lib.accounts.create(mesmo.Mesmo.TESTNET).close(); print(\"OK: wheel bundling the musl lib works on Alpine, no MESMO_LIB_PATH\")"
             '
 
       - name: Verify the JS wrapper runs on Alpine under Bun
@@ -174,10 +174,10 @@ jobs:
             -v "$PWD/core/build/native/nativeCompile:/out" oven/bun:alpine sh -c '
               set -eux
               mkdir -p wrappers/js/libs
-              cp /out/libccl.so wrappers/js/libs/libccl.so
+              cp /out/libmesmo.so wrappers/js/libs/libmesmo.so
               cd wrappers/js
-              env -u CCL_LIB_PATH -u LD_LIBRARY_PATH bun -e "
-                import { CclBridge, platformSuffix, TESTNET } from \"./src/index.js\";
+              env -u MESMO_LIB_PATH -u LD_LIBRARY_PATH bun -e "
+                import { Mesmo, platformSuffix, TESTNET } from \"./src/index.js\";
 
                 // The regression this guards: platformSuffix() used to have no musl detection at all,
                 // so on Alpine it returned linux-x86_64 and resolved the *glibc* package, which
@@ -187,13 +187,13 @@ jobs:
                   throw new Error(\`platformSuffix() = \${suffix} on Alpine; expected linux-musl-x86_64\`);
                 }
 
-                const bridge = new CclBridge();
+                const lib = new Mesmo();
                 try {
-                  if (!bridge.version()) throw new Error(\"no version\");
-                  bridge.accounts.create(TESTNET).close();
+                  if (!lib.version()) throw new Error(\"no version\");
+                  lib.accounts.create(TESTNET).close();
                   console.log(\`OK: JS wrapper runs on Alpine/musl under Bun (suffix=\${suffix})\`);
                 } finally {
-                  bridge.close();
+                  lib.close();
                 }
               "
             '

@@ -33,7 +33,7 @@ jobs:
         run: python3 -m pip install --break-system-packages pytest pyyaml
 
       - name: Install Yaci DevKit
-        # Pinned to the newest release (cardano-client-bindings tracks latest, incl. previews).
+        # Pinned to the newest release (mesmo tracks latest, incl. previews).
         run: npm install -g @bloxbean/yaci-devkit@0.12.0-beta5
 
       # Start the devnet in the background; it warms up while the native lib builds.

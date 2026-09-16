@@ -6,7 +6,7 @@
 
 ## Context
 
-[ADR-0002](0002-offline-stateless-no-provider.md) keeps `libccl` offline and provider-free: the
+[ADR-0002](0002-offline-stateless-no-provider.md) keeps `libmesmo` offline and provider-free: the
 caller supplies UTxOs and protocol parameters (and, for Plutus, execution units —
 [ADR-0007](0007-caller-supplied-plutus-exec-units.md)) as explicit inputs to `build`. That ADR also
 recorded the intended mitigation for the resulting friction: *optional* convenience helpers that
@@ -29,13 +29,13 @@ will:
   [ADR-0013](0013-transaction-evaluators.md) — execution units are no longer passed here.)
   The offline core imports no networking; the provider is duck-typed/interface-typed and only the
   convenience method touches it.
-- Do **no UTxO selection** in the helper — the bridge selects internally (it hands all of the
+- Do **no UTxO selection** in the helper — Mesmo selects internally (it hands all of the
   sender's UTxOs to CCL). A provider only answers "all UTxOs at address X".
 - Use each language's own HTTP client and **add no mandatory dependency** to the offline core: Python
   `urllib` (stdlib), Go `net/http` (stdlib), JS Bun `fetch` (built-in), Rust `ureq` **behind an
   optional `providers` Cargo feature** so the default crate pulls in no HTTP/TLS stack.
 
-Out of scope: provider modules inside `libccl` (forbidden by ADR-0002); UTxO-selection strategies;
+Out of scope: provider modules inside `libmesmo` (forbidden by ADR-0002); UTxO-selection strategies;
 exec-unit evaluators (the §2b sibling — since shipped in
 [ADR-0013](0013-transaction-evaluators.md), which also gave `build_with` its optional `evaluator`
 argument).
@@ -51,14 +51,14 @@ argument).
   unlike Go/Python). Providers that already emit `cost_models_raw` (real Blockfrost, yaci-store's own
   API) pass through untouched; the DevKit `:10000` proxy currently emits the numeric form, so the
   conversion is still load-bearing. Removal once every endpoint we fetch from returns `cost_models_raw`
-  is tracked in [cardano-client-bindings#11](https://github.com/bloxbean/cardano-client-bindings/issues/11).
+  is tracked in [mesmo#11](https://github.com/bloxbean/mesmo/issues/11).
 - Rust consumers must opt in with `features = ["providers"]`; the helpers are absent otherwise.
 - `BlockfrostProvider` is validated against mocked responses, not live in CI (a Blockfrost key would
   be required); `YaciProvider` is exercised live by the DevKit integration suites.
 
 ## Alternatives considered
 
-- **Bake providers into `libccl`** — rejected by ADR-0002 (networking, retries, secrets in the FFI
+- **Bake providers into `libmesmo`** — rejected by ADR-0002 (networking, retries, secrets in the FFI
   core).
 - **A separate native provider module** — noted as a possible future in ADR-0002, but wrapper-side
   helpers keep the core pure and reuse each language's mature HTTP ecosystem.

@@ -1,12 +1,12 @@
 import pytest
 
-from ccl._ffi import CclError
-from ccl.network import Network
+from mesmo._ffi import MesmoError
+from mesmo.network import Network
 
 # Minimal protocol parameters (CCL ProtocolParams model).
-def _addr(ccl):
+def _addr(mesmo):
     """A fresh testnet address (managed handle, closed immediately)."""
-    with ccl.accounts.create(Network.TESTNET) as acct:
+    with mesmo.accounts.create(Network.TESTNET) as acct:
         return acct.info["base_address"]
 
 
@@ -53,17 +53,17 @@ def _assert_built(result):
     assert int(result["fee"]) > 0
 
 
-def test_simple_payment(ccl):
-    sender = _addr(ccl)
-    receiver = _addr(ccl)
+def test_simple_payment(mesmo):
+    sender = _addr(mesmo)
+    receiver = _addr(mesmo)
     yaml_str = _payment_yaml(sender, receiver, "5000000")
-    _assert_built(ccl.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
+    _assert_built(mesmo.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
 
 
-def test_multiple_payments(ccl):
-    sender = _addr(ccl)
-    r1 = _addr(ccl)
-    r2 = _addr(ccl)
+def test_multiple_payments(mesmo):
+    sender = _addr(mesmo)
+    r1 = _addr(mesmo)
+    r2 = _addr(mesmo)
     yaml_str = f"""
 version: 1.0
 transaction:
@@ -81,12 +81,12 @@ transaction:
             - unit: lovelace
               quantity: "3000000"
 """
-    _assert_built(ccl.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
+    _assert_built(mesmo.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
 
 
-def test_variable_substitution(ccl):
-    sender = _addr(ccl)
-    receiver = _addr(ccl)
+def test_variable_substitution(mesmo):
+    sender = _addr(mesmo)
+    receiver = _addr(mesmo)
     yaml_str = f"""
 version: 1.0
 variables:
@@ -102,15 +102,15 @@ transaction:
             - unit: lovelace
               quantity: ${{amount}}
 """
-    _assert_built(ccl.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
+    _assert_built(mesmo.quicktx.build(yaml_str, _utxos(sender), PROTOCOL_PARAMS))
 
 
-def test_insufficient_funds(ccl):
-    sender = _addr(ccl)
-    receiver = _addr(ccl)
+def test_insufficient_funds(mesmo):
+    sender = _addr(mesmo)
+    receiver = _addr(mesmo)
     yaml_str = _payment_yaml(sender, receiver, "200000000")
-    with pytest.raises(CclError):
-        ccl.quicktx.build(yaml_str, _utxos(sender, 1_000_000), PROTOCOL_PARAMS)
+    with pytest.raises(MesmoError):
+        mesmo.quicktx.build(yaml_str, _utxos(sender, 1_000_000), PROTOCOL_PARAMS)
 
 
 # A Plutus mint TxPlan (always-succeeds V2 policy). The script is not executed offline; the
@@ -141,14 +141,14 @@ transaction:
 """
 
 
-def test_plutus_mint_with_exec_units(ccl):
+def test_plutus_mint_with_exec_units(mesmo):
     # One redeemer (the mint) -> one ExUnits, supplied by the caller.
-    result = ccl.quicktx.build(
+    result = mesmo.quicktx.build(
         MINT_YAML, _utxos(MINT_ADDR), PROTOCOL_PARAMS,
         exec_units=[{"mem": 2000000, "steps": 500000000}])
     _assert_built(result)
 
 
-def test_plutus_mint_without_exec_units_fails(ccl):
-    with pytest.raises(CclError):
-        ccl.quicktx.build(MINT_YAML, _utxos(MINT_ADDR), PROTOCOL_PARAMS)
+def test_plutus_mint_without_exec_units_fails(mesmo):
+    with pytest.raises(MesmoError):
+        mesmo.quicktx.build(MINT_YAML, _utxos(MINT_ADDR), PROTOCOL_PARAMS)

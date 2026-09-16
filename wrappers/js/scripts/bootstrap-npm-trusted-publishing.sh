@@ -13,13 +13,13 @@
 # Afterwards, configure the trusted publisher for each package printed by this script:
 #   Package -> Settings -> Trusted Publisher -> GitHub Actions
 #     Organization or user: bloxbean
-#     Repository:           cardano-client-bindings
+#     Repository:           mesmo
 #     Workflow filename:    publish-js.yml
 #     Environment:          release
 #     Allowed action:       npm publish
 #
 # CLI alternative (requires npm >= 11.15 and account-level 2FA):
-#   npm trust github <package> --repo bloxbean/cardano-client-bindings \
+#   npm trust github <package> --repo bloxbean/mesmo \
 #     --file publish-js.yml --environment release --allow-publish
 #
 # See wrappers/js/scripts/README.md for the complete operator checklist and
@@ -28,12 +28,12 @@ set -euo pipefail
 
 VERSION="0.0.0-oidc-bootstrap.0"
 PACKAGES=(
-  "@bloxbean/cardano-client-lib"
-  "@bloxbean/cardano-client-lib-linux-x86_64"
-  "@bloxbean/cardano-client-lib-linux-aarch64"
-  "@bloxbean/cardano-client-lib-linux-musl-x86_64"
-  "@bloxbean/cardano-client-lib-macos-aarch64"
-  "@bloxbean/cardano-client-lib-windows-x86_64"
+  "@bloxbean/mesmo"
+  "@bloxbean/mesmo-linux-x86_64"
+  "@bloxbean/mesmo-linux-aarch64"
+  "@bloxbean/mesmo-linux-musl-x86_64"
+  "@bloxbean/mesmo-macos-aarch64"
+  "@bloxbean/mesmo-windows-x86_64"
 )
 
 npm_user="$(npm whoami 2>/dev/null)" || {
@@ -69,11 +69,11 @@ for name in "${PACKAGES[@]}"; do
 {
   "name": "${name}",
   "version": "${VERSION}",
-  "description": "Placeholder published once to enable npm trusted publishing for this package name. Do not install; real releases are published by CI from https://github.com/bloxbean/cardano-client-bindings.",
+  "description": "Placeholder published once to enable npm trusted publishing for this package name. Do not install; real releases are published by CI from https://github.com/bloxbean/mesmo.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bloxbean/cardano-client-bindings.git"
+    "url": "git+https://github.com/bloxbean/mesmo.git"
   }
 }
 JSON
@@ -96,6 +96,6 @@ printf '  %s\n' "${published[@]}"
 echo
 echo "Use the npmjs.com settings shown at the top of this script, or npm >= 11.15:"
 for name in "${published[@]}"; do
-  printf 'npm trust github %q --repo bloxbean/cardano-client-bindings --file publish-js.yml --environment release --allow-publish\n' \
+  printf 'npm trust github %q --repo bloxbean/mesmo --file publish-js.yml --environment release --allow-publish\n' \
     "$name"
 done

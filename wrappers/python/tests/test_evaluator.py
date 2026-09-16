@@ -1,5 +1,5 @@
 """Unit tests for the transaction-evaluator helpers (no native lib / no network needed)."""
-from ccl.providers import (
+from mesmo.providers import (
     BlockfrostEvaluator,
     TransactionEvaluator,
     _parse_evaluation,

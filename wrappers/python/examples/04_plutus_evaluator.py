@@ -3,23 +3,23 @@
 A Plutus build needs each redeemer's execution units. This example mints a token with an
 always-succeeds validator and shows both ways to obtain them:
 
-  1. the offline default — the bridge computes the units in-process with Scalus (no network); and
+  1. the offline default — the lib computes the units in-process with Scalus (no network); and
   2. a remote TransactionEvaluator (Blockfrost) — illustrative, requires a project id.
 
-libccl never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
+libmesmo never makes HTTP calls (ADR-0013 / ADR-0002), so a remote evaluator lives here in the
 wrapper: ``build_with`` runs a two-pass (draft -> evaluate -> rebuild).
 
 Run from the repo root:
 
     LIB_DIR=core/build/native/nativeCompile
-    PYTHONPATH=wrappers/python CCL_LIB_PATH=$LIB_DIR \
+    PYTHONPATH=wrappers/python MESMO_LIB_PATH=$LIB_DIR \
     DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
       python3 wrappers/python/examples/04_plutus_evaluator.py
 """
 import json
 from pathlib import Path
 
-from ccl import CclLib, BlockfrostEvaluator  # noqa: F401 (BlockfrostEvaluator used in the snippet below)
+from mesmo import Mesmo, BlockfrostEvaluator  # noqa: F401 (BlockfrostEvaluator used in the snippet below)
 
 # Shared fixtures: an always-succeeds mint (TxPlan YAML), the sender's UTXOs, and protocol
 # parameters *with cost models* (Scalus needs them to run the UPLC machine).
@@ -41,9 +41,9 @@ class LocalProvider:
 
 
 def main():
-    lib = CclLib()
+    lib = Mesmo()
 
-    # 1) Offline default: no evaluator -> the bridge runs the validator with Scalus and stamps the
+    # 1) Offline default: no evaluator -> the lib runs the validator with Scalus and stamps the
     #    computed units. Just works, no network.
     result = lib.quicktx.build_with(YAML, LocalProvider(), [SENDER])
     print("offline (Scalus) — fee:", result["fee"], "tx_hash:", result["tx_hash"])

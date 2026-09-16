@@ -3,7 +3,7 @@ title: Overview
 description: Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
 ---
 
-Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
+Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libmesmo.so` / `libmesmo.dylib` / `libmesmo.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
 
 ## Where this fits in the ecosystem
 
@@ -49,8 +49,8 @@ All four wrappers are first-class and kept at strict parity — same API groups,
 |---|---|---|
 | JavaScript (Bun) | [docs](../js/) | `@bloxbean/mesmo` (npm) |
 | Go | [docs](../go/) | `github.com/bloxbean/mesmo/wrappers/go` |
-| Rust | [docs](../rust/) | `mesmo` (crate, imported as `ccl`) |
-| Python | [docs](../python/) | `mesmo` (PyPI, imported as `ccl`) |
+| Rust | [docs](../rust/) | `mesmo` (crate, imported as `mesmo`) |
+| Python | [docs](../python/) | `mesmo` (PyPI, imported as `mesmo`) |
 
 ## How big is it?
 

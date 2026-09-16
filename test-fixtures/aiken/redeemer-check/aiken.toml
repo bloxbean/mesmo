@@ -1,4 +1,4 @@
-name = "ccl-bridge/redeemer-check"
+name = "mesmo/redeemer-check"
 version = "0.1.0"
 
 description = "Minimal mint validator for integration tests: passes iff the redeemer is the integer 42."

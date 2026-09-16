@@ -6,12 +6,12 @@ the DevKit integration tests.
 """
 from unittest import mock
 
-from ccl.providers import YaciProvider, BlockfrostProvider, ChainDataProvider
-from ccl.quicktx import QuickTx
+from mesmo.providers import YaciProvider, BlockfrostProvider, ChainDataProvider
+from mesmo.quicktx import QuickTx
 
 
 def test_yaci_provider_urls():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = {"ok": True}
         p = YaciProvider()
         p.utxos("addr_test1xyz")
@@ -23,14 +23,14 @@ def test_yaci_provider_urls():
 
 
 def test_yaci_provider_custom_base_url_trailing_slash():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = []
         YaciProvider(base_url="http://host:9999/api/").utxos("addrX")
     assert get.call_args.args[0] == "http://host:9999/api/addresses/addrX/utxos"
 
 
 def test_blockfrost_network_url_and_project_id_header():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = {}
         BlockfrostProvider("proj123", network="preprod").protocol_params()
     url = get.call_args.args[0]
@@ -56,7 +56,7 @@ def test_blockfrost_utxos_paginate_and_inject_address():
     def fake_get(url, headers=None, timeout=30):
         return page1 if "page=1" in url else page2 if "page=2" in url else []
 
-    with mock.patch("ccl.providers._http_get_json", side_effect=fake_get):
+    with mock.patch("mesmo.providers._http_get_json", side_effect=fake_get):
         utxos = BlockfrostProvider("p", network="preview").utxos("addr_test1abc")
 
     assert len(utxos) == 101                       # paged until a short page
@@ -76,7 +76,7 @@ def test_build_with_composes_fetch_and_build():
         def protocol_params(self):
             return sentinel_pp
 
-    qt = QuickTx(bridge=None)
+    qt = QuickTx(lib=None)
     calls = []
     qt.build = lambda y, u, p, e=None, additional_signers=0: (
         calls.append((y, u, p, e, additional_signers)), {"tx_cbor": "DRAFT"})[1]
@@ -116,7 +116,7 @@ def test_build_with_merges_and_dedupes_utxos_across_senders():
         def protocol_params(self):
             return {"min_fee_a": 44}
 
-    qt = QuickTx(bridge=None)
+    qt = QuickTx(lib=None)
     calls = []
     qt.build = lambda y, u, p, e=None, additional_signers=0: (
         calls.append(u), {"tx_cbor": "DRAFT"})[1]

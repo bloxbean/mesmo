@@ -39,28 +39,28 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// Single source of truth for the library version reported by `ccl_version`: generate a BuildInfo
+// Single source of truth for the library version reported by `mesmo_version`: generate a BuildInfo
 // class from the Gradle project version (its base, e.g. "0.1.0-preview1" -> "0.1.0") so the native
 // lib and the wrappers can never silently disagree. Generated source (not a resource) so it needs no
 // native-image resource config. Wrappers compare this against their own expected version on init.
-def cclLibVersion = project.version.toString().replaceAll(/[-+].*$/, '')
+def nativeLibVersion = project.version.toString().replaceAll(/[-+].*$/, '')
 def generatedSrcDir = layout.buildDirectory.dir('generated/sources/buildinfo/java/main')
 
 def generateBuildInfo = tasks.register('generateBuildInfo') {
-    inputs.property('version', cclLibVersion)
+    inputs.property('version', nativeLibVersion)
     outputs.dir(generatedSrcDir)
     doLast {
-        def pkgDir = generatedSrcDir.get().dir('com/bloxbean/cardano/bridge').asFile
+        def pkgDir = generatedSrcDir.get().dir('com/bloxbean/cardano/mesmo').asFile
         pkgDir.mkdirs()
         new File(pkgDir, 'BuildInfo.java').text = """\
-package com.bloxbean.cardano.bridge;
+package com.bloxbean.cardano.mesmo;
 
 /** Generated at build time from the Gradle project version. Do not edit. */
 public final class BuildInfo {
     private BuildInfo() {}
 
-    /** Library version reported by {@code ccl_version} (base semver, no pre-release suffix). */
-    public static final String VERSION = "${cclLibVersion}";
+    /** Library version reported by {@code mesmo_version} (base semver, no pre-release suffix). */
+    public static final String VERSION = "${nativeLibVersion}";
 }
 """
     }
@@ -73,7 +73,7 @@ graalvmNative {
     binaries {
         main {
             sharedLibrary = true
-            imageName = 'libccl'
+            imageName = 'libmesmo'
             buildArgs.addAll(
                 '--no-fallback',
                 '-H:+ReportExceptionStackTraces',
@@ -122,8 +122,8 @@ tasks.register('downloadNativeLib') {
     outputs.dir(nativeDir)
 
     def platformInfo = detectPlatform()
-    def libVersion = project.findProperty('cclVersion') ?: "v${project.version}"
-    def libFile = platformInfo.ext == 'dylib' ? 'libccl.dylib' : 'libccl.so'
+    def libVersion = project.findProperty('mesmoLibVersion') ?: "v${project.version}"
+    def libFile = platformInfo.ext == 'dylib' ? 'libmesmo.dylib' : 'libmesmo.so'
 
     doLast {
         def outDir = nativeDir.get().asFile
@@ -133,7 +133,7 @@ tasks.register('downloadNativeLib') {
         }
 
         outDir.mkdirs()
-        def url = "https://github.com/bloxbean/cardano-client-bindings/releases/download/${libVersion}/cardano-client-lib-${libVersion}-${platformInfo.platform}.tar.gz"
+        def url = "https://github.com/bloxbean/mesmo/releases/download/${libVersion}/mesmo-${libVersion}-${platformInfo.platform}.tar.gz"
         def tarball = new File(outDir, 'cardano-client-lib.tar.gz')
 
         logger.lifecycle("Downloading pre-built library from ${url}")

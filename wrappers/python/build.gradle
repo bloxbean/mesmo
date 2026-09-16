@@ -4,7 +4,7 @@ task copyNativeLib(type: Copy) {
     dependsOn nativeLibTask
     from project(':core').layout.buildDirectory.dir('native/nativeCompile')
     into layout.buildDirectory.dir('native')
-    include 'libccl.*'
+    include 'libmesmo.*'
     include '*.h'
 }
 
@@ -13,7 +13,7 @@ task test(type: Exec) {
     workingDir projectDir
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'DYLD_LIBRARY_PATH', nativeDir
     environment 'LD_LIBRARY_PATH', nativeDir
     environment 'PYTHONPATH', projectDir.absolutePath
@@ -37,7 +37,7 @@ task integrationTest(type: Exec) {
     workingDir projectDir
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'DYLD_LIBRARY_PATH', nativeDir
     environment 'LD_LIBRARY_PATH', nativeDir
     environment 'PYTHONPATH', projectDir.absolutePath
@@ -45,23 +45,23 @@ task integrationTest(type: Exec) {
     commandLine 'bash', '-c', 'python3 -m pytest tests/ -v'
 }
 
-// Stage the platform's libccl.* into ccl/_libs/ (pure Gradle — no shell — so it works on Windows).
+// Stage the platform's libmesmo.* into mesmo/_libs/ (pure Gradle — no shell — so it works on Windows).
 // Keeps the committed .gitkeep; only the binaries are managed here.
 task stageWheelLib {
     dependsOn copyNativeLib
     doLast {
-        delete fileTree('ccl/_libs') { include 'libccl.*' }
+        delete fileTree('mesmo/_libs') { include 'libmesmo.*' }
         delete 'dist'
         copy {
             from layout.buildDirectory.dir('native')
-            into 'ccl/_libs'
-            include 'libccl.so', 'libccl.dylib', 'libccl.dll'
+            into 'mesmo/_libs'
+            include 'libmesmo.so', 'libmesmo.dylib', 'libmesmo.dll'
         }
     }
 }
 
-// Build a platform-specific wheel that bundles the native library into ccl/_libs/, so
-// `pip install` needs no CCL_LIB_PATH. Requires the `build` package (`pip install build`).
+// Build a platform-specific wheel that bundles the native library into mesmo/_libs/, so
+// `pip install` needs no MESMO_LIB_PATH. Requires the `build` package (`pip install build`).
 task wheel(type: Exec) {
     dependsOn stageWheelLib
     workingDir projectDir

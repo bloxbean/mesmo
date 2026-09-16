@@ -1,10 +1,10 @@
 //! Managed-account object tests (ADR-0016 slice 5): owned-handle lifecycle, typed-role signing
 //! parity with the mnemonic-per-call path, one-shot recovery-phrase export, secret hygiene, and
-//! the owned-value guarantees (storable next to the Bridge; hard-invalidated by Bridge drop).
+//! the owned-value guarantees (storable next to the Mesmo; hard-invalidated by Mesmo drop).
 //! Fully offline.
 
-use ccl::accounts::{Account, SigningRole};
-use ccl::{error_codes, Bridge, Network};
+use mesmo::accounts::{Account, SigningRole};
+use mesmo::{error_codes, Mesmo, Network};
 use serde_json::{json, Value};
 
 const TEST_MNEMONIC: &str =
@@ -22,7 +22,7 @@ fn protocol_params() -> Value {
     })
 }
 
-fn unsigned_stake_reg(bridge: &Bridge, info: &Value) -> String {
+fn unsigned_stake_reg(lib: &Mesmo, info: &Value) -> String {
     let base = info["base_address"].as_str().unwrap();
     let stake = info["stake_address"].as_str().unwrap();
     let yaml = format!(
@@ -32,7 +32,7 @@ fn unsigned_stake_reg(bridge: &Bridge, info: &Value) -> String {
         "tx_hash": "a".repeat(64), "output_index": 0, "address": base,
         "amount": [{"unit": "lovelace", "quantity": "2000000000"}]
     }]);
-    bridge
+    lib
         .quicktx()
         .build(&yaml, &utxos, &protocol_params(), None, 1)
         .expect("build")
@@ -41,8 +41,8 @@ fn unsigned_stake_reg(bridge: &Bridge, info: &Value) -> String {
 
 #[test]
 fn open_info_matches_pinned_derivation() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
     let info = acct.info().unwrap();
 
     // Pinned CIP-1852 derivation for the standard CCL test mnemonic at testnet 0/0; the
@@ -67,9 +67,9 @@ pjcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq5hxe5g"
 
 #[test]
 fn sign_determinism_and_role_witnesses() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
-    let unsigned = unsigned_stake_reg(&bridge, &acct.info().unwrap());
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    let unsigned = unsigned_stake_reg(&lib, &acct.info().unwrap());
 
     let managed = acct.sign_tx(&unsigned, SigningRole::PAYMENT).unwrap();
     // Deterministic: signing twice yields byte-identical output.
@@ -90,81 +90,81 @@ fn sign_determinism_and_role_witnesses() {
 
 #[test]
 fn empty_role_mask_rejected() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
-    let unsigned = unsigned_stake_reg(&bridge, &acct.info().unwrap());
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    let unsigned = unsigned_stake_reg(&lib, &acct.info().unwrap());
     let err = acct.sign_tx(&unsigned, SigningRole(0)).unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 }
 
 #[test]
 fn lifecycle_close_idempotent_use_after_close_typed() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
     acct.close().unwrap();
     acct.close().unwrap(); // idempotent
     let err = acct.info().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_HANDLE);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_HANDLE);
 }
 
 #[test]
 fn create_export_once_and_restore() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().create(TESTNET).unwrap();
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().create(TESTNET).unwrap();
     let base = acct.info().unwrap()["base_address"].clone();
 
     let phrase = acct.export_recovery_phrase().unwrap();
     assert_eq!(phrase.split_whitespace().count(), 24);
 
-    let restored = bridge.accounts().from_mnemonic(&phrase, TESTNET, 0, 0).unwrap();
+    let restored = lib.accounts().from_mnemonic(&phrase, TESTNET, 0, 0).unwrap();
     assert_eq!(restored.info().unwrap()["base_address"], base);
 
     // One-shot.
     let err = acct.export_recovery_phrase().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 
     // Imported accounts never export.
     let err = restored.export_recovery_phrase().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_ARGUMENT);
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_ARGUMENT);
 }
 
 #[test]
 fn debug_never_contains_secrets() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().create(TESTNET).unwrap();
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().create(TESTNET).unwrap();
     let phrase = acct.export_recovery_phrase().unwrap();
     let debug = format!("{:?}", acct);
     assert!(!debug.contains("addr")); // not even public data, just the handle
     assert!(!debug.contains(phrase.split_whitespace().next().unwrap()));
     acct.close().unwrap();
-    assert_eq!(format!("{:?}", acct), "<ccl::Account closed>");
+    assert_eq!(format!("{:?}", acct), "<mesmo::Account closed>");
 }
 
 /// The owned-handle promise (ADR-0016 amendment): an Account can live in the same struct as its
-/// Bridge — impossible with the originally sketched `Account<'bridge>` borrow.
+/// Mesmo — impossible with the originally sketched `Account<'lib>` borrow.
 #[test]
-fn owned_account_storable_next_to_bridge() {
+fn owned_account_storable_next_to_mesmo() {
     struct WalletService {
-        _bridge: Bridge,
+        _mesmo: Mesmo,
         account: Account,
     }
-    let bridge = Bridge::new().unwrap();
-    let account = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
-    let service = WalletService { _bridge: bridge, account };
+    let lib = Mesmo::new().unwrap();
+    let account = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    let service = WalletService { _mesmo: lib, account };
     assert!(service.account.info().unwrap()["base_address"]
         .as_str()
         .unwrap()
         .starts_with("addr_test1"));
 }
 
-/// Dropping the Bridge hard-invalidates outstanding Accounts: calls fail with a typed error,
+/// Dropping the Mesmo hard-invalidates outstanding Accounts: calls fail with a typed error,
 /// never a dangling-isolate dereference.
 #[test]
-fn bridge_drop_invalidates_outstanding_accounts() {
-    let bridge = Bridge::new().unwrap();
-    let acct = bridge.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
-    drop(bridge);
+fn mesmo_drop_invalidates_outstanding_accounts() {
+    let lib = Mesmo::new().unwrap();
+    let acct = lib.accounts().from_mnemonic(TEST_MNEMONIC, TESTNET, 0, 0).unwrap();
+    drop(lib);
     let err = acct.info().unwrap_err();
-    assert_eq!(err.code, error_codes::CCL_ERROR_INVALID_HANDLE);
-    acct.close().unwrap(); // and close after bridge-drop is a safe no-op
+    assert_eq!(err.code, error_codes::MESMO_ERROR_INVALID_HANDLE);
+    acct.close().unwrap(); // and close after lib-drop is a safe no-op
 }

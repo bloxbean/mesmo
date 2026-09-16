@@ -22,8 +22,8 @@ func NewYaciProvider(baseURL string) *YaciProvider // "" → "http://localhost:1
 ```
 
 ```go
-provider := ccl.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+provider := mesmo.NewYaciProvider("")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ### BlockfrostProvider
@@ -38,8 +38,8 @@ func NewBlockfrostProviderURL(projectID, baseURL string) *BlockfrostProvider    
 - Protocol parameters come from `/epochs/latest/parameters`; the native library ignores the extra Blockfrost fields.
 
 ```go
-provider, err := ccl.NewBlockfrostProvider(os.Getenv("BF_PROJECT_ID"), "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+provider, err := mesmo.NewBlockfrostProvider(os.Getenv("BF_PROJECT_ID"), "preprod")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ## Evaluators
@@ -62,8 +62,8 @@ func NewBlockfrostEvaluatorURL(projectID, baseURL string) *BlockfrostEvaluator
 POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-compatible) and parses the response into `[{mem, steps}]` in Cardano redeemer order (`spend < mint < cert < reward < vote < propose`). Both the purpose-keyed map form and the Ogmios v6 list form are handled.
 
 ```go
-evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
+evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 

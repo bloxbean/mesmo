@@ -1,14 +1,14 @@
-# Cardano Client Bindings — Cardano Client Lib as a native shared library
+# Mesmo — Cardano Client Lib as a native shared library
 
-Cardano Client Bindings compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. This lets any language call CCL's offline Cardano operations via FFI — no JVM required at runtime.
+Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libmesmo.so` / `libmesmo.dylib` / `libmesmo.dll`) using GraalVM native-image. This lets any language call CCL's offline Cardano operations via FFI — no JVM required at runtime.
 
 ## Why?
 
-[Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib) is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Cardano Client Bindings makes selected CCL modules available as a **native shared library with a C ABI**, so languages like Python, Go, Rust, and JavaScript can use it directly — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
+[Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib) is a mature, feature-rich Cardano SDK covering key derivation, transaction building, Plutus data handling, governance, and more. Mesmo makes selected CCL modules available as a **native shared library with a C ABI**, so languages like Python, Go, Rust, and JavaScript can use it directly — whether as the foundation for a wrapper library, a transaction builder, or for individual functions like crypto, address parsing, and CBOR serialization.
 
 ## What's Included
 
-The bridge exposes CCL's **offline/local** operations:
+Mesmo exposes CCL's **offline/local** operations:
 
 - **Accounts** — Managed account handles (ADR-0016): open once, sign with typed roles; secrets never leave the handle
 - **Address** — Parse, validate, convert between bech32 and bytes
@@ -26,18 +26,18 @@ Backend/HTTP modules (Blockfrost, Koios, Ogmios) are intentionally excluded — 
 
 Per-language user guides (installation, quick start, full API reference, transaction building, providers, troubleshooting) live under [`docs/`](docs/README.md):
 
-- **[JavaScript (Bun)](docs/js/README.md)** — `@bloxbean/cardano-client-lib`
-- **[Go](docs/golang/README.md)** — `github.com/bloxbean/cardano-client-bindings/wrappers/go`
-- **[Rust](docs/rust/README.md)** — `cardano-client-lib` crate
-- **[Python](docs/python/README.md)** — `cardano-client-lib` on PyPI
+- **[JavaScript (Bun)](docs/js/README.md)** — `@bloxbean/mesmo`
+- **[Go](docs/golang/README.md)** — `github.com/bloxbean/mesmo/wrappers/go`
+- **[Rust](docs/rust/README.md)** — `mesmo` crate
+- **[Python](docs/python/README.md)** — `mesmo` on PyPI
 
 Shared references: the [TxPlan (YAML) transaction format](docs/quicktx.md) with its verified intent catalog, and the [architecture decision records](docs/adr/).
 
 ## Project Structure
 
 ```
-cardano-client-bindings/
-├── core/                    # Java bridge + GraalVM native-image → libccl
+mesmo/
+├── core/                    # Java core + GraalVM native-image → libmesmo
 │   ├── src/main/java/       # @CEntryPoint API classes
 │   └── src/test/java/       # JVM unit tests (72+ tests)
 ├── native-test/             # C smoke tests
@@ -123,7 +123,7 @@ Or use Gradle with the `-PusePrebuilt` flag:
 make test-all
 ```
 
-The native library is produced at `core/build/native/nativeCompile/libccl.dylib` (macOS) or `libccl.so` (Linux), along with `libccl.h` and `graal_isolate.h` headers.
+The native library is produced at `core/build/native/nativeCompile/libmesmo.dylib` (macOS) or `libmesmo.so` (Linux), along with `libmesmo.h` and `graal_isolate.h` headers.
 
 ### Run JVM Unit Tests
 
@@ -136,21 +136,21 @@ The native library is produced at `core/build/native/nativeCompile/libccl.dylib`
 ### Download Pre-built Native Library
 
 Download the native library for your platform from
-[GitHub Releases](https://github.com/bloxbean/cardano-client-bindings/releases):
+[GitHub Releases](https://github.com/bloxbean/mesmo/releases):
 
 **macOS (Apple Silicon):**
 
 ```bash
-curl -L https://github.com/bloxbean/cardano-client-bindings/releases/latest/download/cardano-client-lib-v0.1.0-macos-aarch64.tar.gz | tar xz -C /usr/local/lib/
+curl -L https://github.com/bloxbean/mesmo/releases/latest/download/mesmo-v0.1.0-macos-aarch64.tar.gz | tar xz -C /usr/local/lib/
 ```
 
 **Linux (x86_64):**
 
 ```bash
-curl -L https://github.com/bloxbean/cardano-client-bindings/releases/latest/download/cardano-client-lib-v0.1.0-linux-x86_64.tar.gz | tar xz -C /usr/local/lib/
+curl -L https://github.com/bloxbean/mesmo/releases/latest/download/mesmo-v0.1.0-linux-x86_64.tar.gz | tar xz -C /usr/local/lib/
 ```
 
-> The Linux `libccl.so` is built against an old **glibc 2.17** baseline (in a `manylinux_2_28`
+> The Linux `libmesmo.so` is built against an old **glibc 2.17** baseline (in a `manylinux_2_28`
 > container), so it runs on any glibc ≥ 2.17 — RHEL/CentOS 7+, Amazon Linux 2, Ubuntu 18.04+,
 > Debian 9+, and all newer distros. (It does **not** run on musl-only systems such as Alpine; a
 > musl variant is a possible future addition.) See [ADR-0008](docs/adr/0008-linux-glibc-baseline-portability.md) for the why.
@@ -158,7 +158,7 @@ curl -L https://github.com/bloxbean/cardano-client-bindings/releases/latest/down
 Then set the library path:
 
 ```bash
-export CCL_LIB_PATH=/usr/local/lib
+export MESMO_LIB_PATH=/usr/local/lib
 
 # Linux
 export LD_LIBRARY_PATH=/usr/local/lib
@@ -172,13 +172,13 @@ export DYLD_LIBRARY_PATH=/usr/local/lib
 
 ## Running Tests Without Gradle
 
-You can also run wrapper tests directly. Set `CCL_LIB_PATH` to point to the native library directory.
+You can also run wrapper tests directly. Set `MESMO_LIB_PATH` to point to the native library directory.
 
 ### C
 
 ```bash
 cd native-test
-make CCL_LIB_PATH=../core/build/native/nativeCompile
+make MESMO_LIB_PATH=../core/build/native/nativeCompile
 make test
 ```
 
@@ -186,16 +186,16 @@ make test
 
 ```bash
 PYTHONPATH=wrappers/python \
-CCL_LIB_PATH=core/build/native/nativeCompile \
+MESMO_LIB_PATH=core/build/native/nativeCompile \
   pytest wrappers/python/tests/ -v
 ```
 
 ### Go
 
 ```bash
-cd wrappers/go/ccl
+cd wrappers/go/mesmo
 CGO_CFLAGS="-I../../../core/build/native/nativeCompile" \
-CGO_LDFLAGS="-L../../../core/build/native/nativeCompile -lccl" \
+CGO_LDFLAGS="-L../../../core/build/native/nativeCompile -lmesmo" \
 DYLD_LIBRARY_PATH=../../../core/build/native/nativeCompile \
   go test -v ./...
 ```
@@ -203,7 +203,7 @@ DYLD_LIBRARY_PATH=../../../core/build/native/nativeCompile \
 ### Rust
 
 ```bash
-CCL_LIB_PATH=core/build/native/nativeCompile \
+MESMO_LIB_PATH=core/build/native/nativeCompile \
 DYLD_LIBRARY_PATH=core/build/native/nativeCompile \
   cargo test --manifest-path wrappers/rust/Cargo.toml -- --test-threads=1
 ```
@@ -211,8 +211,8 @@ DYLD_LIBRARY_PATH=core/build/native/nativeCompile \
 ### JavaScript (Bun)
 
 ```bash
-CCL_LIB_PATH=core/build/native/nativeCompile \
-  bun test wrappers/js/test/ccl.test.js
+MESMO_LIB_PATH=core/build/native/nativeCompile \
+  bun test wrappers/js/test/mesmo.test.js
 ```
 
 > **Note:** Node.js FFI libraries (ffi-napi, koffi) crash with GraalVM native-image on macOS ARM64 due to stack boundary detection issues. Use [Bun](https://bun.sh/) instead, which has built-in FFI that works correctly.
@@ -225,31 +225,31 @@ All functions follow the same pattern:
 |--------|-----------|
 | **Inputs** | Strings via `char*` (JSON for complex data, hex for binary) |
 | **Return value** | `int` status code (`0` = success, negative = error) |
-| **Get result** | `ccl_get_result(thread)` → result string (JSON or hex). **Read-once**: a second read returns empty — copy if needed twice |
-| **Get error** | `ccl_get_last_error(thread)` → error message |
-| **Memory** | Free returned strings with `ccl_free_string(thread, ptr)` |
+| **Get result** | `mesmo_get_result(thread)` → result string (JSON or hex). **Read-once**: a second read returns empty — copy if needed twice |
+| **Get error** | `mesmo_get_last_error(thread)` → error message |
+| **Memory** | Free returned strings with `mesmo_free_string(thread, ptr)` |
 | **Network ID** | `0` = mainnet, `1` = testnet |
 
 ### Usage Pattern (C)
 
 ```c
-#include "libccl.h"
+#include "libmesmo.h"
 
 graal_isolatethread_t *thread = NULL;
 graal_isolate_t *isolate = NULL;
 graal_create_isolate(NULL, &isolate, &thread);
 
 long long handle = 0;
-int rc = ccl_account_create_handle(thread, 0, &handle); // 0 = mainnet
-if (rc == 0 && ccl_account_get_info(thread, handle) == 0) {
-    char *json = ccl_get_result(thread);
+int rc = mesmo_account_create_handle(thread, 0, &handle); // 0 = mainnet
+if (rc == 0 && mesmo_account_get_info(thread, handle) == 0) {
+    char *json = mesmo_get_result(thread);
     printf("Account: %s\n", json);   // public data only — never the mnemonic
-    ccl_free_string(thread, json);
-    ccl_account_close(thread, handle);
+    mesmo_free_string(thread, json);
+    mesmo_account_close(thread, handle);
 } else {
-    char *err = ccl_get_last_error(thread);
+    char *err = mesmo_get_last_error(thread);
     printf("Error: %s\n", err);
-    ccl_free_string(thread, err);
+    mesmo_free_string(thread, err);
 }
 
 graal_tear_down_isolate(thread);
@@ -258,11 +258,11 @@ graal_tear_down_isolate(thread);
 ### Usage Pattern (Python)
 
 ```python
-from ccl import CclLib
+from mesmo import Mesmo
 
-lib = CclLib()  # loads libccl and creates isolate
+lib = Mesmo()  # loads libmesmo and creates isolate
 
-from ccl import Network
+from mesmo import Network
 
 with lib.accounts.create(Network.MAINNET) as account:   # managed handle (ADR-0016)
     print(account.info)   # {'base_address': 'addr1...', 'drep_id': 'drep1...', ...} — never the mnemonic
@@ -281,52 +281,52 @@ lib.close()
 ### Usage Pattern (Rust)
 
 ```rust
-use ccl::Bridge;
+use mesmo::Mesmo;
 
-let bridge = Bridge::new().unwrap();
+let lib = Mesmo::new().unwrap();
 
-let account = bridge.accounts().create(ccl::Network::Mainnet).unwrap(); // managed handle
+let account = lib.accounts().create(mesmo::Network::Mainnet).unwrap(); // managed handle
 println!("Address: {}", account.info().unwrap()["base_address"]);
 
-let hash = bridge.crypto().blake2b_256("48656c6c6f").unwrap();
-let tx_hash = bridge.tx().hash(tx_cbor).unwrap();
-let datum_hash = bridge.plutus().data_hash("182a").unwrap();
-// Bridge::drop() tears down the isolate automatically
+let hash = lib.crypto().blake2b_256("48656c6c6f").unwrap();
+let tx_hash = lib.tx().hash(tx_cbor).unwrap();
+let datum_hash = lib.plutus().data_hash("182a").unwrap();
+// Mesmo::drop() tears down the isolate automatically
 ```
 
 ### Usage Pattern (Go)
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 
-bridge, _ := ccl.New()
-defer bridge.Close()
+lib, _ := mesmo.New()
+defer lib.Close()
 
-account, _ := bridge.Accounts.Create(ccl.Mainnet) // managed handle
+account, _ := lib.Accounts.Create(mesmo.Mainnet) // managed handle
 defer account.Close()
 info, _ := account.Info()
 fmt.Println("Address:", info.BaseAddress)
 
-hash, _ := bridge.Crypto.Blake2b256("48656c6c6f")
-txHash, _ := bridge.Tx.Hash(txCbor)
-datumHash, _ := bridge.Plutus.DataHash("182a")
+hash, _ := lib.Crypto.Blake2b256("48656c6c6f")
+txHash, _ := lib.Tx.Hash(txCbor)
+datumHash, _ := lib.Plutus.DataHash("182a")
 ```
 
 ### Usage Pattern (JavaScript / Bun)
 
 ```javascript
-import { CclBridge, MAINNET } from '@bloxbean/cardano-client-lib';
+import { Mesmo, MAINNET } from '@bloxbean/mesmo';
 
-const bridge = new CclBridge();
+const lib = new Mesmo();
 
-using account = bridge.accounts.create(MAINNET); // managed handle
+using account = lib.accounts.create(MAINNET); // managed handle
 console.log('Address:', account.info.base_address);
 
-const hash = bridge.crypto.blake2b256('48656c6c6f');
-const txHash = bridge.tx.hash(txCbor);
-const datumHash = bridge.plutus.dataHash('182a');
+const hash = lib.crypto.blake2b256('48656c6c6f');
+const txHash = lib.tx.hash(txCbor);
+const datumHash = lib.plutus.dataHash('182a');
 
-bridge.close();
+lib.close();
 ```
 
 ## API Reference
@@ -335,73 +335,73 @@ bridge.close();
 
 | Function | Description |
 |----------|-------------|
-| `ccl_version` | Returns library version |
-| `ccl_get_result` | Returns last successful result string (read-once: consumed on read) |
-| `ccl_get_last_error` | Returns last error message |
-| `ccl_free_string` | Frees a string returned by the library |
+| `mesmo_version` | Returns library version |
+| `mesmo_get_result` | Returns last successful result string (read-once: consumed on read) |
+| `mesmo_get_last_error` | Returns last error message |
+| `mesmo_free_string` | Frees a string returned by the library |
 
 ### Account
 
 | Function | Description |
 |----------|-------------|
-| `ccl_account_open_mnemonic` | Open a managed account handle from a mnemonic (ADR-0016) |
-| `ccl_account_create_handle` | Create a fresh managed account; returns an opaque handle |
-| `ccl_account_get_info` | Public account data (addresses, DRep id, committee ids) — never secrets |
-| `ccl_account_sign_tx_handle` | Sign a transaction with typed role selection |
-| `ccl_account_export_recovery_phrase` | One-shot recovery-phrase export for created accounts |
-| `ccl_account_close` | Release the handle (explicit, idempotent) |
+| `mesmo_account_open_mnemonic` | Open a managed account handle from a mnemonic (ADR-0016) |
+| `mesmo_account_create_handle` | Create a fresh managed account; returns an opaque handle |
+| `mesmo_account_get_info` | Public account data (addresses, DRep id, committee ids) — never secrets |
+| `mesmo_account_sign_tx_handle` | Sign a transaction with typed role selection |
+| `mesmo_account_export_recovery_phrase` | One-shot recovery-phrase export for created accounts |
+| `mesmo_account_close` | Release the handle (explicit, idempotent) |
 
 ### Address
 
 | Function | Description |
 |----------|-------------|
-| `ccl_address_info` | Parse address → JSON (type, network, credentials) |
-| `ccl_address_validate` | Validate a bech32 address |
-| `ccl_address_to_bytes` | Convert bech32 address to hex bytes |
-| `ccl_address_from_bytes` | Convert hex bytes to bech32 address |
+| `mesmo_address_info` | Parse address → JSON (type, network, credentials) |
+| `mesmo_address_validate` | Validate a bech32 address |
+| `mesmo_address_to_bytes` | Convert bech32 address to hex bytes |
+| `mesmo_address_from_bytes` | Convert hex bytes to bech32 address |
 
 ### Crypto
 
 | Function | Description |
 |----------|-------------|
-| `ccl_crypto_blake2b_256` | Blake2b-256 hash (hex in → hex out) |
-| `ccl_crypto_blake2b_224` | Blake2b-224 hash (hex in → hex out) |
-| `ccl_crypto_generate_mnemonic` | Generate mnemonic (12 or 24 words) |
-| `ccl_crypto_validate_mnemonic` | Validate a mnemonic phrase |
-| `ccl_crypto_sign` | Ed25519 sign (message hex + secret key hex → signature hex) |
-| `ccl_crypto_verify` | Ed25519 verify (signature + message + public key) |
-| `ccl_crypto_derive_key` | Stateless CIP-1852 key derivation (raw key material, any role) |
+| `mesmo_crypto_blake2b_256` | Blake2b-256 hash (hex in → hex out) |
+| `mesmo_crypto_blake2b_224` | Blake2b-224 hash (hex in → hex out) |
+| `mesmo_crypto_generate_mnemonic` | Generate mnemonic (12 or 24 words) |
+| `mesmo_crypto_validate_mnemonic` | Validate a mnemonic phrase |
+| `mesmo_crypto_sign` | Ed25519 sign (message hex + secret key hex → signature hex) |
+| `mesmo_crypto_verify` | Ed25519 verify (signature + message + public key) |
+| `mesmo_crypto_derive_key` | Stateless CIP-1852 key derivation (raw key material, any role) |
 
 ### Transaction
 
 | Function | Description |
 |----------|-------------|
-| `ccl_tx_hash` | Compute transaction hash from CBOR hex |
-| `ccl_tx_sign_with_secret_key` | Sign transaction with a secret key |
-| `ccl_tx_to_json` | Convert transaction CBOR hex to JSON |
-| `ccl_tx_from_json` | Convert transaction JSON to CBOR hex |
-| `ccl_tx_deserialize` | Deserialize transaction CBOR hex to JSON |
+| `mesmo_tx_hash` | Compute transaction hash from CBOR hex |
+| `mesmo_tx_sign_with_secret_key` | Sign transaction with a secret key |
+| `mesmo_tx_to_json` | Convert transaction CBOR hex to JSON |
+| `mesmo_tx_from_json` | Convert transaction JSON to CBOR hex |
+| `mesmo_tx_deserialize` | Deserialize transaction CBOR hex to JSON |
 
 ### Plutus
 
 | Function | Description |
 |----------|-------------|
-| `ccl_plutus_data_hash` | Compute datum hash from CBOR hex |
-| `ccl_plutus_data_to_json` | Convert PlutusData CBOR to JSON |
-| `ccl_plutus_data_from_json` | Convert PlutusData JSON to CBOR hex |
+| `mesmo_plutus_data_hash` | Compute datum hash from CBOR hex |
+| `mesmo_plutus_data_to_json` | Convert PlutusData CBOR to JSON |
+| `mesmo_plutus_data_from_json` | Convert PlutusData JSON to CBOR hex |
 
 ### Script
 
 | Function | Description |
 |----------|-------------|
-| `ccl_script_native_from_json` | Parse native script from JSON → CBOR hex |
-| `ccl_script_hash` | Compute script hash from CBOR hex |
+| `mesmo_script_native_from_json` | Parse native script from JSON → CBOR hex |
+| `mesmo_script_hash` | Compute script hash from CBOR hex |
 
 ### QuickTx
 
 | Function | Description |
 |----------|-------------|
-| `ccl_quicktx_build` | Build an unsigned transaction from a JSON spec ([documentation](docs/quicktx.md)) |
+| `mesmo_quicktx_build` | Build an unsigned transaction from a JSON spec ([documentation](docs/quicktx.md)) |
 
 ## Upstream
 
