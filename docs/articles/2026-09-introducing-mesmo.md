@@ -20,11 +20,11 @@ Cardano Client Lib sits in a different position. Its maintenance is supported by
 
 That leads to the intended usage pattern, and it's worth being explicit about it:
 
-> **Keep your library. Add Mesmo for the pieces that are missing.** Because Mesmo is offline and stateless — it performs no I/O, holds no connections, and syncs no chain — it slots in alongside pycardano, MeshJS, pallas, or gOuroboros for exactly the operations you need, with no rip-and-replace and no architectural commitment. If your library later gains the feature, you can drop Mesmo for that path just as easily.
+> **Keep your library. Add Mesmo for the pieces that are missing.** Mesmo's core is stateless — it holds no connections, runs no node protocols, and syncs no chain — so it slots in alongside pycardano, MeshJS, pallas, or gOuroboros for exactly the operations you need, with no rip-and-replace and no architectural commitment. If your library later gains the feature, you can drop Mesmo for that path just as easily.
 
 ## What's inside
 
-Mesmo exposes CCL's **offline and local** operations — deliberately nothing else. Fetching UTXOs, querying parameters, and submitting transactions stay in your code, where every language already has good HTTP clients:
+Mesmo's native core performs the **local** operations — building, signing, hashing, derivation. Transaction building is not a purely offline affair, of course: you cannot select inputs without knowing which UTXOs are actually spendable, or compute fees without current protocol parameters. That chain data enters through a small **`ChainDataProvider`** interface in each wrapper, with two implementations included — **Yaci-Store** and **Blockfrost** — and a shape simple enough (fetch UTXOs, fetch parameters) that plugging in your own indexer is a few lines. Transaction *submission* stays in your code, where every language already has good HTTP clients. What Mesmo exposes:
 
 - **Accounts** — managed account handles: open an account once, sign with typed roles (payment, stake, DRep, committee); secrets never leave the handle
 - **Transaction building** — the declarative TxPlan model (below): payments, staking, Conway governance, native and Plutus scripts, multi-party composition
@@ -155,7 +155,7 @@ Two gaps, stated plainly: **macOS Intel** (Oracle GraalVM no longer ships Intel-
 A fallback is only trustworthy if its costs are stated plainly:
 
 - **Binary size.** You are adding a ~50 MB platform-specific native library to your dependency tree.
-- **Offline only.** No node protocols, no chain sync, no submission — by design. Mesmo builds and signs; your HTTP stack talks to the network.
+- **Not a node client.** No node protocols, no chain sync, no submission — by design. Chain data for building comes through the `ChainDataProvider` interface (Yaci-Store and Blockfrost implementations included, or your own); submission is your HTTP stack's job.
 - **Platform coverage.** See the matrix above — a pure-language library has no such constraints.
 
 If none of the gaps Mesmo fills apply to you, the honest advice remains: use your ecosystem's native library.
