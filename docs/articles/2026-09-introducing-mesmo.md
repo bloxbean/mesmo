@@ -24,7 +24,11 @@ That leads to the intended usage pattern, and it's worth being explicit about it
 
 ## What's inside
 
-Mesmo's native core performs the **local** operations — building, signing, hashing, derivation. Transaction building is not a purely offline affair, of course: you cannot select inputs without knowing which UTXOs are actually spendable, or compute fees without current protocol parameters. That chain data enters through a small **`ChainDataProvider`** interface in each wrapper, with two implementations included — **Yaci-Store** and **Blockfrost** — and a shape simple enough (fetch UTXOs, fetch parameters) that plugging in your own indexer is a few lines. Transaction *submission* stays in your code, where every language already has good HTTP clients. What Mesmo exposes:
+Mesmo's native core performs the **local** operations — building, signing, hashing, derivation. Transaction building is not a purely offline affair, of course: you cannot select inputs without knowing which UTXOs are actually spendable, or compute fees without current protocol parameters. That chain data enters through a small **`ChainDataProvider`** interface in each wrapper, with two implementations included — **Yaci-Store** and **Blockfrost** — and a shape simple enough (fetch UTXOs, fetch parameters) that plugging in your own indexer is a few lines.
+
+Plutus script costing follows the same pluggable pattern: the **`TransactionEvaluator`** interface decides how execution units are computed. Supply nothing and the default applies — the **Scalus** UPLC virtual machine embedded in the native core evaluates the script in-process, so script transactions cost themselves without any external service. Prefer node-backed costing? A **`BlockfrostEvaluator`** implementation ships too, and the interface accepts your own.
+
+Transaction *submission* stays in your code, where every language already has good HTTP clients. What Mesmo exposes:
 
 - **Accounts** — managed account handles: open an account once, sign with typed roles (payment, stake, DRep, committee); secrets never leave the handle
 - **Transaction building** — the declarative TxPlan model (below): payments, staking, Conway governance, native and Plutus scripts, multi-party composition
