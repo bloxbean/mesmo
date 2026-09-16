@@ -18,7 +18,14 @@ dependencies {
     // Scalus offline Plutus evaluator (Scala 3): computes redeemer execution units in-process by
     // running the UPLC engine — no network. Used as the fallback evaluator when the caller supplies
     // none. (Compiles + runs inside the GraalVM native image.)
-    implementation "org.scalus:scalus-bloxbean-cardano-client-lib_3:0.17.0"
+    implementation("org.scalus:scalus-bloxbean-cardano-client-lib_3:0.17.0") {
+        // scala-java-time is a cross-platform java.time reimplementation Scalus pulls in
+        // transitively. On the JVM (which native-image targets) java.base provides java.time and
+        // wins, so these jars are dead weight — but they ship classes in the java.time package
+        // (e.g. TzdbZoneRulesProvider) that shadow java.base, which native-image's stricter
+        // class-path check (since 25.1) rejects. Drop them.
+        exclude group: 'io.github.cquiroz'
+    }
 
     // CCL CIP modules
     implementation "com.bloxbean.cardano:cardano-client-cip8:${cclVersion}"
@@ -28,7 +35,7 @@ dependencies {
     implementation "com.bloxbean.cardano:cardano-client-cip68:${cclVersion}"
 
     // GraalVM SDK for @CEntryPoint, CCharPointer, etc.
-    compileOnly "org.graalvm.sdk:nativeimage:25.0.3"
+    compileOnly "org.graalvm.sdk:nativeimage:25.3.4.1"
 
     // SLF4J NOP - avoids log framework init issues in native image
     implementation 'org.slf4j:slf4j-nop:2.0.11'
