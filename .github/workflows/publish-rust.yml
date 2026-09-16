@@ -43,10 +43,11 @@ jobs:
       CRATE_VERSION: ${{ needs.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1.6.6
         with:
-          java-version: '25.0.3'
+          version: '25.3.4.1'
           distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
 
       # `cargo publish` verify-builds the crate, which runs build.rs. Point it at an in-tree libmesmo so

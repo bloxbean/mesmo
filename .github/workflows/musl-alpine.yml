@@ -26,12 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Oracle GraalVM 25.0.3
+      - name: Install Oracle GraalVM 25.3
         run: |
           set -eux
           mkdir -p /opt/graalvm
           curl -fsSL -o /tmp/graalvm.tar.gz \
-            "https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-x64_bin.tar.gz"
+            "https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-x64_bin.tar.gz"
           tar xzf /tmp/graalvm.tar.gz -C /opt/graalvm --strip-components=1
           echo "JAVA_HOME=/opt/graalvm" >> "$GITHUB_ENV"
           echo "/opt/graalvm/bin" >> "$GITHUB_PATH"

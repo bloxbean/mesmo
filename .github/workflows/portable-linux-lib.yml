@@ -25,11 +25,11 @@ jobs:
           - arch: x86_64
             runner: ubuntu-latest
             image: quay.io/pypa/manylinux_2_28_x86_64
-            graalvm_url: https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-x64_bin.tar.gz
+            graalvm_url: https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-x64_bin.tar.gz
           - arch: aarch64
             runner: ubuntu-24.04-arm
             image: quay.io/pypa/manylinux_2_28_aarch64
-            graalvm_url: https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-aarch64_bin.tar.gz
+            graalvm_url: https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-aarch64_bin.tar.gz
     container:
       image: ${{ matrix.image }}
     env:
@@ -49,7 +49,7 @@ jobs:
           gcc --version | head -1 || dnf install -y gcc
           dnf install -y zlib-devel || true
 
-      - name: Install Oracle GraalVM 25.0.3
+      - name: Install Oracle GraalVM 25.3
         run: |
           set -eux
           mkdir -p /opt/graalvm

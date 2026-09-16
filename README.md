@@ -60,9 +60,9 @@ mesmo/
 - The pre-built native library is downloaded automatically via `make` or `-PusePrebuilt`
 
 **For core developers** (building from source):
-- **[GraalVM 25+](https://www.graalvm.org/)** (includes `native-image`)
+- **[Oracle GraalVM 25.3](https://www.graalvm.org/)** (the monthly "Innovation" line on JDK 25 LTS; includes `native-image`)
   ```bash
-  sdk install java 25.0.3-graal   # Oracle GraalVM, via SDKMAN
+  sdk install java 25.3.4+1.r25-graal   # Oracle GraalVM, via SDKMAN
   ```
 
 **Language runtimes (install whichever you need):**
@@ -406,7 +406,7 @@ lib.close();
 ## Upstream
 
 - **Cardano Client Lib**: [bloxbean/cardano-client-lib](https://github.com/bloxbean/cardano-client-lib) v0.8.0-pre4
-- **GraalVM**: Oracle GraalVM 25.0.3 (`native-image --shared`)
+- **GraalVM**: Oracle GraalVM 25.3.4.1 (`native-image --shared`)
 
 ## License
 
