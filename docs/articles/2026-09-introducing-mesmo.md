@@ -179,6 +179,8 @@ Four things are on the roadmap:
 - **A programmatic QuickTx builder in all four languages.** Today transactions are described as TxPlan YAML documents. A code-first QuickTx builder — expressed in each wrapper's own idiom, on top of the same core — is planned, so teams that prefer constructing transactions in code get the same single-implementation semantics.
 - **A WebAssembly target.** Alongside the existing native platform builds, compiling the core to WebAssembly would bring Mesmo to the browser — and to the server *without native-library bindings at all*, for runtimes that can host wasm. Server-side wasm support varies across language ecosystems, so this lands as an **additional** target next to the native ones, not a replacement for them.
 
+And beyond that list, the roadmap is deliberately unfinished: Mesmo exists to fill the gaps developers actually hit, which means **feedback and feature requests from the Cardano community drive what gets built next**. If your SDK is missing something Mesmo doesn't cover yet, or you need a provider for a backend we haven't named — [open an issue](https://github.com/bloxbean/mesmo/issues). Real gap reports from real projects are the best prioritization signal this project can get.
+
 ## Where this comes from
 
 Mesmo is built on Cardano Client Lib, whose maintenance the Cardano Foundation supports and will continue to support. In practice that means the functionality exposed through Mesmo — including what arrives with future hard forks — tracks the protocol closely, is covered by CCL's extensive test suite, and is additionally verified end-to-end in Mesmo's own CI: every wrapper builds, signs, and submits every supported transaction type against a live devnet on every change.
