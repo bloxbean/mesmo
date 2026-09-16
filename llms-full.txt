@@ -34,7 +34,7 @@ curl -o CLAUDE.md https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 Claude Code reads `CLAUDE.md` at the start of every session, so the agent always has the bindings' contract in context. For multi-project setups, reference the hosted version from your global `~/.claude/CLAUDE.md`:
 
 ```markdown
-When working with the Mesmo bindings (Python/Go/Rust/JS `ccl` packages),
+When working with the Mesmo bindings (Python/Go/Rust/JS `mesmo` packages),
 follow https://pages.bloxbean.com/mesmo/ai/starter-pack/
 ```
 
@@ -44,7 +44,7 @@ Add a project rule:
 
 ```bash
 mkdir -p .cursor/rules
-curl -o .cursor/rules/ccl-bindings.mdc https://pages.bloxbean.com/mesmo/ai/starter-pack.md
+curl -o .cursor/rules/mesmo-bindings.mdc https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 ```
 
 ### Continue (VS Code / JetBrains)
@@ -85,14 +85,14 @@ Source: https://pages.bloxbean.com/mesmo/ai/starter-pack/
 
 ## 1. What this is
 
-Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl`) via GraalVM native-image, with four wrappers exposing the same functionality:
+Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libmesmo`) via GraalVM native-image, with four wrappers exposing the same functionality:
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install mesmo`, `from ccl import CclLib` | `CclLib()` | `snake_case` |
-| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `ccl.New()` → `Bridge` | `PascalCase` |
-| Rust ≥ 1.70 | crate `mesmo` (import as `ccl`) | `ccl::Bridge::new()` | `snake_case`, methods return `Result` |
-| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new CclBridge()` | `camelCase` |
+| Python ≥ 3.8 | `pip install mesmo`, `from mesmo import Mesmo` | `Mesmo()` | `snake_case` |
+| Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `mesmo.New()` → `Mesmo` | `PascalCase` |
+| Rust ≥ 1.70 | crate `mesmo` (import as `mesmo`) | `mesmo::Mesmo::new()` | `snake_case`, methods return `Result` |
+| JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new Mesmo()` | `camelCase` |
 
 All four have the same nine API groups — `account`, `address`, `crypto`, `tx`, `plutus`, `script`, `gov`, `wallet`, `quicktx` — the same error codes, and the same TxPlan YAML format. Semantics are identical; only naming idiom differs.
 
@@ -106,9 +106,9 @@ All four have the same nine API groups — `account`, `address`, `crypto`, `tx`,
 ## 3. Core workflow (build → sign → submit)
 
 ```python
-from ccl import CclLib, Network, SigningRole, YaciProvider
+from mesmo import Mesmo, Network, SigningRole, YaciProvider
 
-with CclLib() as lib, lib.accounts.create(Network.TESTNET) as account:
+with Mesmo() as lib, lib.accounts.create(Network.TESTNET) as account:
     address = account.info["base_address"]           # info is public data — never the mnemonic
     provider = YaciProvider()                        # or BlockfrostProvider(project_id, network="preprod")
 
@@ -136,9 +136,9 @@ To restore an existing account: `lib.accounts.from_mnemonic(mnemonic, Network.TE
 crosses the boundary once, there. A created account's phrase is exported once, deliberately, with
 `account.export_recovery_phrase()`.
 
-Go: `acct, _ := bridge.Accounts.Create(ccl.Testnet)` / `acct.SignTx(result.TxCbor, ccl.RolePayment)`.
-JS: `using acct = bridge.accounts.create(TESTNET)` / `acct.signTx(result.tx_cbor)`.
-Rust: `let acct = bridge.accounts().create(Network::Testnet)?` / `acct.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?`.
+Go: `acct, _ := lib.Accounts.Create(mesmo.Testnet)` / `acct.SignTx(result.TxCbor, mesmo.RolePayment)`.
+JS: `using acct = lib.accounts.create(TESTNET)` / `acct.signTx(result.tx_cbor)`.
+Rust: `let acct = lib.accounts().create(Network::Testnet)?` / `acct.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?`.
 The `additional_signers` build count is **positional** in Go/Rust; keyword/options elsewhere.
 
 **Uniform signatures:** `sign_tx(tx_cbor, roles)` has the same shape in all four languages — no
@@ -293,7 +293,7 @@ There is **no separate gov or wallet group**: governance identity (DRep id, comm
 
 ## 9. Errors
 
-Native errors carry a code (Python raises `CclError` with `.code`/`.message`; Go/Rust return errors; JS throws):
+Native errors carry a code (Python raises `MesmoError` with `.code`/`.message`; Go/Rust return errors; JS throws):
 
 | Code | Meaning | Typical fix |
 |---|---|---|
@@ -315,8 +315,8 @@ Predicates (`validate`, `validate_mnemonic`, `verify`) return false instead of r
 1. **No networking in the library.** Never generate code expecting `lib.submit(...)` or `lib.fetch_utxos(...)` on the core API.
 2. **Broken functions** (GraalVM reflection gaps, all languages): `tx.from_json`, `tx.sign_with_secret_key`, `plutus.data_to_json`, `plutus.data_from_json`.
 3. **JS = Bun only.** Never scaffold the JS wrapper with Node.js/`npm run` — use `bun`.
-4. **Go calls are serialized** per `Bridge` (one OS thread owns the isolate). For parallelism use multiple `Bridge` instances.
-5. **Version lock**: wrapper and native lib must match base semver; local dev uses `CCL_LIB_PATH` to point at a built library.
+4. **Go calls are serialized** per `Mesmo` (one OS thread owns the isolate). For parallelism use multiple `Mesmo` instances.
+5. **Version lock**: wrapper and native lib must match base semver; local dev uses `MESMO_LIB_PATH` to point at a built library.
 6. **Pre-1.0** against CCL `0.8.0-pre4` — APIs may change.
 7. **Platforms**: no macOS Intel, no Windows ARM64; Alpine Python is source-install for now.
 
@@ -334,7 +334,7 @@ Predicates (`validate`, `validate_mnemonic`, `verify`) return false instead of r
 
 Source: https://pages.bloxbean.com/mesmo/overview/
 
-Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libccl.so` / `libccl.dylib` / `libccl.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
+Mesmo compiles [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib) into a native shared library (`libmesmo.so` / `libmesmo.dylib` / `libmesmo.dll`) using GraalVM native-image. Any language can call CCL's offline Cardano operations via FFI — **no JVM required at runtime**.
 
 ## Where this fits in the ecosystem
 
@@ -380,8 +380,8 @@ All four wrappers are first-class and kept at strict parity — same API groups,
 |---|---|---|
 | JavaScript (Bun) | [docs](../js/) | `@bloxbean/mesmo` (npm) |
 | Go | [docs](../go/) | `github.com/bloxbean/mesmo/wrappers/go` |
-| Rust | [docs](../rust/) | `mesmo` (crate, imported as `ccl`) |
-| Python | [docs](../python/) | `mesmo` (PyPI, imported as `ccl`) |
+| Rust | [docs](../rust/) | `mesmo` (crate, imported as `mesmo`) |
+| Python | [docs](../python/) | `mesmo` (PyPI, imported as `mesmo`) |
 
 ## How big is it?
 
@@ -419,13 +419,13 @@ Requires [Bun](https://bun.sh) 1.0+ — Node.js is [not supported](../reference/
 go get github.com/bloxbean/mesmo/wrappers/go
 ```
 
-Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libccl` with purego and downloads it once on first use (then cached). Set `CCL_LIB_PATH` to use a local build instead.
+Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libmesmo` with purego and downloads it once on first use (then cached). Set `MESMO_LIB_PATH` to use a local build instead.
 
 ### Rust
 
 ```toml
 [dependencies]
-ccl = { package = "mesmo", version = "0.1" }
+mesmo = { package = "mesmo", version = "0.1" }
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -443,9 +443,9 @@ Python 3.8+. Platform wheels bundle the native library; the only dependency is `
 Create an account and build a payment, fully offline (Python shown — the [other guides](../overview/#the-four-wrappers) have the same example idiomatically):
 
 ```python
-from ccl import CclLib, Network
+from mesmo import Mesmo, Network
 
-with CclLib() as lib, lib.accounts.create(Network.TESTNET) as account:
+with Mesmo() as lib, lib.accounts.create(Network.TESTNET) as account:
     address = account.info["base_address"]
     print(address)                   # addr_test1... (info is public data — never the mnemonic)
 
@@ -484,15 +484,15 @@ The transaction is described as [TxPlan YAML](../reference/txplan/); the library
 
 Source: https://pages.bloxbean.com/mesmo/js/
 
-`@bloxbean/cardano-client-lib` brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to JavaScript as a native library. No JVM, no remote service: the heavy lifting happens inside `libccl`, a GraalVM native-image build of CCL that ships with the package.
+`@bloxbean/mesmo` brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to JavaScript as a native library. No JVM, no remote service: the heavy lifting happens inside `libmesmo`, a GraalVM native-image build of CCL that ships with the package.
 
-> **Bun only.** The wrapper uses `bun:ffi` and requires [Bun](https://bun.sh) ≥ 1.0. Node.js is not supported: Node FFI bridges (ffi-napi, koffi) crash against a GraalVM native library due to its stack-boundary detection.
+> **Bun only.** The wrapper uses `bun:ffi` and requires [Bun](https://bun.sh) ≥ 1.0. Node.js is not supported: Node FFI libraries (ffi-napi, koffi) crash against a GraalVM native library due to its stack-boundary detection.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API reference](api/) | Every class and method: `CclBridge`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api/) | Every class and method: `Mesmo`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions/) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers/) | Fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting/) | Native library resolution, platform support, common errors |
@@ -501,47 +501,47 @@ Source: https://pages.bloxbean.com/mesmo/js/
 ## Installation
 
 ```bash
-bun add @bloxbean/cardano-client-lib
+bun add @bloxbean/mesmo
 ```
 
 The package pulls in a platform-specific package (via `optionalDependencies`) that bundles the prebuilt native library — nothing else to install:
 
 | Platform | Package |
 |---|---|
-| Linux x86_64 (glibc ≥ 2.17) | `@bloxbean/cardano-client-lib-linux-x86_64` |
-| Linux aarch64 (glibc ≥ 2.17) | `@bloxbean/cardano-client-lib-linux-aarch64` |
-| Linux x86_64 (musl / Alpine) | `@bloxbean/cardano-client-lib-linux-musl-x86_64` |
-| macOS Apple Silicon | `@bloxbean/cardano-client-lib-macos-aarch64` |
-| Windows x86_64 | `@bloxbean/cardano-client-lib-windows-x86_64` |
+| Linux x86_64 (glibc ≥ 2.17) | `@bloxbean/mesmo-linux-x86_64` |
+| Linux aarch64 (glibc ≥ 2.17) | `@bloxbean/mesmo-linux-aarch64` |
+| Linux x86_64 (musl / Alpine) | `@bloxbean/mesmo-linux-musl-x86_64` |
+| macOS Apple Silicon | `@bloxbean/mesmo-macos-aarch64` |
+| Windows x86_64 | `@bloxbean/mesmo-windows-x86_64` |
 
-macOS Intel is not supported with prebuilt binaries (Oracle GraalVM dropped Intel Macs); musl is x86_64-only. On those platforms, [build the library from source](troubleshooting/#building-the-native-library-from-source) and point `CCL_LIB_PATH` at it.
+macOS Intel is not supported with prebuilt binaries (Oracle GraalVM dropped Intel Macs); musl is x86_64-only. On those platforms, [build the library from source](troubleshooting/#building-the-native-library-from-source) and point `MESMO_LIB_PATH` at it.
 
 ## Quick start
 
 ```js
-import { CclBridge, TESTNET } from "@bloxbean/cardano-client-lib";
+import { Mesmo, TESTNET } from "@bloxbean/mesmo";
 
-const bridge = new CclBridge();
+const lib = new Mesmo();
 try {
   // Create a new managed account (testnet). Its info never contains the phrase;
   // export the recovery phrase once, deliberately.
-  using account = bridge.accounts.create(TESTNET);
+  using account = lib.accounts.create(TESTNET);
   console.log(account.info.base_address);   // addr_test1...
   console.log(account.info.stake_address);  // stake_test1...
   const mnemonic = account.exportRecoveryPhrase();
 
   // Restore it later from the phrase.
-  using restored = bridge.accounts.fromMnemonic(mnemonic, TESTNET, 0, 0);
+  using restored = lib.accounts.fromMnemonic(mnemonic, TESTNET, 0, 0);
 } finally {
-  bridge.close();
+  lib.close();
 }
 ```
 
 Or let `using` handle the lifecycle:
 
 ```js
-using bridge = new CclBridge();
-using account = bridge.accounts.create(TESTNET);
+using lib = new Mesmo();
+using account = lib.accounts.create(TESTNET);
 ```
 
 ### Build, sign, and inspect a transaction — fully offline
@@ -562,20 +562,20 @@ transaction:
               quantity: "5000000"
 `;
 
-const result = bridge.quicktx.build(yaml, utxos, protocolParams);
+const result = lib.quicktx.build(yaml, utxos, protocolParams);
 // result = { tx_cbor, tx_hash, fee }
 
-const signed = sender.signTx(result.tx_cbor);   // sender = bridge.accounts.fromMnemonic(...)
+const signed = sender.signTx(result.tx_cbor);   // sender = lib.accounts.fromMnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider, fetching the chain data is one call:
 
 ```js
-import { YaciProvider } from "@bloxbean/cardano-client-lib";
+import { YaciProvider } from "@bloxbean/mesmo";
 
 const provider = new YaciProvider();  // local Yaci DevKit
-const result = await bridge.quicktx.buildWith(yaml, provider, [account.base_address]);
+const result = await lib.quicktx.buildWith(yaml, provider, [account.base_address]);
 ```
 
 ## Design in one paragraph
@@ -585,7 +585,7 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 ## Networks
 
 ```js
-import { MAINNET, TESTNET } from "@bloxbean/cardano-client-lib";
+import { MAINNET, TESTNET } from "@bloxbean/mesmo";
 ```
 
 Every key-derivation method requires an explicit network argument — there is no default. Always pass one of these constants, never a bare number: they are CCL enum ordinals (`MAINNET = 0`, `TESTNET = 1`), which are the **inverse** of Cardano's on-chain network id (on-chain mainnet = 1). See [API reference → Networks](api/#networks).
@@ -606,19 +606,19 @@ Runnable examples live in [`wrappers/js/examples/`](../../wrappers/js/examples):
 
 Source: https://pages.bloxbean.com/mesmo/js/api/
 
-All functionality hangs off a `CclBridge` instance. Import what you need from the package root:
+All functionality hangs off a `Mesmo` instance. Import what you need from the package root:
 
 ```js
 import {
-  CclBridge, CclError, CclClosedError,
+  Mesmo, MesmoError, MesmoClosedError,
   MAINNET, TESTNET,
   YaciProvider, BlockfrostProvider, BlockfrostEvaluator,
-} from "@bloxbean/cardano-client-lib";
+} from "@bloxbean/mesmo";
 ```
 
 The package ships TypeScript definitions (`index.d.ts`) for every class, method, and result shape shown below.
 
-## CclBridge
+## Mesmo
 
 ```ts
 constructor(libPath?: string)
@@ -627,15 +627,15 @@ close(): void
 [Symbol.dispose](): void
 ```
 
-Constructing a bridge loads the native library (see [resolution order](../troubleshooting/#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `bridge.accounts`, `bridge.address`, `bridge.crypto`, `bridge.tx`, `bridge.plutus`, `bridge.script`, `bridge.quicktx`.
+Constructing a Mesmo loads the native library (see [resolution order](../troubleshooting/#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are properties: `lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`, `lib.script`, `lib.quicktx`.
 
-**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
+**Lifecycle.** `close()` tears down the isolate and is idempotent. Any call after `close()` throws `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable error. Use `try/finally` or the `using` declaration:
 
 ```js
-using bridge = new CclBridge();   // closed automatically at end of scope
+using lib = new Mesmo();   // closed automatically at end of scope
 ```
 
-**Threading.** A bridge is bound to the thread that created it. In Bun's single-threaded model this rarely matters; if you use workers, create one bridge per worker.
+**Threading.** A Mesmo is bound to the thread that created it. In Bun's single-threaded model this rarely matters; if you use workers, create one Mesmo per worker.
 
 ## Networks
 
@@ -652,45 +652,45 @@ Every method that derives keys (`account.*`, `wallet.*`, `gov.*`) requires a `ne
 
 | Class | When |
 |---|---|
-| `CclError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
-| `CclClosedError` | Any API call after `close()`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message` (the native error text). |
+| `MesmoClosedError` | Any API call after `close()`. |
 | `TypeError` / `RangeError` | Missing / out-of-range `network` argument. |
 | `Error` | Library load failure, isolate creation failure, version mismatch, provider HTTP failures. |
 
-Error codes on `CclError.code`:
+Error codes on `MesmoError.code`:
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle |
 
 Validation-style methods (`address.validate`, `crypto.validateMnemonic`, `crypto.verify`) return `false` instead of throwing.
 
-## bridge.accounts — managed accounts
+## lib.accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
 
 ```javascript
-import { SigningRole } from '@bloxbean/cardano-client-lib';
+import { SigningRole } from '@bloxbean/mesmo';
 
-const acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);   // or bridge.accounts.create(...)
+const acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);   // or lib.accounts.create(...)
 try {
   acct.info;                                     // public data only — never the mnemonic
   const signed = acct.signTx(txCbor, SigningRole.PAYMENT | SigningRole.STAKE);
 } finally {
   acct.close();                                  // or: using acct = ... (Symbol.dispose)
 }
-// after close: further use throws CclError with code -11
+// after close: further use throws MesmoError with code -11
 ```
 
 - `fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0)` — the mnemonic crosses the
@@ -710,7 +710,7 @@ try {
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.address
+## lib.address
 
 ```ts
 info(bech32: string): AddressInfo
@@ -721,7 +721,7 @@ fromBytes(hexBytes: string): string // bech32
 
 `AddressInfo` = `{ type, network_id, payment_credential_hash?, delegation_credential_hash?, is_pubkey_payment, is_script_payment }`. `type` is e.g. `"Base"`, `"Enterprise"`, `"Pointer"`, `"Reward"`. `network_id` is the genuine on-chain id (mainnet = 1).
 
-## bridge.crypto
+## lib.crypto
 
 ```ts
 blake2b256(dataHex: string): string
@@ -741,12 +741,12 @@ accept for registration). Key derivation is network-independent. Prefer managed
 accounts for signing — handles never expose key bytes.
 
 ```js
-const digest = bridge.crypto.blake2b256("48656c6c6f");          // "Hello"
-const sk = bridge.crypto.deriveKey(mnemonic).private_key; // pass the extended key whole
-const sig = bridge.crypto.sign("68656c6c6f", sk);
+const digest = lib.crypto.blake2b256("48656c6c6f");          // "Hello"
+const sk = lib.crypto.deriveKey(mnemonic).private_key; // pass the extended key whole
+const sig = lib.crypto.sign("68656c6c6f", sk);
 ```
 
-## bridge.tx
+## lib.tx
 
 ```ts
 hash(txCborHex: string): string
@@ -758,7 +758,7 @@ deserialize(txCborHex: string): TransactionJson   // parsed object
 
 `toJson` returns a JSON **string**; `deserialize` returns the parsed object (with a `body` field holding inputs/outputs/fee). `signWithSecretKey` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `account.signTx`.
 
-## bridge.plutus
+## lib.plutus
 
 ```ts
 dataHash(datumCborHex: string): string    // 64 hex chars
@@ -767,10 +767,10 @@ dataFromJson(json: string): string        // CBOR hex
 ```
 
 ```js
-bridge.plutus.dataHash("182a");   // hash of PlutusData int 42
+lib.plutus.dataHash("182a");   // hash of PlutusData int 42
 ```
 
-## bridge.script
+## lib.script
 
 ```ts
 nativeFromJson(json: string): string           // JSON: { policy_id, script_hash, cbor_hex }
@@ -780,7 +780,7 @@ hash(scriptCborHex: string, scriptType = 0): string
 `scriptType`: `0` native, `1` PlutusV1, `2` PlutusV2, `3` PlutusV3.
 
 ```js
-const script = JSON.parse(bridge.script.nativeFromJson(JSON.stringify({ type: "sig", keyHash })));
+const script = JSON.parse(lib.script.nativeFromJson(JSON.stringify({ type: "sig", keyHash })));
 // script.policy_id, script.script_hash, script.cbor_hex
 ```
 
@@ -788,11 +788,11 @@ const script = JSON.parse(bridge.script.nativeFromJson(JSON.stringify({ type: "s
 
 There is no separate gov/wallet API. Governance *identity* (DRep id, committee ids and credentials)
 is public data on `acct.info`; governance *signing* uses `signTx` with the `DREP`/`COMMITTEE_*`
-roles; raw governance key material comes from `bridge.crypto.deriveKey`. An HD wallet is one
+roles; raw governance key material comes from `lib.crypto.deriveKey`. An HD wallet is one
 recovery phrase with one managed handle per CIP-1852 payment leaf — pass `addressIndex` to
-`bridge.accounts.fromMnemonic` to enumerate addresses.
+`lib.accounts.fromMnemonic` to enumerate addresses.
 
-## bridge.quicktx
+## lib.quicktx
 
 ```ts
 build(txplanYaml: string, utxos: Utxo[], protocolParams: ProtocolParams,
@@ -812,8 +812,8 @@ buildWith(txplanYaml: string, provider: ChainDataProvider, senders: string[],
 - **`buildWith`** fetches each sender's UTXOs from a [provider](../providers/) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```js
-const result = bridge.quicktx.build(yaml, utxos, params);
-const plutusResult = bridge.quicktx.build(yaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
+const result = lib.quicktx.build(yaml, utxos, params);
+const plutusResult = lib.quicktx.build(yaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
 ```
 
 ## Utility exports
@@ -839,9 +839,9 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```js
-import { CclBridge, TESTNET, YaciProvider } from "@bloxbean/cardano-client-lib";
+import { Mesmo, TESTNET, YaciProvider } from "@bloxbean/mesmo";
 
-using bridge = new CclBridge();
+using lib = new Mesmo();
 const provider = new YaciProvider();          // or BlockfrostProvider, or your own
 
 // 1. Describe — TxPlan YAML (see the intent catalog)
@@ -859,11 +859,11 @@ transaction:
 `;
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-const result = await bridge.quicktx.buildWith(yaml, provider, [sender]);
-// (or bridge.quicktx.build(yaml, utxos, protocolParams) with your own chain data)
+const result = await lib.quicktx.buildWith(yaml, provider, [sender]);
+// (or lib.quicktx.build(yaml, utxos, protocolParams) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);
 const signed = acct.signTx(result.tx_cbor);
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
@@ -889,7 +889,7 @@ combine `SigningRole` flags with `|` (witnesses apply in canonical order):
 | `governance_proposal` | `PAYMENT` |
 | `pool_registration` / `pool_update` / `pool_retirement` | `PAYMENT \| STAKE` when the pool is keyed to the account's stake key |
 
-The examples below assume an open handle: `using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET)` (with `SigningRole` imported).
+The examples below assume an open handle: `using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET)` (with `SigningRole` imported).
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
 The same table gives the fee's witness budget: pass `additional_signers = len(keys) - 1` to the build (the input UTXOs already cover the payment key). For a native-script spend whose only inputs sit at the script address, pass the number of the script's `sig` keys instead.
@@ -909,7 +909,7 @@ transaction:
         - type: stake_registration
           stake_address: ${account.stake_address}
 `;
-const reg = await bridge.quicktx.buildWith(stakeYaml, provider, [sender], null, 1);
+const reg = await lib.quicktx.buildWith(stakeYaml, provider, [sender], null, 1);
 const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedReg);          // wait for inclusion before the next step
 
@@ -923,7 +923,7 @@ transaction:
           stake_address: ${account.stake_address}
           pool_id: pool1...
 `;
-const deleg = await bridge.quicktx.buildWith(delegYaml, provider, [sender], null, 1);
+const deleg = await lib.quicktx.buildWith(delegYaml, provider, [sender], null, 1);
 const signedDeleg = acct.signTx(deleg.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 await submit(signedDeleg);
 ```
@@ -933,7 +933,7 @@ await submit(signedDeleg);
 The DRep credential comes from the governance API:
 
 ```js
-const drep = bridge.crypto.deriveKey(mnemonic, 0, 0, 'drep');
+const drep = lib.crypto.deriveKey(mnemonic, 0, 0, 'drep');
 
 const drepYaml = `
 version: 1.0
@@ -947,7 +947,7 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const reg = await bridge.quicktx.buildWith(drepYaml, provider, [sender], null, 1);
+const reg = await lib.quicktx.buildWith(drepYaml, provider, [sender], null, 1);
 const signedReg = acct.signTx(reg.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 await submit(signedReg);
 ```
@@ -969,7 +969,7 @@ transaction:
           anchor_url: https://example.com/meta.json
           anchor_hash: ${anchorHash}
 `;
-const vote = await bridge.quicktx.buildWith(voteYaml, provider, [sender], null, 1);
+const vote = await lib.quicktx.buildWith(voteYaml, provider, [sender], null, 1);
 const signedVote = acct.signTx(vote.tx_cbor, SigningRole.PAYMENT | SigningRole.DREP);
 ```
 
@@ -992,7 +992,7 @@ transaction:
           script_hex: "820180"
           script_type: 0
 `;
-const mint = await bridge.quicktx.buildWith(mintYaml, provider, [sender]);
+const mint = await lib.quicktx.buildWith(mintYaml, provider, [sender]);
 const signedMint = acct.signTx(mint.tx_cbor);
 ```
 
@@ -1001,30 +1001,30 @@ const signedMint = acct.signTx(mint.tx_cbor);
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```js
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender]);
+const result = await lib.quicktx.buildWith(plutusMintYaml, provider, [sender]);
 ```
 
 To cost against a real node instead, pass an evaluator — `buildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```js
-import { BlockfrostEvaluator } from "@bloxbean/cardano-client-lib";
+import { BlockfrostEvaluator } from "@bloxbean/mesmo";
 
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(plutusMintYaml, provider, [sender], evaluator);
+const result = await lib.quicktx.buildWith(plutusMintYaml, provider, [sender], evaluator);
 ```
 
 Or supply units yourself with the offline `build`:
 
 ```js
-const result = bridge.quicktx.build(plutusMintYaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
+const result = lib.quicktx.build(plutusMintYaml, utxos, params, [{ mem: 2000000, steps: 500000000 }]);
 ```
 
 For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with its `data_hash`) **plus** a separate UTXO for fee/collateral in `utxos` — see the [catalog entry](../../reference/txplan/#plutus-scripts) and the end-to-end lock-then-spend flow in [`wrappers/js/test/intents.integration.test.js`](../../wrappers/js/test/intents.integration.test.js).
 
 ## Errors you'll meet
 
-- `CCL Error -10` — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
-- `CCL Error -8` — the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -10` — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
+- `Mesmo error -8` — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.
 
 
@@ -1057,7 +1057,7 @@ new YaciProvider(baseUrl?: string)   // default: "http://localhost:10000/local-c
 
 ```js
 const provider = new YaciProvider();
-const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
+const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 ### BlockfrostProvider
@@ -1072,7 +1072,7 @@ new BlockfrostProvider(projectId: string, options?: { network?: "mainnet" | "pre
 
 ```js
 const provider = new BlockfrostProvider(process.env.BF_PROJECT_ID, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, [senderAddress]);
+const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress]);
 ```
 
 ## Evaluators
@@ -1095,7 +1095,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```js
 const evaluator = new BlockfrostEvaluator(projectId, { network: "preprod" });
-const result = await bridge.quicktx.buildWith(yaml, provider, [sender], evaluator);
+const result = await lib.quicktx.buildWith(yaml, provider, [sender], evaluator);
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 
@@ -1128,12 +1128,12 @@ Source: https://pages.bloxbean.com/mesmo/js/troubleshooting/
 
 ## How the native library is found
 
-`new CclBridge(libPath?)` resolves `libccl.dylib` / `libccl.so` / `libccl.dll` in this order:
+`new Mesmo(libPath?)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
 
 1. The explicit `libPath` constructor argument (a directory).
-2. The `CCL_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
+2. The `MESMO_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
 3. A copy bundled inside the package itself (`libs/`).
-4. The platform-specific package for your OS/arch (e.g. `@bloxbean/cardano-client-lib-macos-aarch64`) — this is what a normal `bun add` install uses.
+4. The platform-specific package for your OS/arch (e.g. `@bloxbean/mesmo-macos-aarch64`) — this is what a normal `bun add` install uses.
 5. The bare filename, letting the OS loader search its default paths.
 
 On Linux, musl (Alpine) is detected automatically by checking for the musl dynamic loader, and the `linux-musl-x86_64` package is selected instead of the glibc one.
@@ -1141,7 +1141,7 @@ On Linux, musl (Alpine) is detected automatically by checking for the musl dynam
 Check what would be loaded:
 
 ```js
-import { resolveLibFile, platformSuffix } from "@bloxbean/cardano-client-lib";
+import { resolveLibFile, platformSuffix } from "@bloxbean/mesmo";
 console.log(platformSuffix());   // e.g. "linux-x86_64"
 console.log(resolveLibFile());   // absolute path to the library
 ```
@@ -1153,29 +1153,29 @@ console.log(resolveLibFile());   // absolute path to the library
 The library file wasn't found or couldn't be loaded.
 
 - **Normal install:** make sure the platform package was installed (check `bun pm ls | grep cardano-client-lib`). `optionalDependencies` can be skipped by `--no-optional` / some CI caching setups — reinstall without that flag.
-- **Local build:** set `CCL_LIB_PATH` to the directory containing the library, **and** make the OS loader happy for its transitive dependencies:
+- **Local build:** set `MESMO_LIB_PATH` to the directory containing the library, **and** make the OS loader happy for its transitive dependencies:
   ```bash
-  export CCL_LIB_PATH=/path/to/core/build/native/nativeCompile
-  export DYLD_LIBRARY_PATH=$CCL_LIB_PATH   # macOS
-  export LD_LIBRARY_PATH=$CCL_LIB_PATH     # Linux
+  export MESMO_LIB_PATH=/path/to/core/build/native/nativeCompile
+  export DYLD_LIBRARY_PATH=$MESMO_LIB_PATH   # macOS
+  export LD_LIBRARY_PATH=$MESMO_LIB_PATH     # Linux
   ```
 - **Unsupported platform** (macOS Intel; Alpine on ARM): no prebuilt library exists — build from source (below).
 
-### `libccl version '...' is incompatible`
+### `libmesmo version '...' is incompatible`
 
-The wrapper and the native library must match on base semver. This appears when `CCL_LIB_PATH` points at a stale build. Rebuild the library, or (at your own risk) set `CCL_SKIP_VERSION_CHECK=1`.
+The wrapper and the native library must match on base semver. This appears when `MESMO_LIB_PATH` points at a stale build. Rebuild the library, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `CclClosedError: CclBridge is closed`
+### `MesmoClosedError: Mesmo is closed`
 
-Something called the bridge after `close()`. This error is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole process. Keep calls inside the bridge's `try`/`using` scope, or create a new bridge.
+Something called Mesmo after `close()`. This error is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole process. Keep calls inside Mesmo's `try`/`using` scope, or create a new lib.
 
-### `CCL Error -10: ...` from `quicktx.build`
+### `Mesmo error -10: ...` from `quicktx.build`
 
-`CCL_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
+`MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../../reference/txplan/)).
 - A Plutus transaction with wrong/missing execution units.
-- Check `CCL Error -8` too: `INSUFFICIENT_FUNDS` means the supplied UTXOs can't cover outputs + fee.
+- Check `Mesmo error -8` too: `INSUFFICIENT_FUNDS` means the supplied UTXOs can't cover outputs + fee.
 
 ### `PPViewHashesDontMatch` when submitting a Plutus transaction
 
@@ -1183,18 +1183,18 @@ The protocol parameters' cost models were mangled. `build()` normalizes the comm
 
 ### Crash / segfault under Node.js
 
-Node is not supported — this is expected, not a bug. GraalVM native libraries do stack-boundary checks that Node FFI bridges violate. Run under [Bun](https://bun.sh) ≥ 1.0.
+Node is not supported — this is expected, not a bug. GraalVM native libraries do stack-boundary checks that Node FFI libraries violate. Run under [Bun](https://bun.sh) ≥ 1.0.
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library (macOS Intel, Alpine ARM) or for development against the bridge itself:
+Needed only on platforms without a prebuilt library (macOS Intel, Alpine ARM) or for development against Mesmo itself:
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
-./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libccl.*
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 ```
 
 ## Platform support
@@ -1216,13 +1216,13 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 
 Source: https://pages.bloxbean.com/mesmo/go/
 
-The `ccl` Go package brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Go as a native library. No JVM, **no cgo, no C toolchain**: the shared library is loaded at runtime with [purego](https://github.com/ebitengine/purego).
+The `mesmo` Go package brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Go as a native library. No JVM, **no cgo, no C toolchain**: the shared library is loaded at runtime with [purego](https://github.com/ebitengine/purego).
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API reference](api/) | Every type and method: `Bridge`, Account, Address, Crypto, Tx, Plutus, Script, Gov, Wallet, QuickTx |
+| [API reference](api/) | Every type and method: `Mesmo`, Account, Address, Crypto, Tx, Plutus, Script, Gov, Wallet, QuickTx |
 | [Building transactions](transactions/) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers/) | Fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting/) | Native library download & resolution, platform support, common errors |
@@ -1231,16 +1231,16 @@ The `ccl` Go package brings [Cardano Client Lib (CCL)](https://github.com/bloxbe
 ## Installation
 
 ```bash
-go get github.com/bloxbean/cardano-client-bindings/wrappers/go
+go get github.com/bloxbean/mesmo/wrappers/go
 ```
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
-Requires Go ≥ 1.21. On first use, the package downloads the prebuilt native library (`libccl`) for your platform from the project's GitHub releases into your user cache directory (`os.UserCacheDir()/cardano-client-bindings/<version>/`) — a one-time, per-version download. No environment variables or build flags are needed.
+Requires Go ≥ 1.21. On first use, the package downloads the prebuilt native library (`libmesmo`) for your platform from the project's GitHub releases into your user cache directory (`os.UserCacheDir()/mesmo/<version>/`) — a one-time, per-version download. No environment variables or build flags are needed.
 
-To use a locally built library instead (or on a platform without prebuilt binaries), set `CCL_LIB_PATH` — see [troubleshooting](troubleshooting/#how-the-native-library-is-found).
+To use a locally built library instead (or on a platform without prebuilt binaries), set `MESMO_LIB_PATH` — see [troubleshooting](troubleshooting/#how-the-native-library-is-found).
 
 ## Quick start
 
@@ -1251,19 +1251,19 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 func main() {
-	bridge, err := ccl.New()
+	lib, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close()
+	defer lib.Close()
 
 	// Create a new managed account (testnet). Its Info never contains the phrase;
 	// export the recovery phrase once, deliberately.
-	account, err := bridge.Accounts.Create(ccl.Testnet)
+	account, err := lib.Accounts.Create(mesmo.Testnet)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1274,7 +1274,7 @@ func main() {
 	mnemonic, _ := account.ExportRecoveryPhrase()
 
 	// Restore it later from the phrase.
-	restored, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+	restored, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 	defer restored.Close()
 }
 ```
@@ -1297,18 +1297,18 @@ transaction:
               quantity: "5000000"
 `, sender.BaseAddress, receiver)
 
-result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams)
+result, err := lib.QuickTx.Build(yaml, utxos, protocolParams)
 // result.TxCbor, result.TxHash, result.Fee
 
-signed, err := sender.SignTx(result.TxCbor, ccl.RolePayment) // sender = bridge.Accounts.FromMnemonic(...)
+signed, err := sender.SignTx(result.TxCbor, mesmo.RolePayment) // sender = lib.Accounts.FromMnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider, fetching the chain data is one call:
 
 ```go
-provider := ccl.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
+provider := mesmo.NewYaciProvider("") // local Yaci DevKit ("" = default URL)
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender.BaseAddress}, 0)
 ```
 
 ## Design in one paragraph
@@ -1317,16 +1317,16 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Concurrency
 
-A `*Bridge` is safe to share across goroutines: all native calls are funneled to one dedicated, pinned OS thread (a GraalVM isolate thread is bound to the OS thread that created it), so calls are serialized. For parallel native work, create multiple `Bridge` instances. Always `defer bridge.Close()`; calls after `Close` return `ccl.ErrBridgeClosed` rather than crashing.
+A `*Mesmo` is safe to share across goroutines: all native calls are funneled to one dedicated, pinned OS thread (a GraalVM isolate thread is bound to the OS thread that created it), so calls are serialized. For parallel native work, create multiple `Mesmo` instances. Always `defer lib.Close()`; calls after `Close` return `mesmo.ErrClosed` rather than crashing.
 
 ## Networks
 
 ```go
-ccl.Mainnet // 0
-ccl.Testnet // 1
+mesmo.Mainnet // 0
+mesmo.Testnet // 1
 ```
 
-Every key-derivation method takes a typed `ccl.Network` — passing a bare `int` is a compile error. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api/#networks).
+Every key-derivation method takes a typed `mesmo.Network` — passing a bare `int` is a compile error. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api/#networks).
 
 ## Examples
 
@@ -1348,37 +1348,37 @@ go run ./examples/account
 
 Source: https://pages.bloxbean.com/mesmo/go/api/
 
-Everything lives in package `ccl`:
+Everything lives in package `mesmo`:
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
-## Bridge
+## Mesmo
 
 ```go
-func New() (*Bridge, error)
-func (b *Bridge) Close() error
-func (b *Bridge) Version() (string, error)
+func New() (*Mesmo, error)
+func (b *Mesmo) Close() error
+func (b *Mesmo) Version() (string, error)
 
-var ErrBridgeClosed = errors.New("ccl: bridge is closed")
+var ErrClosed = errors.New("mesmo: closed")
 ```
 
 `New()` loads the native library (downloading it on first use — see [troubleshooting](../troubleshooting/#how-the-native-library-is-found)), creates a GraalVM isolate on a dedicated pinned OS thread, and verifies the library version matches the wrapper. The API groups are exported fields:
 
 ```go
-bridge.Accounts // *AccountsApi (managed accounts, ADR-0016)
-bridge.Address  // *AddressApi
-bridge.Crypto   // *CryptoApi
-bridge.Tx       // *TxApi
-bridge.Plutus   // *PlutusApi
-bridge.Script   // *ScriptApi
-bridge.QuickTx  // *QuickTxApi
+lib.Accounts // *AccountsApi (managed accounts, ADR-0016)
+lib.Address  // *AddressApi
+lib.Crypto   // *CryptoApi
+lib.Tx       // *TxApi
+lib.Plutus   // *PlutusApi
+lib.Script   // *ScriptApi
+lib.QuickTx  // *QuickTxApi
 ```
 
-**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrBridgeClosed` (test with `errors.Is`) — it never hangs or panics.
+**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrClosed` (test with `errors.Is`) — it never hangs or panics.
 
-**Concurrency.** A `*Bridge` may be shared across goroutines; calls are serialized onto the bridge's single isolate thread. Create multiple bridges for parallelism.
+**Concurrency.** A `*Mesmo` may be shared across goroutines; calls are serialized onto Mesmo's single isolate thread. Create multiple instances for parallelism.
 
 ## Networks
 
@@ -1401,14 +1401,14 @@ Account operations (`Accounts`) require a `Network` value; an out-of-range value
 ## Errors
 
 ```go
-type CclError struct {
+type MesmoError struct {
 	Code    int
 	Message string
 }
-func (e *CclError) Error() string  // "CCL Error <code>: <message>"
+func (e *MesmoError) Error() string  // "Mesmo error <code>: <message>"
 ```
 
-Native failures surface as `*CclError` — match with `errors.As`. Error codes:
+Native failures surface as `*MesmoError` — match with `errors.As`. Error codes:
 
 | Constant | Code | Meaning |
 |---|---|---|
@@ -1426,17 +1426,17 @@ Native failures surface as `*CclError` — match with `errors.As`. Error codes:
 
 Predicate methods (`Address.Validate`, `Crypto.ValidateMnemonic`, `Crypto.Verify`) return `bool` and never error.
 
-## bridge.Accounts — managed accounts
+## lib.Accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
 
 ```go
-acct, err := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)  // or bridge.Accounts.Create(...)
+acct, err := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)  // or lib.Accounts.Create(...)
 defer acct.Close()
 
 info, _ := acct.Info()                            // *AccountPublicInfo — never the mnemonic
-signed, err := acct.SignTx(txCbor, ccl.RolePayment|ccl.RoleStake)
+signed, err := acct.SignTx(txCbor, mesmo.RolePayment|mesmo.RoleStake)
 // after Close: further use fails with ErrInvalidHandle (-11)
 ```
 
@@ -1450,7 +1450,7 @@ signed, err := acct.SignTx(txCbor, ccl.RolePayment|ccl.RoleStake)
   witnesses apply in canonical order. An empty mask is rejected.
 - `Close()` is explicit and idempotent — close Accounts like files. Like `os.File`, a dropped
   Account is reclaimed best-effort by a GC finalizer (fallback only; timing is the GC's). All
-  Account calls ride the Bridge's dedicated isolate thread, so concurrent goroutine use is safe
+  Account calls ride the Mesmo's dedicated isolate thread, so concurrent goroutine use is safe
   (and serialized). `String()` shows only the handle.
 - `Info()` returns public data only: the base/enterprise/stake/change addresses, network and
   derivation indices, `DRepID`, and the committee identifiers (`CommitteeColdID`/`CommitteeHotID`, bech32,
@@ -1459,7 +1459,7 @@ signed, err := acct.SignTx(txCbor, ccl.RolePayment|ccl.RoleStake)
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.Address
+## lib.Address
 
 ```go
 func (a *AddressApi) Info(bech32 string) (*AddressInfo, error)
@@ -1479,7 +1479,7 @@ type AddressInfo struct {
 }
 ```
 
-## bridge.Crypto
+## lib.Crypto
 
 ```go
 func (c *CryptoApi) Blake2b256(dataHex string) (string, error)
@@ -1501,12 +1501,12 @@ managed accounts for signing — handles never expose key bytes.
 Hash inputs are hex in → hex out:
 
 ```go
-digest, _ := bridge.Crypto.Blake2b256("48656c6c6f") // "Hello"
-key, _ := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
-sig, _ := bridge.Crypto.Sign(msgHex, key.PrivateKey) // pass the extended key whole
+digest, _ := lib.Crypto.Blake2b256("48656c6c6f") // "Hello"
+key, _ := lib.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+sig, _ := lib.Crypto.Sign(msgHex, key.PrivateKey) // pass the extended key whole
 ```
 
-## bridge.Tx
+## lib.Tx
 
 ```go
 func (t *TxApi) Hash(txCborHex string) (string, error)
@@ -1518,7 +1518,7 @@ func (t *TxApi) Deserialize(txCborHex string) (string, error)
 
 `ToJson`/`Deserialize` return a JSON string with a `body` field (inputs/outputs/fee). `SignWithSecretKey` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `Account.SignTx`.
 
-## bridge.Plutus
+## lib.Plutus
 
 ```go
 func (p *PlutusApi) DataHash(datumCborHex string) (string, error)   // 64 hex chars
@@ -1527,10 +1527,10 @@ func (p *PlutusApi) DataFromJson(jsonStr string) (string, error)    // returns C
 ```
 
 ```go
-hash, _ := bridge.Plutus.DataHash("182a")  // hash of PlutusData int 42
+hash, _ := lib.Plutus.DataHash("182a")  // hash of PlutusData int 42
 ```
 
-## bridge.Script
+## lib.Script
 
 ```go
 func (s *ScriptApi) NativeFromJson(jsonStr string) (string, error)              // JSON: {policy_id, script_hash, cbor_hex}
@@ -1541,7 +1541,7 @@ func (s *ScriptApi) Hash(scriptCborHex string, scriptType int) (string, error)  
 
 ```go
 scriptJSON := fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, info.PaymentCredentialHash)
-result, _ := bridge.Script.NativeFromJson(scriptJSON)
+result, _ := lib.Script.NativeFromJson(scriptJSON)
 // unmarshal result → policy_id, script_hash, cbor_hex
 ```
 
@@ -1553,7 +1553,7 @@ credentials) is public data on `acct.Info()`; governance *signing* uses `SignTx`
 An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment leaf — pass
 `addressIndex` to `Accounts.FromMnemonic` to enumerate addresses.
 
-## bridge.QuickTx
+## lib.QuickTx
 
 ```go
 func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interface{}, additionalSigners int, execUnits ...interface{}) (*TxResult, error)
@@ -1576,11 +1576,11 @@ type TxResult struct {
 - **`BuildWith`** fetches each sender's UTXOs from a [provider](../providers/) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```go
-result, err := bridge.QuickTx.Build(yaml, utxos, params, 0)          // plain payment
+result, err := lib.QuickTx.Build(yaml, utxos, params, 0)          // plain payment
 
-stakeResult, err := bridge.QuickTx.Build(yaml, utxos, params, 1)     // payment+stake signing
+stakeResult, err := lib.QuickTx.Build(yaml, utxos, params, 1)     // payment+stake signing
 
-plutusResult, err := bridge.QuickTx.Build(yaml, utxos, params, 0,
+plutusResult, err := lib.QuickTx.Build(yaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```
 
@@ -1598,11 +1598,11 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```go
-bridge, err := ccl.New()
+lib, err := mesmo.New()
 if err != nil { log.Fatal(err) }
-defer bridge.Close()
+defer lib.Close()
 
-provider := ccl.NewYaciProvider("")   // or a BlockfrostProvider, or your own
+provider := mesmo.NewYaciProvider("")   // or a BlockfrostProvider, or your own
 
 // 1. Describe — TxPlan YAML (see the intent catalog)
 yaml := fmt.Sprintf(`
@@ -1619,13 +1619,13 @@ transaction:
 `, sender, receiver)
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
-// (or bridge.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0)
+// (or lib.QuickTx.Build(yaml, utxos, protocolParams, additionalSigners) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+acct, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
-signed, err := acct.SignTx(result.TxCbor, ccl.RolePayment)
+signed, err := acct.SignTx(result.TxCbor, mesmo.RolePayment)
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
 txBytes, _ := hex.DecodeString(signed)
@@ -1638,7 +1638,7 @@ resp, err := http.Post(submitURL+"/tx/submit", "application/cbor", bytes.NewRead
 
 | Transaction contains | Roles |
 |---|---|
-| Payments, metadata, minting, Plutus operations | `ccl.RolePayment` |
+| Payments, metadata, minting, Plutus operations | `mesmo.RolePayment` |
 | `stake_registration` / `stake_deregistration` / `stake_delegation` / `stake_withdrawal` / `voting_delegation` | `RolePayment\|RoleStake` |
 | `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `RolePayment\|RoleDRep` |
 | `governance_proposal` | `RolePayment` |
@@ -1663,8 +1663,8 @@ transaction:
           stake_address: %s
 `, sender, account.StakeAddress)
 
-reg, err := bridge.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
-signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleStake)
+reg, err := lib.QuickTx.BuildWith(stakeYaml, provider, []string{sender}, 1)
+signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 // submit signedReg; wait for inclusion before the next step
 
 delegYaml := fmt.Sprintf(`
@@ -1678,8 +1678,8 @@ transaction:
           pool_id: pool1...
 `, sender, account.StakeAddress)
 
-deleg, err := bridge.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
-signedDeleg, err := acct.SignTx(deleg.TxCbor, ccl.RolePayment|ccl.RoleStake)
+deleg, err := lib.QuickTx.BuildWith(delegYaml, provider, []string{sender}, 1)
+signedDeleg, err := acct.SignTx(deleg.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
 ## Worked example: DRep registration, then vote
@@ -1687,7 +1687,7 @@ signedDeleg, err := acct.SignTx(deleg.TxCbor, ccl.RolePayment|ccl.RoleStake)
 The DRep credential comes from the governance API:
 
 ```go
-drep, err := bridge.Crypto.DeriveKey(mnemonic, 0, 0, "drep")
+drep, err := lib.Crypto.DeriveKey(mnemonic, 0, 0, "drep")
 
 drepYaml := fmt.Sprintf(`
 version: 1.0
@@ -1702,8 +1702,8 @@ transaction:
           anchor_hash: %s
 `, sender, drep.PublicKeyHash, anchorHash)
 
-reg, err := bridge.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
-signedReg, err := acct.SignTx(reg.TxCbor, ccl.RolePayment|ccl.RoleDRep)
+reg, err := lib.QuickTx.BuildWith(drepYaml, provider, []string{sender}, 1)
+signedReg, err := acct.SignTx(reg.TxCbor, mesmo.RolePayment|mesmo.RoleDRep)
 ```
 
 To vote on a governance action, the action id is the proposal transaction's hash plus its index (a proposal you submit yourself returns its hash from `Build` — `result.TxHash`). Sign the `voting` transaction with `RolePayment\|RoleDRep`.
@@ -1726,8 +1726,8 @@ transaction:
           script_type: 0
 `, sender, receiver)
 
-mint, err := bridge.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
-signedMint, err := acct.SignTx(mint.TxCbor, ccl.RolePayment)
+mint, err := lib.QuickTx.BuildWith(mintYaml, provider, []string{sender}, 0)
+signedMint, err := acct.SignTx(mint.TxCbor, mesmo.RolePayment)
 ```
 
 An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed policy needs the corresponding key's witness.
@@ -1737,29 +1737,29 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```go
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
+result, err := lib.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0)
 ```
 
 To cost against a real node instead, pass an evaluator — `BuildWith` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```go
-evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
+evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
+result, err := lib.QuickTx.BuildWith(plutusMintYaml, provider, []string{sender}, 0, evaluator)
 ```
 
 Or supply units yourself with the offline `Build`:
 
 ```go
-result, err := bridge.QuickTx.Build(plutusMintYaml, utxos, params, 0,
+result, err := lib.QuickTx.Build(plutusMintYaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```
 
-For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with its `data_hash`) **plus** a separate UTXO for fee/collateral in `utxos` — see the [catalog entry](../../reference/txplan/#plutus-scripts) and the end-to-end lock-then-spend flow in [`wrappers/go/ccl/script_spend_test.go`](../../wrappers/go/ccl/script_spend_test.go).
+For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with its `data_hash`) **plus** a separate UTXO for fee/collateral in `utxos` — see the [catalog entry](../../reference/txplan/#plutus-scripts) and the end-to-end lock-then-spend flow in [`wrappers/go/mesmo/script_spend_test.go`](../../wrappers/go/mesmo/script_spend_test.go).
 
 ## Errors you'll meet
 
-- `CCL Error -10` (`ErrTxBuild`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
-- `CCL Error -8` (`ErrInsufficientFunds`) — the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -10` (`ErrTxBuild`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
+- `Mesmo error -8` (`ErrInsufficientFunds`) — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.
 
 
@@ -1791,8 +1791,8 @@ func NewYaciProvider(baseURL string) *YaciProvider // "" → "http://localhost:1
 ```
 
 ```go
-provider := ccl.NewYaciProvider("")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+provider := mesmo.NewYaciProvider("")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ### BlockfrostProvider
@@ -1807,8 +1807,8 @@ func NewBlockfrostProviderURL(projectID, baseURL string) *BlockfrostProvider    
 - Protocol parameters come from `/epochs/latest/parameters`; the native library ignores the extra Blockfrost fields.
 
 ```go
-provider, err := ccl.NewBlockfrostProvider(os.Getenv("BF_PROJECT_ID"), "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
+provider, err := mesmo.NewBlockfrostProvider(os.Getenv("BF_PROJECT_ID"), "preprod")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 ```
 
 ## Evaluators
@@ -1831,8 +1831,8 @@ func NewBlockfrostEvaluatorURL(projectID, baseURL string) *BlockfrostEvaluator
 POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-compatible) and parses the response into `[{mem, steps}]` in Cardano redeemer order (`spend < mint < cert < reward < vote < propose`). Both the purpose-keyed map form and the Ogmios v6 list form are handled.
 
 ```go
-evaluator, _ := ccl.NewBlockfrostEvaluator(projectID, "preprod")
-result, err := bridge.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
+evaluator, _ := mesmo.NewBlockfrostEvaluator(projectID, "preprod")
+result, err := lib.QuickTx.BuildWith(yaml, provider, []string{sender}, 0, evaluator)
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 
@@ -1865,13 +1865,13 @@ Source: https://pages.bloxbean.com/mesmo/go/troubleshooting/
 
 ## How the native library is found
 
-The `ccl` package resolves `libccl.dylib` / `libccl.so` / `libccl.dll` at runtime, once per process, in this order:
+The `mesmo` package resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at runtime, once per process, in this order:
 
-1. **`CCL_LIB_PATH`** — a directory containing the library, or the library file itself. If set but the file isn't there, resolution fails hard (no fallback) — this is the way to run against a locally built library.
-2. **The per-version cache**: `os.UserCacheDir()/cardano-client-bindings/<version>/` (e.g. `~/Library/Caches/...` on macOS, `~/.cache/...` on Linux).
+1. **`MESMO_LIB_PATH`** — a directory containing the library, or the library file itself. If set but the file isn't there, resolution fails hard (no fallback) — this is the way to run against a locally built library.
+2. **The per-version cache**: `os.UserCacheDir()/mesmo/<version>/` (e.g. `~/Library/Caches/...` on macOS, `~/.cache/...` on Linux).
 3. **A one-time download** of the release tarball from GitHub releases, extracted atomically into the cache.
 
-The downloaded release tag is pinned in the wrapper (kept in lockstep with the wrapper version); override it with `CCL_LIB_VERSION` (e.g. `CCL_LIB_VERSION=v0.1.0-pre4`).
+The downloaded release tag is pinned in the wrapper (kept in lockstep with the wrapper version); override it with `MESMO_LIB_VERSION` (e.g. `MESMO_LIB_VERSION=v0.1.0-pre4`).
 
 On Linux, musl (Alpine) is detected automatically by checking for the musl dynamic loader, and the `linux-musl-x86_64` artifact is downloaded instead of the glibc one.
 
@@ -1879,39 +1879,39 @@ Environment variables:
 
 | Variable | Effect |
 |---|---|
-| `CCL_LIB_PATH` | Use a local library instead of the cache/download |
-| `CCL_LIB_VERSION` | Override the pinned release tag to download |
-| `CCL_SKIP_VERSION_CHECK` | Skip the wrapper ↔ native-lib version compatibility check |
+| `MESMO_LIB_PATH` | Use a local library instead of the cache/download |
+| `MESMO_LIB_VERSION` | Override the pinned release tag to download |
+| `MESMO_SKIP_VERSION_CHECK` | Skip the wrapper ↔ native-lib version compatibility check |
 
 ## Common errors
 
-### `CCL_LIB_PATH set but ... not found`
+### `MESMO_LIB_PATH set but ... not found`
 
-`CCL_LIB_PATH` is authoritative: when set, nothing else is tried. Point it at the directory that actually contains `libccl.so`/`libccl.dylib` (typically `core/build/native/nativeCompile` in a source checkout), or unset it to use the downloaded library.
+`MESMO_LIB_PATH` is authoritative: when set, nothing else is tried. Point it at the directory that actually contains `libmesmo.so`/`libmesmo.dylib` (typically `core/build/native/nativeCompile` in a source checkout), or unset it to use the downloaded library.
 
 ### Download fails on first use
 
-The first `ccl.New()` needs network access to GitHub releases (a one-time, per-version download). In restricted environments, either pre-populate the cache directory, or build from source and set `CCL_LIB_PATH`. The download is atomic (temp file + rename), so a killed process can't leave a corrupt library behind.
+The first `mesmo.New()` needs network access to GitHub releases (a one-time, per-version download). In restricted environments, either pre-populate the cache directory, or build from source and set `MESMO_LIB_PATH`. The download is atomic (temp file + rename), so a killed process can't leave a corrupt library behind.
 
-### `no prebuilt libccl for <GOOS>/<GOARCH>`
+### `no prebuilt libmesmo for <GOOS>/<GOARCH>`
 
-No prebuilt artifact exists for your platform (see matrix below). Build from source and set `CCL_LIB_PATH`.
+No prebuilt artifact exists for your platform (see matrix below). Build from source and set `MESMO_LIB_PATH`.
 
 ### Version mismatch on `New()`
 
-The wrapper and the native library must match on base semver. This usually means `CCL_LIB_PATH` points at a stale build, or `CCL_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `CCL_SKIP_VERSION_CHECK=1`.
+The wrapper and the native library must match on base semver. This usually means `MESMO_LIB_PATH` points at a stale build, or `MESMO_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `ccl: bridge is closed`
+### `mesmo: closed`
 
-Something called the bridge after `Close()`. Check with `errors.Is(err, ccl.ErrBridgeClosed)`. Keep the bridge alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
+Something called Mesmo after `Close()`. Check with `errors.Is(err, mesmo.ErrClosed)`. Keep Mesmo alive for as long as callers use it — the guard exists because handing a stale isolate handle to the native side would crash the process.
 
-### `CCL Error -10: ...` from `QuickTx.Build`
+### `Mesmo error -10: ...` from `QuickTx.Build`
 
 `ErrTxBuild` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../../reference/txplan/)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`ErrInsufficientFunds`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`ErrInsufficientFunds`) means the supplied UTXOs can't cover outputs + fee.
 
 ### Old `go get` errors (module not found)
 
@@ -1919,14 +1919,14 @@ Early revisions of the module had a stale internal pin that broke `go get`. Upda
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library or for development against the bridge itself:
+Needed only on platforms without a prebuilt library or for development against Mesmo itself:
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
-./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libccl.*
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 ```
 
 ## Platform support
@@ -1948,13 +1948,13 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 
 Source: https://pages.bloxbean.com/mesmo/rust/
 
-The `cardano-client-lib` crate (imported as `ccl`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libccl`, a GraalVM native-image build of CCL fetched automatically at build time.
+The `mesmo` crate (imported as `mesmo`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libmesmo`, a GraalVM native-image build of CCL fetched automatically at build time.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API reference](api/) | Every type and method: `Bridge`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api/) | Every type and method: `Mesmo`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions/) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers/) | The `providers` feature: fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting/) | Native library fetching, platform support, common errors |
@@ -1975,37 +1975,37 @@ Until then, use a git dependency:
 
 ```toml
 [dependencies]
-cardano-client-lib = { git = "https://github.com/bloxbean/cardano-client-bindings", package = "cardano-client-lib" }
+cardano-client-lib = { git = "https://github.com/bloxbean/mesmo", package = "cardano-client-lib" }
 ```
 
-The import name is `ccl` regardless: `use ccl::{Bridge, Network};`.
+The import name is `mesmo` regardless: `use mesmo::{Mesmo, Network};`.
 
-**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libccl` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `CCL_LIB_PATH` — see [troubleshooting](troubleshooting/#how-the-native-library-is-obtained).
+**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libmesmo` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `MESMO_LIB_PATH` — see [troubleshooting](troubleshooting/#how-the-native-library-is-obtained).
 
 Features:
 
 | Feature | Default | Adds |
 |---|---|---|
-| `providers` | off | `ccl::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
+| `providers` | off | `mesmo::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
 
 ## Quick start
 
 ```rust
-use ccl::{Bridge, Network};
+use mesmo::{Mesmo, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bridge = Bridge::new()?; // torn down automatically on drop (RAII)
+    let lib = Mesmo::new()?; // torn down automatically on drop (RAII)
 
     // Create a new managed account (testnet). Its info never contains the phrase;
     // export the recovery phrase once, deliberately.
-    let account = bridge.accounts().create(Network::Testnet)?;
+    let account = lib.accounts().create(Network::Testnet)?;
     let info = account.info()?;
     println!("{}", info["base_address"]);  // addr_test1...
     println!("{}", info["stake_address"]); // stake_test1...
     let mnemonic = account.export_recovery_phrase()?;
 
     // Restore it later from the phrase.
-    let _restored = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
+    let _restored = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
     Ok(())
 }
 ```
@@ -2028,20 +2028,20 @@ transaction:
               quantity: "5000000"
 "#);
 
-let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params, None)?;
+let result = lib.quicktx().build(&yaml, &utxos, &protocol_params, None)?;
 // result.tx_cbor, result.tx_hash, result.fee
 
-let signed = sender.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?; // sender = bridge.accounts().from_mnemonic(...)
+let signed = sender.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?; // sender = lib.accounts().from_mnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider (requires the `providers` feature), fetching the chain data is one call:
 
 ```rust
-use ccl::providers::YaciProvider;
+use mesmo::providers::YaciProvider;
 
 let provider = YaciProvider::default(); // local Yaci DevKit
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Design in one paragraph
@@ -2050,7 +2050,7 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Threading
 
-`Bridge` is deliberately **`!Send` and `!Sync`**: the underlying GraalVM isolate thread is bound to the OS thread that created it, so moving a bridge across threads would corrupt the VM. The compiler enforces this — create **one `Bridge` per thread**. Teardown is RAII (`Drop`); there is no `close()` to forget, and the borrow checker prevents use-after-free of the bridge by the API handles.
+`Mesmo` is deliberately **`!Send` and `!Sync`**: the underlying GraalVM isolate thread is bound to the OS thread that created it, so moving a Mesmo across threads would corrupt the VM. The compiler enforces this — create **one `Mesmo` per thread**. Teardown is RAII (`Drop`); there is no `close()` to forget, and the borrow checker prevents use-after-free of Mesmo by the API handles.
 
 ## Networks
 
@@ -2082,15 +2082,15 @@ cargo run --example evaluator --features providers
 Source: https://pages.bloxbean.com/mesmo/rust/api/
 
 ```rust
-use ccl::{Bridge, Network, CclError, Result};
+use mesmo::{Mesmo, Network, MesmoError, Result};
 ```
 
-Most methods return `ccl::Result<String>` where the string is either a JSON document (parse with `serde_json`) or a bare hex/bech32 value — noted per method below.
+Most methods return `mesmo::Result<String>` where the string is either a JSON document (parse with `serde_json`) or a bare hex/bech32 value — noted per method below.
 
-## Bridge
+## Mesmo
 
 ```rust
-impl Bridge {
+impl Mesmo {
     pub fn new() -> Result<Self>;
     pub fn version(&self) -> Result<String>;
 
@@ -2104,11 +2104,11 @@ impl Bridge {
 }
 ```
 
-`Bridge::new()` creates a GraalVM isolate and verifies the native library version matches the crate.
+`Mesmo::new()` creates a GraalVM isolate and verifies the native library version matches the crate.
 
-**Lifecycle.** Teardown is RAII: `Drop` tears down the isolate. The namespace handles (`AddressApi<'_>` etc.) borrow the bridge, so the borrow checker statically prevents use-after-free; managed `Account`s are owned values that a bridge drop hard-invalidates (typed -11 errors).
+**Lifecycle.** Teardown is RAII: `Drop` tears down the isolate. The namespace handles (`AddressApi<'_>` etc.) borrow Mesmo, so the borrow checker statically prevents use-after-free; managed `Account`s are owned values that a Mesmo drop hard-invalidates (typed -11 errors).
 
-**Threading.** `Bridge` is **`!Send` and `!Sync`** — moving it to another thread is a compile error. The GraalVM isolate thread is bound to the OS thread that created it; create one `Bridge` per thread.
+**Threading.** `Mesmo` is **`!Send` and `!Sync`** — moving it to another thread is a compile error. The GraalVM isolate thread is bound to the OS thread that created it; create one `Mesmo` per thread.
 
 ## Networks
 
@@ -2124,45 +2124,45 @@ impl Network { pub fn as_i32(self) -> i32 }  // Mainnet=0, Testnet=1
 ## Errors
 
 ```rust
-pub struct CclError { pub code: i32, pub message: String }  // Display: "CCL Error {code}: {message}"
-pub type Result<T> = std::result::Result<T, CclError>;
+pub struct MesmoError { pub code: i32, pub message: String }  // Display: "Mesmo error {code}: {message}"
+pub type Result<T> = std::result::Result<T, MesmoError>;
 ```
 
-Error codes (`ccl::error_codes`):
+Error codes (`mesmo::error_codes`):
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure (also: version mismatch, HTTP provider errors) |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument (also: interior NUL in a string) |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx().build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Bridge that was dropped |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure (also: version mismatch, HTTP provider errors) |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument (also: interior NUL in a string) |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx().build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle, or a Mesmo that was dropped |
 
 Predicate methods (`validate`, `validate_mnemonic`, `verify`) return `bool` and never error.
 
-## bridge.accounts() — managed accounts
+## lib.accounts() — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
 account API.
 
 ```rust
-use ccl::accounts::SigningRole;
+use mesmo::accounts::SigningRole;
 
-let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
+let acct = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
 let info = acct.info()?;                          // serde_json::Value — never the mnemonic
 let signed = acct.sign_tx(&tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 // Drop closes the handle; acct.close() is the explicit, idempotent form
 ```
 
 - The `Account` is an **owned value**, not a borrow: it can live in the same struct as its
-  `Bridge`. Dropping the `Bridge` hard-invalidates outstanding accounts — their calls fail with
-  `CCL_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Bridge`, an
+  `Mesmo`. Dropping the `Mesmo` hard-invalidates outstanding accounts — their calls fail with
+  `MESMO_ERROR_INVALID_HANDLE` (-11), never by touching a dead isolate. Like the `Mesmo`, an
   `Account` is `!Send`.
 - `create(network)` — fresh 24-word account; **no secret in the result**. Retrieve the phrase once,
   deliberately, with `export_recovery_phrase()` — a second call fails, as does export on a
@@ -2177,7 +2177,7 @@ let signed = acct.sign_tx(&tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 
 An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-## bridge.address()
+## lib.address()
 
 ```rust
 pub fn info(&self, bech32: &str) -> Result<String>;       // JSON
@@ -2188,7 +2188,7 @@ pub fn from_bytes(&self, hex_bytes: &str) -> Result<String>; // bech32
 
 `info` JSON fields: `type` (`"Base"`, `"Enterprise"`, `"Pointer"`, `"Reward"`), `network_id` (on-chain: 1 = mainnet), `payment_credential_hash`, `delegation_credential_hash`, `is_pubkey_payment`, `is_script_payment`.
 
-## bridge.crypto()
+## lib.crypto()
 
 ```rust
 pub fn blake2b_256(&self, data_hex: &str) -> Result<String>;
@@ -2208,14 +2208,14 @@ cardano-cli and GovTool accept for registration). Key derivation is network-inde
 Prefer managed accounts for signing — handles never expose key bytes.
 
 ```rust
-let digest = bridge.crypto().blake2b_256("48656c6c6f")?; // "Hello"
+let digest = lib.crypto().blake2b_256("48656c6c6f")?; // "Hello"
 let key: serde_json::Value =
-    serde_json::from_str(&bridge.crypto().derive_key(&mnemonic, 0, 0, "payment")?)?;
+    serde_json::from_str(&lib.crypto().derive_key(&mnemonic, 0, 0, "payment")?)?;
 let sk = key["private_key"].as_str().unwrap();
-let sig = bridge.crypto().sign(msg_hex, &sk)?;           // pass the extended key whole
+let sig = lib.crypto().sign(msg_hex, &sk)?;           // pass the extended key whole
 ```
 
-## bridge.tx()
+## lib.tx()
 
 ```rust
 pub fn hash(&self, tx_cbor_hex: &str) -> Result<String>;   // 64-hex tx id
@@ -2227,7 +2227,7 @@ pub fn deserialize(&self, tx_cbor_hex: &str) -> Result<String>;  // JSON
 
 `to_json`/`deserialize` return JSON with a `body` object (inputs/outputs/fee). `sign_with_secret_key` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `account().sign_tx`.
 
-## bridge.plutus()
+## lib.plutus()
 
 ```rust
 pub fn data_hash(&self, datum_cbor_hex: &str) -> Result<String>;   // 64 hex chars
@@ -2236,10 +2236,10 @@ pub fn data_from_json(&self, json: &str) -> Result<String>;        // CBOR hex
 ```
 
 ```rust
-let hash = bridge.plutus().data_hash("182a")?;  // hash of PlutusData int 42
+let hash = lib.plutus().data_hash("182a")?;  // hash of PlutusData int 42
 ```
 
-## bridge.script()
+## lib.script()
 
 ```rust
 pub fn native_from_json(&self, json: &str) -> Result<String>;  // JSON: { policy_id, script_hash, cbor_hex }
@@ -2250,7 +2250,7 @@ pub fn hash(&self, script_cbor_hex: &str, script_type: i32) -> Result<String>;  
 
 ```rust
 let script_json = format!(r#"{{"type":"sig","keyHash":"{key_hash}"}}"#);
-let parsed: serde_json::Value = serde_json::from_str(&bridge.script().native_from_json(&script_json)?)?;
+let parsed: serde_json::Value = serde_json::from_str(&lib.script().native_from_json(&script_json)?)?;
 // parsed["policy_id"], parsed["script_hash"], parsed["cbor_hex"]
 ```
 
@@ -2262,7 +2262,7 @@ credentials) is public data on `acct.info()`; governance *signing* uses `sign_tx
 An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment leaf — pass
 `address_index` to `accounts().from_mnemonic` to enumerate addresses.
 
-## bridge.quicktx()
+## lib.quicktx()
 
 ```rust
 #[derive(Debug, serde::Deserialize)]
@@ -2286,9 +2286,9 @@ pub fn build_with(&self, yaml: &str, provider: &dyn ChainDataProvider, senders: 
 ```rust
 use serde_json::json;
 
-let result = bridge.quicktx().build(&yaml, &utxos, &params, None)?;
+let result = lib.quicktx().build(&yaml, &utxos, &params, None)?;
 
-let plutus = bridge.quicktx().build(&yaml, &utxos, &params,
+let plutus = lib.quicktx().build(&yaml, &utxos, &params,
     Some(&json!([{"mem": 2000000, "steps": 500000000}])))?;
 ```
 
@@ -2306,10 +2306,10 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps (providers need `--features providers`):
 
 ```rust
-use ccl::{Bridge, Network};
-use ccl::providers::YaciProvider;
+use mesmo::{Mesmo, Network};
+use mesmo::providers::YaciProvider;
 
-let bridge = Bridge::new()?;
+let lib = Mesmo::new()?;
 let provider = YaciProvider::default();   // or BlockfrostProvider, or your own impl
 
 // 1. Describe — TxPlan YAML (see the intent catalog)
@@ -2327,11 +2327,11 @@ transaction:
 "#);
 
 // 2. Build — offline; UTXO selection, fee, and change happen in the native lib
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
-// (or bridge.quicktx().build(&yaml, &utxos, &protocol_params, None, additional_signers) with your own chain data)
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+// (or lib.quicktx().build(&yaml, &utxos, &protocol_params, None, additional_signers) with your own chain data)
 
 // 3. Sign — with the key roles the transaction's certificates require
-let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
+let acct = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
 let signed = acct.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?;
 
 // 4. Submit — any Blockfrost-compatible endpoint; the library never submits
@@ -2350,7 +2350,7 @@ need their own witness — combine `SigningRole` flags with `|` (witnesses apply
 | `drep_registration` / `drep_update` / `drep_deregistration` / `voting` | `PAYMENT \| DREP` |
 | `governance_proposal` | `PAYMENT` |
 
-The examples below assume an open handle: `let acct = bridge.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;` (with `use ccl::accounts::SigningRole;`).
+The examples below assume an open handle: `let acct = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;` (with `use mesmo::accounts::SigningRole;`).
 | `pool_registration` / `pool_update` / `pool_retirement` | `&["payment", "stake"]` when the pool is keyed to the account's stake key |
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
@@ -2372,7 +2372,7 @@ transaction:
           stake_address: {stake_address}
 "#);
 
-let reg = bridge.quicktx().build_with(&stake_yaml, &provider, &[sender.as_str()], 1, None)?;
+let reg = lib.quicktx().build_with(&stake_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed_reg = acct.sign_tx(&reg.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 // submit signed_reg; wait for inclusion before the next step
 
@@ -2387,7 +2387,7 @@ transaction:
           pool_id: pool1...
 "#);
 
-let deleg = bridge.quicktx().build_with(&deleg_yaml, &provider, &[sender.as_str()], 1, None)?;
+let deleg = lib.quicktx().build_with(&deleg_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed_deleg = acct.sign_tx(&deleg.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)?;
 ```
 
@@ -2397,7 +2397,7 @@ The DRep credential comes from the stateless key-derivation utility:
 
 ```rust
 let drep: serde_json::Value =
-    serde_json::from_str(&bridge.crypto().derive_key(&mnemonic, 0, 0, "drep")?)?;
+    serde_json::from_str(&lib.crypto().derive_key(&mnemonic, 0, 0, "drep")?)?;
 let credential = drep["public_key_hash"].as_str().unwrap();
 
 let drep_yaml = format!(r#"
@@ -2413,7 +2413,7 @@ transaction:
           anchor_hash: {anchor_hash}
 "#);
 
-let reg = bridge.quicktx().build_with(&drep_yaml, &provider, &[sender.as_str()], 1, None)?;
+let reg = lib.quicktx().build_with(&drep_yaml, &provider, &[sender.as_str()], 1, None)?;
 let signed = acct.sign_tx(&reg.tx_cbor, SigningRole::PAYMENT | SigningRole::DREP)?;
 ```
 
@@ -2437,7 +2437,7 @@ transaction:
           script_type: 0
 "#);
 
-let mint = bridge.quicktx().build_with(&mint_yaml, &provider, &[sender.as_str()], 0, None)?;
+let mint = lib.quicktx().build_with(&mint_yaml, &provider, &[sender.as_str()], 0, None)?;
 let signed = acct.sign_tx(&mint.tx_cbor, SigningRole::PAYMENT)?;
 ```
 
@@ -2448,16 +2448,16 @@ An empty `ScriptAll` policy (`820180`) needs no extra signature; a `sig`-keyed p
 By default execution units are computed **offline** (embedded Scalus evaluator) — a Plutus transaction is a normal build:
 
 ```rust
-let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 To cost against a real node instead, pass an evaluator — `build_with` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```rust
-use ccl::providers::BlockfrostEvaluator;
+use mesmo::providers::BlockfrostEvaluator;
 
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
-let result = bridge.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
+let result = lib.quicktx().build_with(&plutus_mint_yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
 ```
 
 Or supply units yourself with the offline `build`:
@@ -2465,7 +2465,7 @@ Or supply units yourself with the offline `build`:
 ```rust
 use serde_json::json;
 
-let result = bridge.quicktx().build(&plutus_mint_yaml, &utxos, &params, 0,
+let result = lib.quicktx().build(&plutus_mint_yaml, &utxos, &params, 0,
     Some(&json!([{"mem": 2000000, "steps": 500000000}])))?;
 ```
 
@@ -2473,8 +2473,8 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 ## Errors you'll meet
 
-- `CCL Error -10` (`CCL_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
-- `CCL Error -8` (`CCL_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -10` (`MESMO_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
+- `Mesmo error -8` (`MESMO_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.
 
 
@@ -2492,7 +2492,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
-use ccl::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
+use mesmo::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
 ```
 
 ## ChainDataProvider
@@ -2520,7 +2520,7 @@ impl Default for YaciProvider;  // = new(DEFAULT_URL)
 
 ```rust
 let provider = YaciProvider::default();
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ### BlockfrostProvider
@@ -2538,7 +2538,7 @@ impl BlockfrostProvider {
 
 ```rust
 let provider = BlockfrostProvider::new(&std::env::var("BF_PROJECT_ID")?, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Evaluators
@@ -2565,7 +2565,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```rust
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 
@@ -2575,7 +2575,7 @@ Chain data flows through `serde_json::Value`, which keeps JSON integers exact (`
 
 ## Timeouts & errors
 
-HTTP failures surface as `CclError { code: CCL_ERROR_GENERAL, message: "<context>: <cause>" }`.
+HTTP failures surface as `MesmoError { code: MESMO_ERROR_GENERAL, message: "<context>: <cause>" }`.
 
 > **Caveat:** the provider HTTP calls currently set no explicit request timeout, so a hung endpoint can block the calling thread indefinitely. If your application can't tolerate that, wrap provider calls in your own timeout mechanism or implement the `ChainDataProvider` trait over an HTTP client you configure.
 
@@ -2588,60 +2588,60 @@ Source: https://pages.bloxbean.com/mesmo/rust/troubleshooting/
 
 ## How the native library is obtained
 
-`build.rs` sources `libccl.dylib` / `libccl.so` / `libccl.dll` at **build time**, in this order:
+`build.rs` sources `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` at **build time**, in this order:
 
-1. **`CCL_LIB_PATH`** — an explicit directory containing a locally built library.
-2. **In-tree build** — `core/build/native/nativeCompile`, when developing inside the `cardano-client-bindings` repository.
+1. **`MESMO_LIB_PATH`** — an explicit directory containing a locally built library.
+2. **In-tree build** — `core/build/native/nativeCompile`, when developing inside the `mesmo` repository.
 3. **GitHub release download** — the prebuilt library for your target platform, fetched with `curl` and cached in the crate's build directory.
 
-The downloaded release tag is pinned in `build.rs` (kept in lockstep with the crate version); override it with the `CCL_LIB_VERSION` environment variable.
+The downloaded release tag is pinned in `build.rs` (kept in lockstep with the crate version); override it with the `MESMO_LIB_VERSION` environment variable.
 
-The library is staged into `OUT_DIR` and an **rpath is emitted automatically**, so nothing is needed at runtime — no `LD_LIBRARY_PATH`, no `DYLD_LIBRARY_PATH`. On macOS the install name is rewritten to `@rpath/libccl.dylib`; on Windows the GraalVM import library is staged for the MSVC linker.
+The library is staged into `OUT_DIR` and an **rpath is emitted automatically**, so nothing is needed at runtime — no `LD_LIBRARY_PATH`, no `DYLD_LIBRARY_PATH`. On macOS the install name is rewritten to `@rpath/libmesmo.dylib`; on Windows the GraalVM import library is staged for the MSVC linker.
 
 Environment variables (build-time):
 
 | Variable | Effect |
 |---|---|
-| `CCL_LIB_PATH` | Use a local library instead of the in-tree/download paths |
-| `CCL_LIB_VERSION` | Override the pinned release tag to download |
-| `CCL_SKIP_VERSION_CHECK` | (runtime) Skip the crate ↔ native-lib version compatibility check in `Bridge::new()` |
+| `MESMO_LIB_PATH` | Use a local library instead of the in-tree/download paths |
+| `MESMO_LIB_VERSION` | Override the pinned release tag to download |
+| `MESMO_SKIP_VERSION_CHECK` | (runtime) Skip the crate ↔ native-lib version compatibility check in `Mesmo::new()` |
 
 ## Common errors
 
 ### Build fails downloading the library
 
-The first build needs network access to GitHub releases (the ~50 MB library can't be hosted on crates.io). In restricted environments, pre-download the release tarball, extract it, and set `CCL_LIB_PATH` to that directory — the download step is skipped entirely.
+The first build needs network access to GitHub releases (the ~50 MB library can't be hosted on crates.io). In restricted environments, pre-download the release tarball, extract it, and set `MESMO_LIB_PATH` to that directory — the download step is skipped entirely.
 
-### `no prebuilt libccl for <platform>` (build.rs panic)
+### `no prebuilt libmesmo for <platform>` (build.rs panic)
 
-No prebuilt artifact exists for your target (see matrix below — notably macOS Intel and non-x86_64 musl). Build the library from source (below) and set `CCL_LIB_PATH`.
+No prebuilt artifact exists for your target (see matrix below — notably macOS Intel and non-x86_64 musl). Build the library from source (below) and set `MESMO_LIB_PATH`.
 
-### Version mismatch from `Bridge::new()`
+### Version mismatch from `Mesmo::new()`
 
-The crate and the native library must match on base semver. This usually means `CCL_LIB_PATH` points at a stale local build, or `CCL_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `CCL_SKIP_VERSION_CHECK=1`.
+The crate and the native library must match on base semver. This usually means `MESMO_LIB_PATH` points at a stale local build, or `MESMO_LIB_VERSION` pins an old tag. Rebuild/repin, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `Bridge` cannot be sent between threads safely (compile error)
+### `Mesmo` cannot be sent between threads safely (compile error)
 
-Deliberate. The GraalVM isolate thread inside `Bridge` is bound to the OS thread that created it — moving it would corrupt the VM, so `Bridge` is `!Send`/`!Sync` and the compiler stops you. Create one `Bridge` per thread (e.g. in a `thread_local!`, or construct inside each worker).
+Deliberate. The GraalVM isolate thread inside `Mesmo` is bound to the OS thread that created it — moving it would corrupt the VM, so `Mesmo` is `!Send`/`!Sync` and the compiler stops you. Create one `Mesmo` per thread (e.g. in a `thread_local!`, or construct inside each worker).
 
-### `CCL Error -10: ...` from `quicktx().build`
+### `Mesmo error -10: ...` from `quicktx().build`
 
-`CCL_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
+`MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../../reference/txplan/)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library or for development against the bridge itself:
+Needed only on platforms without a prebuilt library or for development against Mesmo itself:
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
-./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libccl.*
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 cargo build
 ```
 
@@ -2664,7 +2664,7 @@ cargo build
 
 Source: https://pages.bloxbean.com/mesmo/python/
 
-The `ccl` Python package (distribution name: `cardano-client-lib`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Python as a native library. No JVM, no C extension: pure `ctypes` over `libccl`, a GraalVM native-image build of CCL.
+The `mesmo` Python package (distribution name: `cardano-client-lib`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Python as a native library. No JVM, no C extension: pure `ctypes` over `libmesmo`, a GraalVM native-image build of CCL.
 
 Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 
@@ -2672,7 +2672,7 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 
 | Document | Contents |
 |---|---|
-| [API reference](api/) | Every class and method: `CclLib`, accounts, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api/) | Every class and method: `Mesmo`, accounts, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions/) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers/) | Fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting/) | Native library resolution, platform support, common errors |
@@ -2681,24 +2681,24 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 ## Installation
 
 ```bash
-pip install cardano-client-lib
+pip install mesmo
 ```
 
-> If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/cardano-client-bindings/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
+> If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/mesmo/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
 
 For development against a locally built native library, skip the wheel and point the package at it:
 
 ```bash
-export PYTHONPATH=/path/to/cardano-client-bindings/wrappers/python
-export CCL_LIB_PATH=/path/to/cardano-client-bindings/core/build/native/nativeCompile
+export PYTHONPATH=/path/to/mesmo/wrappers/python
+export MESMO_LIB_PATH=/path/to/mesmo/core/build/native/nativeCompile
 ```
 
 ## Quick start
 
 ```python
-from ccl import CclLib, Network
+from mesmo import Mesmo, Network
 
-with CclLib() as lib:
+with Mesmo() as lib:
     # Create a new managed account (testnet). Its info never contains the phrase;
     # export the recovery phrase once, deliberately.
     with lib.accounts.create(Network.TESTNET) as account:
@@ -2741,7 +2741,7 @@ signed = sender.sign_tx(result["tx_cbor"])   # sender = lib.accounts.from_mnemon
 With a provider, fetching the chain data is one call:
 
 ```python
-from ccl import YaciProvider
+from mesmo import YaciProvider
 
 provider = YaciProvider()  # local Yaci DevKit
 result = lib.quicktx.build_with(yaml, provider, [account["base_address"]])
@@ -2753,12 +2753,12 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Threading
 
-A single `CclLib` instance is **safe to share across threads** — each OS thread is attached to the GraalVM isolate lazily and gets its own native call state, so it works naturally in threaded web servers (Flask/FastAPI/gunicorn, `ThreadPoolExecutor`). Just never use an instance after `close()`; that raises `CclClosedError`.
+A single `Mesmo` instance is **safe to share across threads** — each OS thread is attached to the GraalVM isolate lazily and gets its own native call state, so it works naturally in threaded web servers (Flask/FastAPI/gunicorn, `ThreadPoolExecutor`). Just never use an instance after `close()`; that raises `MesmoClosedError`.
 
 ## Networks
 
 ```python
-from ccl import Network
+from mesmo import Network
 
 Network.MAINNET  # 0
 Network.TESTNET  # 1
@@ -2783,25 +2783,25 @@ Runnable examples live in [`wrappers/python/examples/`](../../wrappers/python/ex
 Source: https://pages.bloxbean.com/mesmo/python/api/
 
 ```python
-from ccl import CclLib, Network, CclError, CclClosedError
+from mesmo import Mesmo, Network, MesmoError, MesmoClosedError
 ```
 
-All functionality hangs off a `CclLib` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
+All functionality hangs off a `Mesmo` instance. JSON-returning methods give you plain `dict`s / `list`s; key and hash methods return `str`.
 
-## CclLib
+## Mesmo
 
 ```python
-CclLib(lib_path=None)          # lib_path: directory containing libccl, overrides auto-resolution
+Mesmo(lib_path=None)          # lib_path: directory containing libmesmo, overrides auto-resolution
 lib.version() -> str
 lib.close() -> None            # idempotent
-# context manager: with CclLib() as lib: ...
+# context manager: with Mesmo() as lib: ...
 ```
 
 Constructing loads the native library (see [resolution order](../troubleshooting/#how-the-native-library-is-found)), creates a GraalVM isolate, and verifies the library version matches the wrapper. The API groups are attributes: `lib.accounts`, `lib.address`, `lib.crypto`, `lib.tx`, `lib.plutus`, `lib.script`, `lib.quicktx`.
 
-**Lifecycle.** `close()` detaches all attached threads and tears down the isolate; it is idempotent and also runs on `__exit__`/`__del__`. Any call after `close()` raises `CclClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable exception.
+**Lifecycle.** `close()` detaches all attached threads and tears down the isolate; it is idempotent and also runs on `__exit__`/`__del__`. Any call after `close()` raises `MesmoClosedError` — this is deliberate: passing a stale isolate handle to the native side would abort the whole process uncatchably, so the wrapper converts it into a catchable exception.
 
-**Threading.** One `CclLib` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
+**Threading.** One `Mesmo` may be shared across threads: each OS thread is attached to the isolate lazily on first use and gets its own native call state, so concurrent calls from a thread pool are safe.
 
 ## Networks
 
@@ -2819,27 +2819,27 @@ Every method that derives keys or signs requires a `network` argument. Omitting 
 
 | Exception | When |
 |---|---|
-| `CclError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"CCL Error <code>: <message>"`. |
-| `CclClosedError` (a `RuntimeError`) | Any API call after `close()`. |
+| `MesmoError` | A native call failed. Has `.code` (see table below) and `.message`. `str(e)` = `"Mesmo error <code>: <message>"`. |
+| `MesmoClosedError` (a `RuntimeError`) | Any API call after `close()`. |
 | `TypeError` / `ValueError` | Missing / out-of-range `network` argument. |
 | `OSError` | Native library could not be loaded. |
 | `RuntimeError` | Isolate creation failure or wrapper/native version mismatch. |
 
-Error codes on `CclError.code` (also available as `CclLib.CCL_ERROR_*` constants):
+Error codes on `MesmoError.code` (also available as `Mesmo.MESMO_ERROR_*` constants):
 
 | Constant | Code | Meaning |
 |---|---|---|
-| `CCL_ERROR_GENERAL` | -1 | Unspecified failure |
-| `CCL_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
-| `CCL_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
-| `CCL_ERROR_CRYPTO` | -4 | Cryptographic failure |
-| `CCL_ERROR_INVALID_NETWORK` | -5 | Bad network value |
-| `CCL_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
-| `CCL_ERROR_INVALID_ADDRESS` | -7 | Bad address |
-| `CCL_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
-| `CCL_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
-| `CCL_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
-| `CCL_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle (raised as `CclInvalidHandleError`) |
+| `MESMO_ERROR_GENERAL` | -1 | Unspecified failure |
+| `MESMO_ERROR_INVALID_ARGUMENT` | -2 | Bad argument |
+| `MESMO_ERROR_SERIALIZATION` | -3 | (De)serialization failure |
+| `MESMO_ERROR_CRYPTO` | -4 | Cryptographic failure |
+| `MESMO_ERROR_INVALID_NETWORK` | -5 | Bad network value |
+| `MESMO_ERROR_INVALID_MNEMONIC` | -6 | Bad mnemonic |
+| `MESMO_ERROR_INVALID_ADDRESS` | -7 | Bad address |
+| `MESMO_ERROR_INSUFFICIENT_FUNDS` | -8 | UTXOs can't cover outputs + fee |
+| `MESMO_ERROR_INVALID_TRANSACTION` | -9 | Bad transaction |
+| `MESMO_ERROR_TX_BUILD` | -10 | TxPlan build failure (most common `quicktx.build` error — usually a malformed plan) |
+| `MESMO_ERROR_INVALID_HANDLE` | -11 | Unknown or closed account handle (raised as `CclInvalidHandleError`) |
 
 Predicate methods (`address.validate`, `crypto.validate_mnemonic`, `crypto.verify`) return `False` instead of raising.
 
@@ -2849,7 +2849,7 @@ Handle-based accounts (ADR-0016): open once, then operate without the mnemonic �
 account API.
 
 ```python
-from ccl import SigningRole, CclInvalidHandleError
+from mesmo import SigningRole, CclInvalidHandleError
 
 with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:   # or lib.accounts.create(...)
     acct.info                                    # public data only — never the mnemonic
@@ -3001,10 +3001,10 @@ This guide walks the full life of a transaction: describe it in [TxPlan YAML](..
 Every transaction follows the same four steps:
 
 ```python
-from ccl import CclLib, Network, SigningRole, YaciProvider
+from mesmo import Mesmo, Network, SigningRole, YaciProvider
 import urllib.request
 
-with CclLib() as lib:
+with Mesmo() as lib:
     provider = YaciProvider()   # or BlockfrostProvider, or your own
 
     # 1. Describe — TxPlan YAML (see the intent catalog)
@@ -3052,7 +3052,7 @@ witness — combine `SigningRole` flags with `|` (witnesses apply in canonical o
 
 A missing witness is rejected by the node with `MissingVKeyWitnessesUTXOW`.
 
-The examples below assume an open handle: `acct = lib.accounts.from_mnemonic(mnemonic, Network.TESTNET)` (with `from ccl import SigningRole`).
+The examples below assume an open handle: `acct = lib.accounts.from_mnemonic(mnemonic, Network.TESTNET)` (with `from mesmo import SigningRole`).
 The same table gives the fee's witness budget: pass `additional_signers = len(keys) - 1` to the build (the input UTXOs already cover the payment key). For a native-script spend whose only inputs sit at the script address, pass the number of the script's `sig` keys instead.
 
 
@@ -3148,7 +3148,7 @@ result = lib.quicktx.build_with(plutus_mint_yaml, provider, [sender])
 To cost against a real node instead, pass an evaluator — `build_with` then runs the two-pass flow (draft → remote evaluate → rebuild):
 
 ```python
-from ccl import BlockfrostEvaluator
+from mesmo import BlockfrostEvaluator
 
 evaluator = BlockfrostEvaluator(project_id, network="preprod")
 result = lib.quicktx.build_with(plutus_mint_yaml, provider, [sender], evaluator)
@@ -3165,8 +3165,8 @@ For spending a script UTXO (`script_collect_from`), supply the locked UTXO (with
 
 ## Errors you'll meet
 
-- `CCL Error -10` (`CCL_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
-- `CCL Error -8` (`CCL_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -10` (`MESMO_ERROR_TX_BUILD`) — the plan didn't build: malformed YAML, wrong intent field, or a Plutus costing problem. Compare against the [catalog](../../reference/txplan/#intent-catalog--verified-shapes).
+- `Mesmo error -8` (`MESMO_ERROR_INSUFFICIENT_FUNDS`) — the supplied UTXOs can't cover outputs + fee.
 - Node rejection `MissingVKeyWitnessesUTXOW` — a certificate wasn't witnessed; check the roles table above.
 
 
@@ -3179,7 +3179,7 @@ Source: https://pages.bloxbean.com/mesmo/python/providers/
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences (stdlib `urllib`, no extra dependencies) for feeding `quicktx.build_with` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `quicktx.build` directly.
 
 ```python
-from ccl import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
+from mesmo import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
 ```
 
 ## ChainDataProvider
@@ -3261,11 +3261,11 @@ Source: https://pages.bloxbean.com/mesmo/python/troubleshooting/
 
 ## How the native library is found
 
-`CclLib(lib_path=None)` resolves `libccl.dylib` / `libccl.so` / `libccl.dll` in this order:
+`Mesmo(lib_path=None)` resolves `libmesmo.dylib` / `libmesmo.so` / `libmesmo.dll` in this order:
 
 1. The explicit `lib_path` constructor argument (a directory).
-2. The `CCL_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
-3. A copy bundled inside the installed wheel (`ccl/_libs/`) — this is what a normal `pip install` uses.
+2. The `MESMO_LIB_PATH` environment variable (a directory) — the usual way to run against a locally built library.
+3. A copy bundled inside the installed wheel (`mesmo/_libs/`) — this is what a normal `pip install` uses.
 4. The bare filename, letting the OS loader search its default paths.
 
 On Windows, the library's directory is registered with `os.add_dll_directory` so sibling DLL dependencies resolve.
@@ -3276,34 +3276,34 @@ On Windows, the library's directory is registered with `os.add_dll_directory` so
 
 The library file wasn't found or couldn't be loaded.
 
-- **Wheel install:** make sure you installed a wheel built for your platform (check `pip show -f cardano-client-lib` lists `ccl/_libs/libccl...`). A source install has no bundled library — set `CCL_LIB_PATH`.
-- **Local build:** set `CCL_LIB_PATH` to the directory containing the library, **and** make the OS loader happy for its transitive dependencies:
+- **Wheel install:** make sure you installed a wheel built for your platform (check `pip show -f cardano-client-lib` lists `mesmo/_libs/libmesmo...`). A source install has no bundled library — set `MESMO_LIB_PATH`.
+- **Local build:** set `MESMO_LIB_PATH` to the directory containing the library, **and** make the OS loader happy for its transitive dependencies:
   ```bash
-  export CCL_LIB_PATH=/path/to/core/build/native/nativeCompile
-  export DYLD_LIBRARY_PATH=$CCL_LIB_PATH   # macOS
-  export LD_LIBRARY_PATH=$CCL_LIB_PATH     # Linux
+  export MESMO_LIB_PATH=/path/to/core/build/native/nativeCompile
+  export DYLD_LIBRARY_PATH=$MESMO_LIB_PATH   # macOS
+  export LD_LIBRARY_PATH=$MESMO_LIB_PATH     # Linux
   ```
 - **Unsupported platform** (macOS Intel): no prebuilt library exists — build from source (below).
 
 ### `RuntimeError: ... incompatible ...` (version mismatch)
 
-The wrapper and the native library must match on base semver. This appears when `CCL_LIB_PATH` points at a stale build. Rebuild the library, or (at your own risk) set `CCL_SKIP_VERSION_CHECK=1`.
+The wrapper and the native library must match on base semver. This appears when `MESMO_LIB_PATH` points at a stale build. Rebuild the library, or (at your own risk) set `MESMO_SKIP_VERSION_CHECK=1`.
 
-### `CclClosedError`
+### `MesmoClosedError`
 
-Something called the instance after `close()` (or after its `with` block ended). This exception is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole interpreter. Keep calls inside the instance's lifetime, or create a new `CclLib`.
+Something called the instance after `close()` (or after its `with` block ended). This exception is the wrapper saving you: handing a stale isolate handle to the native side would abort the whole interpreter. Keep calls inside the instance's lifetime, or create a new `Mesmo`.
 
 ### `TypeError` / `ValueError` about `network`
 
 The `network` argument is required and validated — there is no default (a silent mainnet default was removed deliberately). Pass `Network.MAINNET` or `Network.TESTNET`.
 
-### `CCL Error -10: ...` from `quicktx.build`
+### `Mesmo error -10: ...` from `quicktx.build`
 
-`CCL_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
+`MESMO_ERROR_TX_BUILD` — the TxPlan didn't build. Usual causes:
 
 - Malformed YAML or a wrong intent field name (check against the [TxPlan reference](../../reference/txplan/)).
 - A Plutus transaction with wrong/missing execution units.
-- `CCL Error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
+- `Mesmo error -8` (`INSUFFICIENT_FUNDS`) means the supplied UTXOs can't cover outputs + fee.
 
 ### `tx.from_json` / `plutus.data_to_json` / `plutus.data_from_json` fail
 
@@ -3311,15 +3311,15 @@ Known limitation of the current native library (GraalVM reflection configuration
 
 ## Building the native library from source
 
-Needed only on platforms without a prebuilt library (macOS Intel) or for development against the bridge itself:
+Needed only on platforms without a prebuilt library (macOS Intel) or for development against Mesmo itself:
 
 ```bash
-git clone https://github.com/bloxbean/cardano-client-bindings
-cd cardano-client-bindings
+git clone https://github.com/bloxbean/mesmo
+cd mesmo
 sdk install java 25.0.3-graal        # GraalVM with native-image
-./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libccl.*
+./gradlew :core:nativeCompile        # → core/build/native/nativeCompile/libmesmo.*
 export PYTHONPATH=$PWD/wrappers/python
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 ```
 
 ## Platform support
@@ -3332,7 +3332,7 @@ export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
 | macOS Intel | ❌ | Oracle GraalVM dropped Intel Macs |
 | Windows x86_64 | ✅ | |
 
-> Alpine/musl: the musl native library exists (the Go/Rust/JS wrappers use it), but musllinux wheel publishing is still being wired up — on Alpine, install from source with `CCL_LIB_PATH` pointing at the musl `libccl.so` for now.
+> Alpine/musl: the musl native library exists (the Go/Rust/JS wrappers use it), but musllinux wheel publishing is still being wired up — on Alpine, install from source with `MESMO_LIB_PATH` pointing at the musl `libmesmo.so` for now.
 
 
 ---
@@ -3350,7 +3350,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 
 ## Overview
 
-- **Single function**: `ccl_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json, additional_signers)` → returns `0` on success.
+- **Single function**: `mesmo_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json, additional_signers)` → returns `0` on success.
 - **Result**: a YAML document with `tx_cbor` (unsigned transaction), `tx_hash`, and `fee`.
 - **Fully offline**: the caller supplies UTXOs and protocol parameters — the native library makes no
   HTTP calls and never submits. (The native entry point has no provider mode; each wrapper offers a
@@ -3361,7 +3361,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 ### Entry point
 
 ```c
-int ccl_quicktx_build(
+int mesmo_quicktx_build(
     graal_isolatethread_t* thread,
     const char* yaml,                  // TxPlan YAML
     const char* utxos_json,            // JSON array of UTXOs
@@ -3375,7 +3375,7 @@ int ccl_quicktx_build(
 
 | Code | Meaning |
 |------|---------|
-| `0`  | Success — retrieve the result via `ccl_get_result(thread)` |
+| `0`  | Success — retrieve the result via `mesmo_get_result(thread)` |
 | `-2` | Invalid argument (e.g. missing YAML or protocol parameters) |
 | `-8` | Insufficient funds (UTXOs can't cover outputs + fees) |
 | `-10`| Transaction build failure (e.g. malformed TxPlan) |
@@ -3442,7 +3442,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 | `native_script` | Attach a native script |
 | `script_collect_from` / `script_minting` / `validator` | Plutus script operations |
 
-> The exact YAML fields for each intent come from CCL's TxPlan serialization. This bridge passes the
+> The exact YAML fields for each intent come from CCL's TxPlan serialization. This Mesmo passes the
 > YAML through unchanged, so the authoritative field reference is the CCL `quicktx` module
 > (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre4`). Known-good shapes for every intent
 > are cataloged in [Intent catalog — verified shapes](#intent-catalog--verified-shapes) below.
@@ -3452,7 +3452,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 > [Scalus](https://scalus.org) UPLC evaluator (see [ADR-0013](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0013-transaction-evaluators.md)).
 > To supply your own units instead — from Ogmios, Blockfrost, Aiken, or any other evaluator — pass
 > `exec_units_json`, a JSON array of `[{mem, steps}]`, one per redeemer in transaction order; the
-> bridge then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
+> Mesmo then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
 > Explicit units always take precedence over the Scalus default.
 
 > **Witness budgeting is caller-supplied.** `additional_signers` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate (`payment`+`stake` signing), `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
@@ -3559,14 +3559,14 @@ transaction:
             - unit: lovelace
               quantity: "2000000"
         - type: metadata
-          metadata: '{"674": {"msg": "Hello from Cardano Client Bindings"}}'
+          metadata: '{"674": {"msg": "Hello from Mesmo"}}'
 ```
 
 ### 5. Plutus mint (with caller-supplied execution units)
 
 A script intent goes under `scripts:` (the validator) with the operation in `intents:`. Execution
 units are optional — omitted, the embedded Scalus evaluator computes them offline; this example
-supplies them explicitly, in which case the bridge stamps them on without running the script.
+supplies them explicitly, in which case Mesmo stamps them on without running the script.
 
 ```yaml
 version: 1.0
@@ -3843,7 +3843,7 @@ Mint under a Plutus policy (`script_minting`, shown in [example 5](#5-plutus-min
 ## Using it from the wrappers
 
 Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?, additionalSigners)` that
-marshals the chain data to JSON, calls `ccl_quicktx_build`, and parses the YAML result — plus a
+marshals the chain data to JSON, calls `mesmo_quicktx_build`, and parses the YAML result — plus a
 `build_with(yaml, provider, senders, additionalSigners, evaluator?)` convenience that fetches the
 chain data from a provider first (see
 each wrapper's providers guide). The result is an object/dict/struct with `tx_cbor`, `tx_hash`, and
@@ -3860,9 +3860,9 @@ submit it yourself.
 ### Python
 
 ```python
-from ccl import CclLib, Network, SigningRole
+from mesmo import Mesmo, Network, SigningRole
 
-lib = CclLib()
+lib = Mesmo()
 # additional_signers: witnesses beyond the input-implied payment key(s) — here 1 (a stake cert)
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params, additional_signers=1)
 with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
@@ -3872,36 +3872,36 @@ with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
 ### JavaScript (Bun)
 
 ```javascript
-import { CclBridge, TESTNET, SigningRole } from '@bloxbean/cardano-client-lib';
+import { Mesmo, TESTNET, SigningRole } from '@bloxbean/mesmo';
 
-const bridge = new CclBridge();
-const result = bridge.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
-using acct = bridge.accounts.fromMnemonic(mnemonic, TESTNET);
+const lib = new Mesmo();
+const result = lib.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
+using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);
 const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 ```
 
 ### Go
 
 ```go
-bridge, _ := ccl.New()
-defer bridge.Close()
+lib, _ := mesmo.New()
+defer lib.Close()
 
-result, _ := bridge.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
-acct, _ := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)
+result, _ := lib.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
+acct, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
 defer acct.Close()
-signed, _ := acct.SignTx(result.TxCbor, ccl.RolePayment|ccl.RoleStake)
+signed, _ := acct.SignTx(result.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
 ### Rust
 
 ```rust
-let bridge = ccl::Bridge::new().unwrap();
+let lib = mesmo::Mesmo::new().unwrap();
 
-use ccl::accounts::SigningRole;
+use mesmo::accounts::SigningRole;
 
-let result = bridge.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
-let acct = bridge.accounts()
-    .from_mnemonic(&mnemonic, ccl::Network::Testnet, 0, 0)
+let result = lib.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
+let acct = lib.accounts()
+    .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
     .unwrap();
 let signed = acct
     .sign_tx(&result.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)
@@ -3917,7 +3917,7 @@ See each wrapper's `examples/transaction.*` for a complete build-and-sign progra
 
 Source: https://pages.bloxbean.com/mesmo/reference/platforms/
 
-The native library (`libccl`) is a platform-specific binary built with GraalVM native-image. This page is the single answer to "does it run on my machine, and how big is it?".
+The native library (`libmesmo`) is a platform-specific binary built with GraalVM native-image. This page is the single answer to "does it run on my machine, and how big is it?".
 
 ## Platform support matrix
 
@@ -3937,14 +3937,14 @@ The Linux builds are deliberately conservative: built inside `manylinux_2_28` fo
 ## Size
 
 - **Native library:** ~50–60 MB uncompressed per platform. The embedded [Scalus](https://scalus.org) UPLC evaluator — which is what lets Plutus transactions build fully offline — accounts for roughly 12 MB.
-- **Wrapper packages:** Python wheels and npm platform packages bundle the library, so they weigh tens of MB (compressed). Rust and Go keep their packages small: the crate/module is source-only and fetches the library once (Rust at first build, Go at first use, both cached; `CCL_LIB_PATH` overrides).
+- **Wrapper packages:** Python wheels and npm platform packages bundle the library, so they weigh tens of MB (compressed). Rust and Go keep their packages small: the crate/module is source-only and fetches the library once (Rust at first build, Go at first use, both cached; `MESMO_LIB_PATH` overrides).
 
 ## How the library reaches you
 
-Every wrapper resolves `libccl` in the same priority order:
+Every wrapper resolves `libmesmo` in the same priority order:
 
 1. an explicit path passed in code;
-2. the `CCL_LIB_PATH` environment variable (local development);
+2. the `MESMO_LIB_PATH` environment variable (local development);
 3. the copy bundled in / cached by the installed package;
 4. the OS loader's default search paths.
 
@@ -3953,7 +3953,7 @@ Every wrapper resolves `libccl` in the same priority order:
 | Python | platform wheel bundles the lib | No — at install |
 | JavaScript | npm platform packages via `optionalDependencies` (musl selected by the `libc` field) | No — at install |
 | Rust | `build.rs` fetches from the GitHub release, stages with `@rpath` | Once, at first build |
-| Go | pure-Go runtime resolution: `CCL_LIB_PATH` → user cache → one-time download | Once, at first use |
+| Go | pure-Go runtime resolution: `MESMO_LIB_PATH` → user cache → one-time download | Once, at first use |
 
 ## Runtimes
 
@@ -3970,8 +3970,8 @@ Needed only on unsupported platforms or for developing the bindings themselves �
 git clone https://github.com/bloxbean/mesmo
 cd mesmo
 sdk install java 25.0.3-graal
-./gradlew :core:nativeCompile     # → core/build/native/nativeCompile/libccl.*
-export CCL_LIB_PATH=$PWD/core/build/native/nativeCompile
+./gradlew :core:nativeCompile     # → core/build/native/nativeCompile/libmesmo.*
+export MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile
 ```
 
 Each language's *Troubleshooting* page covers the loader environment variables and common load errors.
@@ -3987,7 +3987,7 @@ An honest list — read this before building on the bindings. Items are marked *
 
 ## Offline by design
 
-**By design.** The native library is offline, stateless, and side-effect-free: it makes **no network calls and never submits a transaction**. You supply chain data (UTXOs, protocol parameters) and submit the signed CBOR yourself with any HTTP client. Optional wrapper-side providers (Yaci DevKit, Blockfrost) and remote evaluators exist as conveniences — networking lives in the wrappers, never in `libccl`. Backend modules like Blockfrost/Koios/Ogmios clients are intentionally out of scope.
+**By design.** The native library is offline, stateless, and side-effect-free: it makes **no network calls and never submits a transaction**. You supply chain data (UTXOs, protocol parameters) and submit the signed CBOR yourself with any HTTP client. Optional wrapper-side providers (Yaci DevKit, Blockfrost) and remote evaluators exist as conveniences — networking lives in the wrappers, never in `libmesmo`. Backend modules like Blockfrost/Koios/Ogmios clients are intentionally out of scope.
 
 ## JavaScript runs on Bun only
 
@@ -4012,14 +4012,14 @@ Plutus transactions build fully offline: when you supply no execution units, the
 
 ## Threading models differ per language
 
-- **Python**: one `CclLib` may be shared across threads — each OS thread attaches to the isolate lazily.
-- **Go**: all native calls are **serialized** onto one dedicated OS thread per `Bridge` (GraalVM isolates are thread-affine and goroutines migrate). Correctness over raw concurrency; use multiple `Bridge` instances for parallelism.
-- After `close()`, calls fail with a catchable error (e.g. Python's `CclClosedError`) — this guards against passing a stale isolate handle to the native side, which would abort the whole process.
+- **Python**: one `Mesmo` may be shared across threads — each OS thread attaches to the isolate lazily.
+- **Go**: all native calls are **serialized** onto one dedicated OS thread per `Mesmo` (GraalVM isolates are thread-affine and goroutines migrate). Correctness over raw concurrency; use multiple `Mesmo` instances for parallelism.
+- After `close()`, calls fail with a catchable error (e.g. Python's `MesmoClosedError`) — this guards against passing a stale isolate handle to the native side, which would abort the whole process.
 
 ## Format & versioning caveats
 
 - **Pre-1.0, tracking a preview CCL.** The bindings target CCL `0.8.0-pre4`; the TxPlan schema is CCL's and will be re-pinned when CCL `0.8.0` stabilizes. Expect breaking changes before 1.0.
-- **Wrapper ↔ library version lock.** The wrapper and native library must match on base semver; a mismatch fails fast at load (`CCL_SKIP_VERSION_CHECK=1` overrides at your own risk).
+- **Wrapper ↔ library version lock.** The wrapper and native library must match on base semver; a mismatch fails fast at load (`MESMO_SKIP_VERSION_CHECK=1` overrides at your own risk).
 - **Network enum ≠ on-chain network id.** `Network.MAINNET == 0` but a mainnet address's on-chain `network_id` is `1`. Never feed `address.info()["network_id"]` back into an API that takes a `network`.
 - **Quantities are strings.** Chain data carries amounts as strings (`"quantity": "5000000"`) to avoid 2^53 float truncation — mind this in JavaScript especially.
 
@@ -4043,7 +4043,7 @@ Significant decisions are recorded as [Architecture Decision Records](https://gi
 | Decision | ADR |
 |---|---|
 | CCL compiled to a native shared library with a C ABI (GraalVM native-image); no JVM at runtime | [0001](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0001-native-shared-library-ffi.md) |
-| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libccl` | [0002](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
+| The native lib is offline & stateless — caller-supplied chain data, no HTTP inside `libmesmo` | [0002](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0002-offline-stateless-no-provider.md) |
 | Four thin language wrappers over one uniform FFI | [0003](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0003-four-language-wrappers-uniform-ffi.md) |
 | Bun is the only supported JavaScript runtime | [0004](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0004-bun-only-javascript-runtime.md) |
 | Toolchain pinned to Oracle GraalVM 25.0.3 | [0005](https://github.com/bloxbean/mesmo/blob/develop/docs/adr/0005-oracle-graalvm-25.md) |
@@ -4061,4 +4061,4 @@ Significant decisions are recorded as [Architecture Decision Records](https://gi
 
 ## The architecture in one paragraph
 
-CCL (Java) is compiled by GraalVM native-image into `libccl`, exposing `ccl_*` entry points over a C ABI where data crosses as C strings (JSON/YAML/hex). Four thin wrappers — Python (ctypes), Go (purego), Rust (FFI), JS (Bun FFI) — bind the same entry-point set, verified by a CI parity check. The core is strictly offline; anything that touches the network (chain-data providers, remote evaluators) lives in the wrappers using each language's own HTTP stack. Transactions are described in CCL's TxPlan YAML and built offline, with Plutus execution units computed in-process by the embedded Scalus evaluator unless supplied or delegated to a remote evaluator.
+CCL (Java) is compiled by GraalVM native-image into `libmesmo`, exposing `mesmo_*` entry points over a C ABI where data crosses as C strings (JSON/YAML/hex). Four thin wrappers — Python (ctypes), Go (purego), Rust (FFI), JS (Bun FFI) — bind the same entry-point set, verified by a CI parity check. The core is strictly offline; anything that touches the network (chain-data providers, remote evaluators) lives in the wrappers using each language's own HTTP stack. Transactions are described in CCL's TxPlan YAML and built offline, with Plutus execution units computed in-process by the embedded Scalus evaluator unless supplied or delegated to a remote evaluator.

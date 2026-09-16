@@ -25,7 +25,7 @@ curl -o CLAUDE.md https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 Claude Code reads `CLAUDE.md` at the start of every session, so the agent always has the bindings' contract in context. For multi-project setups, reference the hosted version from your global `~/.claude/CLAUDE.md`:
 
 ```markdown
-When working with the Mesmo bindings (Python/Go/Rust/JS `ccl` packages),
+When working with the Mesmo bindings (Python/Go/Rust/JS `mesmo` packages),
 follow https://pages.bloxbean.com/mesmo/ai/starter-pack/
 ```
 
@@ -35,7 +35,7 @@ Add a project rule:
 
 ```bash
 mkdir -p .cursor/rules
-curl -o .cursor/rules/ccl-bindings.mdc https://pages.bloxbean.com/mesmo/ai/starter-pack.md
+curl -o .cursor/rules/mesmo-bindings.mdc https://pages.bloxbean.com/mesmo/ai/starter-pack.md
 ```
 
 ### Continue (VS Code / JetBrains)

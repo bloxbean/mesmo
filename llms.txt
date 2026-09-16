@@ -1,6 +1,6 @@
 # Mesmo
 
-> Cardano Client Lib (CCL) compiled to a native shared library (libccl) with a C ABI,
+> Cardano Client Lib (CCL) compiled to a native shared library (libmesmo) with a C ABI,
 > plus four first-class language wrappers — Python, Go, Rust, and JavaScript (Bun) —
 > for fully offline Cardano key derivation, address handling, transaction building
 > (TxPlan YAML), signing, Plutus data, and governance operations. No JVM at runtime.
