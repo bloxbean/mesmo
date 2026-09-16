@@ -351,7 +351,7 @@ class Mesmo:
 
 
 class MesmoError(Exception):
-    """Exception raised for CCL errors."""
+    """Exception raised for Mesmo errors."""
 
     def __init__(self, code, message):
         self.code = code

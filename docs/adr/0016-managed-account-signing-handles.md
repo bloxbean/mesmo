@@ -87,7 +87,7 @@ Exact names and result mechanics may change during implementation, but these inv
 - Network, account index, and address index are fixed when the Account is opened. Signing takes a
   transaction and typed role selection, not mnemonic/network/path arguments.
 - Handles are scoped to one Mesmo/GraalVM isolate and allocated from a per-isolate randomized
-  62-bit space. Foreign, closed, and stale handles fail with a normal CCL error rather than
+  62-bit space. Foreign, closed, and stale handles fail with a normal Mesmo error rather than
   accessing another object — foreign-handle detection is *statistical* (collision odds ~2⁻⁶²), not
   structural; a fixed counter would make cross-isolate collisions certain and let a foreign handle
   silently alias a real account, which the wrong-pairing regression test pins against.
@@ -238,7 +238,7 @@ The Rust Account will be an **owned value holding shared ownership of Mesmo's is
 (reference-counted internally), not a type that borrows the Mesmo with a lifetime parameter
 (`Account<'Mesmo>`). Validity is enforced at runtime, exactly as the handle invariants above
 require for every wrapper: a call on an Account whose Mesmo has been closed — or whose own handle
-was closed — fails with a normal CCL error rather than touching freed native memory. `Drop` closes
+was closed — fails with a normal Mesmo error rather than touching freed native memory. `Drop` closes
 the native handle; explicit close remains available.
 
 Rationale for owned over borrowed: a borrowed `Account<'Mesmo>` cannot be stored in the same
