@@ -2,15 +2,14 @@ name: Deploy Website to GitHub Pages
 
 on:
   push:
-    tags:
-      - 'dv*'
-    # Temporary while the docsite PR is in review, so the preview at
-    # bloxbean.github.io/cardano-client-bindings stays current; remove the
-    # branch trigger after merge (dv* tags / manual dispatch take over).
+    # The live site tracks main: a promotion that touches the site (or the docs
+    # it imports at build time) redeploys automatically. Manual dispatch covers
+    # everything else (pick the ref to deploy from).
     branches:
-      - feature/docsite
+      - main
     paths:
       - 'website/**'
+      - 'docs/**'
       - '.github/workflows/website-deploy.yml'
   workflow_dispatch:
 
