@@ -163,6 +163,8 @@ A fallback is only trustworthy if its costs are stated plainly:
 - **Binary size.** You are adding a ~50 MB platform-specific native library to your dependency tree.
 - **Not a node client.** No node protocols, no chain sync, no submission — by design. Chain data for building comes through the `ChainDataProvider` interface (Yaci-Store and Blockfrost implementations included, or your own); submission is your HTTP stack's job.
 - **Platform coverage.** See the matrix above — a pure-language library has no such constraints.
+- **JavaScript means Bun, not Node.** Node's FFI bridges (ffi-napi, koffi) crash against GraalVM native libraries, so the JavaScript wrapper requires the [Bun](https://bun.sh) runtime. For teams committed to Node.js, that is a real adoption barrier today (the planned WebAssembly target is the eventual answer).
+- **Pre-release maturity.** Mesmo tracks CCL's 0.8 pre-release line and is itself pre-1.0; APIs can still change before the beta designation. The devnet-verified CI keeps behavior honest, but version-pinning discipline is on you until then.
 
 If none of the gaps Mesmo fills apply to you, the honest advice remains: use your ecosystem's native library.
 
