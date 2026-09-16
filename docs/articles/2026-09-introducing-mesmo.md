@@ -166,7 +166,9 @@ If none of the gaps Mesmo fills apply to you, the honest advice remains: use you
 
 ## What's next
 
-Three things are on the roadmap:
+Four things are on the roadmap:
+
+- **More chain-data providers.** The `ChainDataProvider` seam is deliberately small, and today it ships with Yaci-Store and Blockfrost implementations. Additional out-of-the-box providers are planned — **Ogmios**, **Koios**, and **Dolos** — so UTXO selection works against whichever data backend your infrastructure already runs.
 
 - **Beta, in step with upstream.** Mesmo currently builds on CCL **0.8.0-pre5** — a pre-release, because Mesmo's transaction model relies on TxPlan, which became available in Cardano Client Lib only with the 0.8 line. When cardano-client-lib graduates out of pre-release, Mesmo moves to a beta designation on the stable pin.
 - **A programmatic QuickTx builder in all four languages.** Today transactions are described as TxPlan YAML documents. A code-first QuickTx builder — expressed in each wrapper's own idiom, on top of the same core — is planned, so teams that prefer constructing transactions in code get the same single-implementation semantics.
