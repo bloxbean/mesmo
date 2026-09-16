@@ -38,21 +38,22 @@ Transaction *submission* stays in your code, where every language already has go
 
 Transactions are described declaratively as a **TxPlan** — say what should happen; UTXO selection, fees, and change are handled by the library. TxPlan is a capability of CCL's 0.8 line, which is why Mesmo builds on it: the current pin is **CCL 0.8.0-pre5**, and Mesmo tracks upstream releases closely.
 
+Here is a complete TxPlan for the simplest possible transaction — send 5 ADA from one address to another:
+
 ```yaml
 version: 1.0
 transaction:
   - tx:
-      from: addr_test1qz2fxv…
+      from: addr_test1qz2fxv…        # sender: inputs are selected from this address's UTXOs
       intents:
         - type: payment
-          address: addr_test1qp9khl…
+          address: addr_test1qp9khl…  # recipient
           amounts:
             - unit: lovelace
-              quantity: "5000000"
-        - type: stake_delegation
-          stake_address: stake_test1uq…
-          pool_id: pool1pu5jlj…
+              quantity: "5000000"     # 5 ADA
 ```
+
+That document is everything: `from` names the sender whose UTXOs fund the transaction, and each entry under `intents` declares one thing the transaction should do. Input selection, fee calculation, and the change output back to the sender all happen inside the library. Intents compose — add a `stake_delegation` intent next to the `payment` and both land in one transaction; the same pattern covers staking certificates, governance actions, pool operations, minting, and Plutus scripts.
 
 The same document, byte-for-byte, produces the same transaction from every wrapper — because it is the same code building it.
 
