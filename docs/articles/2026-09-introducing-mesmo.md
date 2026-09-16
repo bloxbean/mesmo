@@ -54,7 +54,9 @@ transaction:
           pool_id: pool1pu5jlj…
 ```
 
-The same document, byte-for-byte, produces the same transaction from every wrapper — because it is the same code building it. Every intent shape is verified in CI by submitting it to a real devnet from all four languages, including negative cases (a purpose-built Aiken validator that must reject on-chain).
+The same document, byte-for-byte, produces the same transaction from every wrapper — because it is the same code building it.
+
+If you're going to rely on a fallback library for exactly the features your main SDK lacks, the question that matters is: *do the transactions it builds actually get accepted by the network?* Mesmo answers that empirically. On every change, CI builds each supported transaction type — payments, staking certificates, governance actions, pool operations, native and Plutus scripts — in all four languages and submits them to a real Cardano devnet node; the node accepting the transaction is the test, not a mock of it. The reverse is proven too: transactions that *should* fail script validation are submitted and must be rejected on-chain — so error handling is as tested as the happy path.
 
 ## The four wrappers
 
