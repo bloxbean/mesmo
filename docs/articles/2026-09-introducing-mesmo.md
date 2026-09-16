@@ -2,6 +2,8 @@
 
 *A technical introduction to Mesmo — Cardano Client Lib compiled to a native shared library, with first-class wrappers for Python, Go, Rust, and JavaScript.*
 
+*September 16, 2026*
+
 ---
 
 Cardano's developer ecosystem is genuinely multilingual. Python teams build on [pycardano](https://github.com/Python-Cardano/pycardano), TypeScript teams on [MeshJS](https://meshjs.dev) or [Lucid Evolution](https://github.com/Anastasia-Labs/lucid-evolution), Rust teams on [pallas](https://github.com/txpipe/pallas), Go teams on [gOuroboros](https://github.com/blinklabs-io/gouroboros) or [Apollo](https://github.com/Salvionied/apollo). These are good libraries, and if one of them serves your needs, you should use it.
@@ -53,9 +55,20 @@ transaction:
               quantity: "5000000"     # 5 ADA
 ```
 
-That document is everything: `from` names the sender whose UTXOs fund the transaction, and each entry under `intents` declares one thing the transaction should do. Input selection, fee calculation, and the change output back to the sender all happen inside the library. Intents compose — add a `stake_delegation` intent next to the `payment` and both land in one transaction; the same pattern covers staking certificates, governance actions, pool operations, minting, and Plutus scripts.
+That document is everything: `from` names the sender whose UTXOs fund the transaction, and each entry under `intents` declares one thing the transaction should do. Input selection, fee calculation, and the change output back to the sender all happen inside the library. Intents compose — add a `stake_delegation` intent next to the `payment` and both land in one transaction.
 
-The same document, byte-for-byte, produces the same transaction from every wrapper — because it is the same code building it.
+Concretely, these are the transaction types Mesmo builds at the time of writing:
+
+| Family | Supported |
+|---|---|
+| **Payments** | ADA and native-token payments, multiple recipients per transaction, transaction metadata, explicit input selection, read-only reference inputs (CIP-31), multi-party composition (several senders in one transaction) |
+| **Staking** | stake address registration and deregistration, delegation to a pool, reward withdrawal |
+| **Governance (Conway)** | DRep registration, update, and deregistration; vote delegation; casting votes; submitting governance actions; treasury donations |
+| **Stake pools** | pool registration, update, and retirement |
+| **Native scripts** | minting and burning under native-script policies, spending from native-script addresses |
+| **Plutus** | minting under Plutus policies, locking at and spending from script addresses, with execution units costed by the embedded Scalus evaluator or a pluggable remote one |
+
+The same document, byte-for-byte, produces the same transaction from every wrapper — because it is the same code building it. And every row in the table above is exercised end-to-end in CI — which brings us to the question of trust.
 
 If you're going to rely on a fallback library for exactly the features your main SDK lacks, the question that matters is: *do the transactions it builds actually get accepted by the network?* Mesmo answers that empirically. On every change, CI builds each supported transaction type — payments, staking certificates, governance actions, pool operations, native and Plutus scripts — in all four languages and submits them to a real Cardano devnet node; the node accepting the transaction is the test, not a mock of it. The reverse is proven too: transactions that *should* fail script validation are submitted and must be rejected on-chain — so error handling is as tested as the happy path.
 
