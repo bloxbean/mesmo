@@ -5,7 +5,7 @@ plugins {
 
 base.archivesName = 'cardano-client-lib-core'
 
-def cclVersion = '0.8.0-pre4'
+def cclVersion = '0.8.0-pre5'
 
 dependencies {
     // CCL core modules (offline-only, no backend HTTP)

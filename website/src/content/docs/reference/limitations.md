@@ -38,7 +38,7 @@ Plutus transactions build fully offline: when you supply no execution units, the
 
 ## Format & versioning caveats
 
-- **Pre-1.0, tracking a preview CCL.** The bindings target CCL `0.8.0-pre4`; the TxPlan schema is CCL's and will be re-pinned when CCL `0.8.0` stabilizes. Expect breaking changes before 1.0.
+- **Pre-1.0, tracking a preview CCL.** The bindings target CCL `0.8.0-pre5`; the TxPlan schema is CCL's and will be re-pinned when CCL `0.8.0` stabilizes. Expect breaking changes before 1.0.
 - **Wrapper ↔ library version lock.** The wrapper and native library must match on base semver; a mismatch fails fast at load (`MESMO_SKIP_VERSION_CHECK=1` overrides at your own risk).
 - **Network enum ≠ on-chain network id.** `Network.MAINNET == 0` but a mainnet address's on-chain `network_id` is `1`. Never feed `address.info()["network_id"]` back into an API that takes a `network`.
 - **Quantities are strings.** Chain data carries amounts as strings (`"quantity": "5000000"`) to avoid 2^53 float truncation — mind this in JavaScript especially.

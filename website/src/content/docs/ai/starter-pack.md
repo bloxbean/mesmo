@@ -239,7 +239,7 @@ Predicates (`validate`, `validate_mnemonic`, `verify`) return false instead of r
 3. **JS = Bun only.** Never scaffold the JS wrapper with Node.js/`npm run` — use `bun`.
 4. **Go calls are serialized** per `Mesmo` (one OS thread owns the isolate). For parallelism use multiple `Mesmo` instances.
 5. **Version lock**: wrapper and native lib must match base semver; local dev uses `MESMO_LIB_PATH` to point at a built library.
-6. **Pre-1.0** against CCL `0.8.0-pre4` — APIs may change.
+6. **Pre-1.0** against CCL `0.8.0-pre5` — APIs may change.
 7. **Platforms**: no macOS Intel, no Windows ARM64; Alpine Python is source-install for now.
 
 ## 11. Doc links (for deeper retrieval)
