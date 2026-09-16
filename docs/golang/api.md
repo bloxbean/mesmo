@@ -81,7 +81,8 @@ Predicate methods (`Address.Validate`, `Crypto.ValidateMnemonic`, `Crypto.Verify
 ## bridge.Accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
-account API.
+account API. The account object retains only the hardened account-level key
+(`m/1852'/1815'/account'`) — never your recovery phrase.
 
 ```go
 acct, err := bridge.Accounts.FromMnemonic(mnemonic, ccl.Testnet, 0, 0)  // or bridge.Accounts.Create(...)

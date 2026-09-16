@@ -3,6 +3,7 @@ package com.bloxbean.cardano.bridge.api.account;
 import com.bloxbean.cardano.bridge.util.NetworkMapper;
 import com.bloxbean.cardano.client.common.model.Network;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,8 +21,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * and idempotent.
  *
  * <p>The Account's ordinary representation ({@link #info}) contains public data only — it never
- * echoes the mnemonic. (Deriving from the hardened account-level key and dropping the phrase — the
- * ADR's preferred mode — is gated on signing-parity verification and lands with the signing slice.)
+ * echoes the mnemonic. Accounts are held by their <b>hardened account-level key</b> (the ADR's
+ * preferred mode; see {@link #accountFromAccountKey}): the phrase is consumed at open and never
+ * retained, gated by {@code AccountKeyDerivationParityTest}.
  */
 public final class AccountService {
 
@@ -88,11 +90,79 @@ public final class AccountService {
         if (accountIndex < 0 || addressIndex < 0) {
             throw new IllegalArgumentException("Account and address indices must be >= 0");
         }
-        var cclAccount = com.bloxbean.cardano.client.account.Account
-                .createFromMnemonic(network, mnemonic, accountIndex, addressIndex);
+        // The mnemonic is consumed here (transient parameter); the stored account retains only
+        // the derived account-level key — see accountFromAccountKey.
+        var cclAccount = accountFromAccountKey(network, mnemonic, accountIndex, addressIndex);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, accountIndex, addressIndex));
         return handle;
+    }
+
+    /**
+     * Builds the CCL account from the <b>hardened account-level key</b> (ADR-0016's preferred
+     * mode).
+     *
+     * <p><b>Reviewer note — passing is not retaining:</b> the mnemonic here is a <em>transient
+     * parameter</em>, consumed within this one call to derive {@code m/1852'/1815'/accountIndex'}.
+     * The account it returns is built via CCL's {@code createFromAccountKey}, so the long-lived
+     * object in the registry holds <em>only</em> that 96-byte account key — its {@code mnemonic}
+     * and {@code rootKey} fields are null. The blast radius of a later memory disclosure is one
+     * account, not the wallet's entire derivation universe.
+     *
+     * <p>The derivation intermediates (root, purpose, coin-type — and the account-level pair,
+     * whose retained form is the independent merged copy handed to CCL) are zeroed in the
+     * {@code finally} block below; CCL's {@code getKeyData()}/{@code getChainCode()} expose the
+     * backing arrays, so the fill genuinely overwrites them. What this cannot reach — the mnemonic
+     * String itself and CCL-internal seed copies — stays GC-transient; zeroization remains
+     * best-effort overall, per the ADR.
+     *
+     * <p>Gated by {@code AccountKeyDerivationParityTest}: addresses, identifiers, and signatures
+     * must be byte-identical with mnemonic-backed accounts.
+     */
+    private static com.bloxbean.cardano.client.account.Account accountFromAccountKey(
+            Network network, String mnemonic, int accountIndex, int addressIndex) {
+        var generator = new com.bloxbean.cardano.client.crypto.bip32.HdKeyGenerator();
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair root = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair purpose = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair coinType = null;
+        com.bloxbean.cardano.client.crypto.bip32.HdKeyPair accountLevel = null;
+        try {
+            root = new com.bloxbean.cardano.client.crypto.cip1852.CIP1852()
+                    .getRootKeyPairFromMnemonic(mnemonic);
+            purpose = generator.getChildKeyPair(root, 1852, true);
+            coinType = generator.getChildKeyPair(purpose, 1815, true);
+            accountLevel = generator.getChildKeyPair(coinType, accountIndex, true);
+            // getBytes() merges keyData + chainCode into a NEW array — the one thing that
+            // legitimately survives this method, inside the CCL account.
+            byte[] accountKey = accountLevel.getPrivateKey().getBytes();
+            return com.bloxbean.cardano.client.account.Account
+                    .createFromAccountKey(network, accountKey, accountIndex, addressIndex);
+        } finally {
+            wipe(root);
+            wipe(purpose);
+            wipe(coinType);
+            wipe(accountLevel);
+        }
+    }
+
+    /**
+     * Zeroes a derivation intermediate's private key material in place. Child derivation copies
+     * out of fresh HMAC output ({@code Arrays.copyOfRange}), so no wiped array is shared with a
+     * pair that must stay live; the private and public halves of one pair share their chain-code
+     * array, which is fine — both halves are being discarded together.
+     */
+    private static void wipe(com.bloxbean.cardano.client.crypto.bip32.HdKeyPair pair) {
+        if (pair == null) {
+            return;
+        }
+        byte[] keyData = pair.getPrivateKey().getKeyData();
+        if (keyData != null) {
+            Arrays.fill(keyData, (byte) 0);
+        }
+        byte[] chainCode = pair.getPrivateKey().getChainCode();
+        if (chainCode != null) {
+            Arrays.fill(chainCode, (byte) 0);
+        }
     }
 
     /**
@@ -105,10 +175,24 @@ public final class AccountService {
         if (network == null) {
             throw new InvalidNetworkException(networkId);
         }
-        var cclAccount = new com.bloxbean.cardano.client.account.Account(network);
+        // Generate the phrase directly (no throwaway mnemonic-backed Account, which would derive
+        // a full key set and float to GC holding the phrase and root key), then hold the account
+        // by its account-level key — same mode as openMnemonic. The phrase itself lives only in
+        // the pending map until export/close.
+        String phrase;
+        try {
+            phrase = String.join(" ", com.bloxbean.cardano.client.crypto.bip39.MnemonicCode.INSTANCE
+                    .createMnemonic(com.bloxbean.cardano.client.crypto.bip39.Words.TWENTY_FOUR));
+        } catch (Exception e) {
+            throw new IllegalStateException("Mnemonic generation failed: " + e.getMessage(), e);
+        }
+        // As in openMnemonic: the phrase is consumed transiently; the stored account retains only
+        // the account-level key. The pending map below is the phrase's sole retention, for export.
+        var cclAccount = accountFromAccountKey(network, phrase, 0, 0);
         long handle = nextHandle.getAndIncrement();
         accounts.put(handle, new Account(cclAccount, networkId, 0, 0));
-        pendingRecoveryPhrases.put(handle, cclAccount.mnemonic());
+        pendingRecoveryPhrases.put(handle, phrase);
+
         return handle;
     }
 

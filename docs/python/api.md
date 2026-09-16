@@ -64,7 +64,8 @@ Predicate methods (`address.validate`, `crypto.validate_mnemonic`, `crypto.verif
 ## lib.accounts — managed accounts
 
 Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
-account API.
+account API. The account object retains only the hardened account-level key
+(`m/1852'/1815'/account'`) — never your recovery phrase.
 
 ```python
 from ccl import SigningRole, CclInvalidHandleError
