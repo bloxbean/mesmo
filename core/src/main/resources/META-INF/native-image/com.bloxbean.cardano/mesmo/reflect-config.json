@@ -456,6 +456,24 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "com.bloxbean.cardano.client.quicktx.intent.UtxoRefDeserializer",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.bloxbean.cardano.client.quicktx.intent.TxInputRef",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.bloxbean.cardano.client.quicktx.intent.FlowOutputRef",
+    "allDeclaredConstructors": true,
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.bloxbean.cardano.client.quicktx.intent.DRepDeregistrationIntent",
     "allDeclaredConstructors": true,
     "allDeclaredFields": true,
