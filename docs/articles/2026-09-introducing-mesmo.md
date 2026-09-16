@@ -136,13 +136,27 @@ lib.close();
 
 The JavaScript wrapper targets Bun's built-in FFI and ships full TypeScript definitions. Amounts survive `2^53` intact — provider responses are parsed losslessly, because a UTXO's token quantity routinely exceeds what a JavaScript `number` can hold.
 
+## Supported platforms
+
+Prebuilt native libraries ship for:
+
+| Platform | Notes |
+|---|---|
+| Linux x86_64 (glibc ≥ 2.17) | built against a deliberately old glibc baseline, so it runs on RHEL/CentOS 7+, Amazon Linux 2, Ubuntu 18.04+, Debian 9+, and everything newer |
+| Linux aarch64 (glibc ≥ 2.17) | same baseline |
+| Alpine Linux x86_64 (musl) | detected automatically at runtime — no configuration |
+| macOS Apple Silicon | |
+| Windows x86_64 | |
+
+Two gaps, stated plainly: **macOS Intel** (Oracle GraalVM no longer ships Intel-Mac builds) and **Alpine on ARM** (GraalVM's musl support is x86_64-only). On those platforms, building the library from source with GraalVM is documented and supported.
+
 ## Being honest about the costs
 
 A fallback is only trustworthy if its costs are stated plainly:
 
 - **Binary size.** You are adding a ~50 MB platform-specific native library to your dependency tree.
 - **Offline only.** No node protocols, no chain sync, no submission — by design. Mesmo builds and signs; your HTTP stack talks to the network.
-- **Platform coverage.** Linux x86_64/aarch64 (glibc ≥ 2.17), Alpine/musl x86_64, macOS Apple Silicon, and Windows x86_64 are prebuilt. macOS Intel and musl-on-ARM are not.
+- **Platform coverage.** See the matrix above — a pure-language library has no such constraints.
 
 If none of the gaps Mesmo fills apply to you, the honest advice remains: use your ecosystem's native library.
 
