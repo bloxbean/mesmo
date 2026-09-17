@@ -5,7 +5,7 @@
 //! - Native library built: ./gradlew :core:nativeCompile
 //!
 //! Run with:
-//!   cd wrappers/rust && CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//!   cd wrappers/rust && MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //!       cargo test --features providers --test quicktx_integration_test -- --test-threads=1
 //!
 //! Shared DevKit plumbing lives in `tests/common/mod.rs` (see that module for the harness the intents
@@ -13,7 +13,7 @@
 
 mod common;
 
-use ccl::Bridge;
+use mesmo::Mesmo;
 use common::*;
 
 // --- YAML builders ---
@@ -43,22 +43,26 @@ fn test_integration_simple_ada_transfer() {
     devkit_reset();
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
-    let (sender, mnemonic) = fund_sender(&bridge, 150);
-    let (receiver, _, _) = get_testnet_account(&bridge);
+    let lib = Mesmo::new().expect("create lib");
+    let (sender, mnemonic) = fund_sender(&lib, 150);
+    let (receiver, _, _) = get_testnet_account(&lib);
 
     let utxos = devkit_get_utxos(&sender);
     let pp = devkit_get_protocol_params();
 
     let yaml = payment_yaml(&sender, &receiver, "5000000");
-    let result = bridge.quicktx().build(&yaml, &utxos, &pp, None).expect("build failed");
+    let result = lib.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build failed");
     assert!(!result.tx_cbor.is_empty());
     assert_eq!(result.tx_hash.len(), 64);
 
-    let signed_tx = bridge
-        .account()
-        .sign_tx(&mnemonic, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-        .expect("sign failed");
+    let signed_tx = {
+        let acct = lib
+            .accounts()
+            .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
+            .expect("open account");
+        acct.sign_tx(&result.tx_cbor, mesmo::accounts::SigningRole::PAYMENT)
+            .expect("sign failed")
+    };
     let tx_hash = devkit_submit_tx(&signed_tx);
     assert!(!tx_hash.is_empty());
 
@@ -76,10 +80,10 @@ fn test_integration_multiple_receivers() {
     devkit_reset();
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
-    let (sender, mnemonic) = fund_sender(&bridge, 150);
-    let (r1, _, _) = get_testnet_account(&bridge);
-    let (r2, _, _) = get_testnet_account(&bridge);
+    let lib = Mesmo::new().expect("create lib");
+    let (sender, mnemonic) = fund_sender(&lib, 150);
+    let (r1, _, _) = get_testnet_account(&lib);
+    let (r2, _, _) = get_testnet_account(&lib);
 
     let utxos = devkit_get_utxos(&sender);
     let pp = devkit_get_protocol_params();
@@ -102,11 +106,15 @@ fn test_integration_multiple_receivers() {
          \x20             quantity: \"2000000\"\n"
     );
 
-    let result = bridge.quicktx().build(&yaml, &utxos, &pp, None).expect("build failed");
-    let signed_tx = bridge
-        .account()
-        .sign_tx(&mnemonic, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-        .expect("sign failed");
+    let result = lib.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build failed");
+    let signed_tx = {
+        let acct = lib
+            .accounts()
+            .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
+            .expect("open account");
+        acct.sign_tx(&result.tx_cbor, mesmo::accounts::SigningRole::PAYMENT)
+            .expect("sign failed")
+    };
     let tx_hash = devkit_submit_tx(&signed_tx);
     assert!(!tx_hash.is_empty());
 
@@ -123,15 +131,15 @@ fn test_integration_insufficient_funds() {
     devkit_reset();
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
-    let (sender, _) = fund_sender(&bridge, 2);
-    let (receiver, _, _) = get_testnet_account(&bridge);
+    let lib = Mesmo::new().expect("create lib");
+    let (sender, _) = fund_sender(&lib, 2);
+    let (receiver, _, _) = get_testnet_account(&lib);
 
     let utxos = devkit_get_utxos(&sender);
     let pp = devkit_get_protocol_params();
 
     let yaml = payment_yaml(&sender, &receiver, "100000000");
-    let result = bridge.quicktx().build(&yaml, &utxos, &pp, None);
+    let result = lib.quicktx().build(&yaml, &utxos, &pp, None, 0);
     assert!(result.is_err(), "expected insufficient funds error");
 }
 
@@ -145,15 +153,15 @@ fn test_integration_build_with_yaci_provider() {
     devkit_reset();
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
-    let (sender, _mnemonic) = fund_sender(&bridge, 150);
-    let (receiver, _, _) = get_testnet_account(&bridge);
+    let lib = Mesmo::new().expect("create lib");
+    let (sender, _mnemonic) = fund_sender(&lib, 150);
+    let (receiver, _, _) = get_testnet_account(&lib);
 
-    let provider = ccl::providers::YaciProvider::default(); // local DevKit cluster
+    let provider = mesmo::providers::YaciProvider::default(); // local DevKit cluster
     let yaml = payment_yaml(&sender, &receiver, "5000000");
-    let result = bridge
+    let result = lib
         .quicktx()
-        .build_with(&yaml, &provider, &sender, None)
+        .build_with(&yaml, &provider, &[sender.as_str()], 0, None)
         .expect("build_with failed");
 
     assert!(!result.tx_cbor.is_empty());
@@ -173,7 +181,7 @@ fn test_integration_donation_treasury() {
     devkit_topup(INTENT_SENDER, 6000);
     wait_for_block();
 
-    let bridge = Bridge::new().expect("create bridge");
+    let lib = Mesmo::new().expect("create lib");
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let pp = devkit_get_protocol_params();
     let base_yaml = read_fixture("donation.yaml");
@@ -185,11 +193,8 @@ fn test_integration_donation_treasury() {
             "current_treasury_value: 0",
             &format!("current_treasury_value: {}", treasury),
         );
-        let result = bridge.quicktx().build(&yaml, &utxos, &pp, None).expect("build");
-        let signed = bridge
-            .account()
-            .sign_tx(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor)
-            .expect("sign");
+        let result = lib.quicktx().build(&yaml, &utxos, &pp, None, 0).expect("build");
+        let signed = intent_sign(&lib, &result.tx_cbor, &["payment"]);
         match devkit_try_submit(&signed) {
             Ok(tx_hash) => {
                 assert!(!tx_hash.is_empty(), "empty tx hash from submit");

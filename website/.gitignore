@@ -1,0 +1,19 @@
+# build output
+dist/
+# generated types
+.astro/
+# dependencies
+node_modules/
+# environment variables
+.env
+.env.production
+# macOS-specific files
+.DS_Store
+
+# Pages imported from ../docs by scripts/import-docs.mjs (npm run import-docs).
+# The markdown under /docs stays canonical; these copies are build artifacts.
+src/content/docs/js/
+src/content/docs/go/
+src/content/docs/rust/
+src/content/docs/python/
+src/content/docs/reference/txplan.md

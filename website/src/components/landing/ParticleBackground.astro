@@ -1,0 +1,90 @@
+<canvas id="particle-bg" class="absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
+
+<script>
+  const canvas = document.getElementById('particle-bg') as HTMLCanvasElement | null;
+  if (canvas) {
+    const ctx = canvas.getContext('2d')!;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const COUNT = 65;
+    const LINK_DIST = 140;
+    const MOUSE_R = 160;
+    // brand blue, light blue, teal
+    const COLORS = [
+      [79, 142, 247],
+      [138, 182, 255],
+      [20, 184, 166],
+    ];
+    let particles: { x: number; y: number; vx: number; vy: number; r: number; c: number[] }[] = [];
+    let mx = -1e4, my = -1e4;
+    let raf = 0;
+
+    function resize() {
+      const parent = canvas.parentElement!;
+      canvas.width = parent.clientWidth * devicePixelRatio;
+      canvas.height = parent.clientHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    }
+
+    function seed() {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      particles = Array.from({ length: COUNT }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: Math.random() < 0.12 ? 2.6 : 1 + Math.random() * 1.6,
+        c: COLORS[Math.random() < 0.2 ? 2 : Math.random() < 0.5 ? 0 : 1],
+      }));
+    }
+
+    function tick() {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      for (const p of particles) {
+        if (!reduced) {
+          p.x += p.vx; p.y += p.vy;
+          const dx = p.x - mx, dy = p.y - my;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < MOUSE_R * MOUSE_R && d2 > 1) {
+            const d = Math.sqrt(d2);
+            p.x += (dx / d) * 0.6; p.y += (dy / d) * 0.6;
+          }
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0.7)`;
+        ctx.fill();
+      }
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i], b = particles[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < LINK_DIST * LINK_DIST) {
+            const alpha = 0.14 * (1 - Math.sqrt(d2) / LINK_DIST);
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = `rgba(79,142,247,${alpha})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+      if (!reduced) raf = requestAnimationFrame(tick);
+    }
+
+    resize(); seed(); tick();
+    addEventListener('resize', () => { resize(); seed(); if (reduced) tick(); });
+    canvas.parentElement!.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      mx = e.clientX - rect.left; my = e.clientY - rect.top;
+    });
+    canvas.parentElement!.addEventListener('mouseleave', () => { mx = my = -1e4; });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) cancelAnimationFrame(raf);
+      else if (!reduced) raf = requestAnimationFrame(tick);
+    });
+  }
+</script>

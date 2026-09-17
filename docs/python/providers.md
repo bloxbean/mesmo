@@ -3,7 +3,7 @@
 The native library is offline by design — it never makes a network call. Providers and evaluators are small wrapper-side HTTP conveniences (stdlib `urllib`, no extra dependencies) for feeding `quicktx.build_with` with chain data. If you already have UTXOs and protocol parameters from your own infrastructure, you don't need them: call `quicktx.build` directly.
 
 ```python
-from ccl import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
+from mesmo import YaciProvider, BlockfrostProvider, BlockfrostEvaluator
 ```
 
 ## ChainDataProvider
@@ -26,7 +26,7 @@ YaciProvider(base_url="http://localhost:10000/local-cluster/api")
 
 ```python
 provider = YaciProvider()
-result = lib.quicktx.build_with(yaml, provider, sender_address)
+result = lib.quicktx.build_with(yaml, provider, [sender_address])
 ```
 
 ### BlockfrostProvider
@@ -42,7 +42,7 @@ BlockfrostProvider(project_id, network="mainnet", base_url=None)
 ```python
 import os
 provider = BlockfrostProvider(os.environ["BF_PROJECT_ID"], network="preprod")
-result = lib.quicktx.build_with(yaml, provider, sender_address)
+result = lib.quicktx.build_with(yaml, provider, [sender_address])
 ```
 
 ## Evaluators
@@ -64,7 +64,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```python
 evaluator = BlockfrostEvaluator(project_id, network="preprod")
-result = lib.quicktx.build_with(yaml, provider, sender, evaluator)
+result = lib.quicktx.build_with(yaml, provider, [sender], evaluator)
 # two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 

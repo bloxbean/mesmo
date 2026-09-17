@@ -1,15 +1,15 @@
 //! Shared Yaci DevKit test harness for the integration test binaries.
 //!
 //! Integration tests in `tests/` each compile to their own crate, so shared plumbing lives here and
-//! is pulled in with `mod common;`. This mirrors the Go `ccl` package's shared DevKit helpers
+//! is pulled in with `mod common;`. This mirrors the Go `mesmo` package's shared DevKit helpers
 //! (devkitReset / devkitTopup / devkitGetUtxos / signSubmit / ...), so the Rust and Go integration
 //! suites cover the same on-chain scenarios with the same key-role signing and ledger substitutions.
 //!
-//! Everything here is HTTP-over-`ureq` (a dev-dependency) plus the offline `Bridge` build/sign, so the
+//! Everything here is HTTP-over-`ureq` (a dev-dependency) plus the offline `Mesmo` build/sign, so the
 //! harness needs no cargo feature. Tests SKIP (return early) when DevKit is not reachable.
 #![allow(dead_code)]
 
-use ccl::Bridge;
+use mesmo::Mesmo;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -243,20 +243,48 @@ pub fn skip_if_no_devkit() -> bool {
 
 // --- Account / fixture helpers ---
 
-pub fn get_testnet_account(bridge: &Bridge) -> (String, String, String) {
-    let result = bridge
-        .account()
-        .create(ccl::Network::Testnet)
+pub fn get_testnet_account(lib: &Mesmo) -> (String, String, String) {
+    let acct = lib
+        .accounts()
+        .create(mesmo::Network::Testnet)
         .expect("create account");
-    let json: Value = serde_json::from_str(&result).expect("parse account");
+    let json = acct.info().expect("account info");
     let addr = json["base_address"].as_str().unwrap().to_string();
-    let mnemonic = json["mnemonic"].as_str().unwrap().to_string();
+    let mnemonic = acct.export_recovery_phrase().expect("export recovery phrase");
     let stake = json["stake_address"].as_str().unwrap_or("").to_string();
     (addr, mnemonic, stake)
 }
 
-pub fn fund_sender(bridge: &Bridge, ada: u64) -> (String, String) {
-    let (addr, mnemonic, _) = get_testnet_account(bridge);
+/// Map fixture role names onto the typed mask.
+pub fn roles_from_keys(keys: &[&str]) -> mesmo::accounts::SigningRole {
+    use mesmo::accounts::SigningRole;
+    let mut mask = 0u32;
+    for k in keys {
+        mask |= match *k {
+            "payment" => SigningRole::PAYMENT.0,
+            "stake" => SigningRole::STAKE.0,
+            "drep" => SigningRole::DREP.0,
+            other => panic!("unknown signing role {other}"),
+        };
+    }
+    SigningRole(mask)
+}
+
+/// Sign with the intent mnemonic through a managed handle at the given address index.
+pub fn intent_sign_at(lib: &Mesmo, address_index: u32, tx_cbor: &str, keys: &[&str]) -> String {
+    let acct = lib
+        .accounts()
+        .from_mnemonic(INTENT_MNEMONIC, mesmo::Network::Testnet, 0, address_index)
+        .expect("open intent account");
+    acct.sign_tx(tx_cbor, roles_from_keys(keys)).expect("sign")
+}
+
+pub fn intent_sign(lib: &Mesmo, tx_cbor: &str, keys: &[&str]) -> String {
+    intent_sign_at(lib, 0, tx_cbor, keys)
+}
+
+pub fn fund_sender(lib: &Mesmo, ada: u64) -> (String, String) {
+    let (addr, mnemonic, _) = get_testnet_account(lib);
     devkit_topup(&addr, ada);
     wait_for_block();
     (addr, mnemonic)
@@ -303,21 +331,34 @@ pub fn read_fixture(rel: &str) -> String {
 // submit. Returns the tx hash. The devnet's /tx/submit returns 200/202 only after the node has
 // validated and accepted the tx, so a returned hash is proof of on-chain acceptance.
 pub fn sign_submit(
-    bridge: &Bridge,
+    lib: &Mesmo,
     yaml: &str,
     utxos: &Value,
     pp: &Value,
     exec_units: Option<&Value>,
     keys: &[&str],
 ) -> String {
-    let result = bridge
+    // The signer count is known here, exactly as it is for a real caller: one witness per key
+    // role beyond the input-implied payment key.
+    sign_submit_n(lib, yaml, utxos, pp, exec_units, keys, keys.len().saturating_sub(1) as u32)
+}
+
+// sign_submit with an explicit additional-signers budget, for transactions whose inputs imply no
+// payment key (e.g. a script-only-input spend).
+pub fn sign_submit_n(
+    lib: &Mesmo,
+    yaml: &str,
+    utxos: &Value,
+    pp: &Value,
+    exec_units: Option<&Value>,
+    keys: &[&str],
+    additional_signers: u32,
+) -> String {
+    let result = lib
         .quicktx()
-        .build(yaml, utxos, pp, exec_units)
+        .build(yaml, utxos, pp, exec_units, additional_signers)
         .expect("build");
-    let signed = bridge
-        .account()
-        .sign_tx_with_keys(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor, keys)
-        .expect("sign");
+    let signed = intent_sign(lib, &result.tx_cbor, keys);
     match devkit_try_submit(&signed) {
         Ok(hash) => hash,
         Err(e) => panic!("submit: {}", e),
@@ -327,7 +368,7 @@ pub fn sign_submit(
 // Reset the devnet, fund the fixed account, build the fixture with its real UTXOs, sign with the
 // given key roles, submit, and return the tx hash. Mirrors Go's buildSignSubmit.
 pub fn build_sign_submit(
-    bridge: &Bridge,
+    lib: &Mesmo,
     fixture: &str,
     exec_units: Option<&Value>,
     keys: &[&str],
@@ -338,13 +379,13 @@ pub fn build_sign_submit(
     wait_for_block();
     let utxos = devkit_get_utxos(INTENT_SENDER);
     let pp = devnet_pp();
-    sign_submit(bridge, &read_fixture(fixture), &utxos, &pp, exec_units, keys)
+    sign_submit(lib, &read_fixture(fixture), &utxos, &pp, exec_units, keys)
 }
 
 // Reset+fund the devnet, submit a prerequisite fixture (e.g. registering a stake address or DRep),
 // then submit the target fixture in the next block. Mirrors Go's setupThenSubmit.
 pub fn setup_then_submit(
-    bridge: &Bridge,
+    lib: &Mesmo,
     setup_fixture: &str,
     setup_keys: &[&str],
     fixture: &str,
@@ -357,11 +398,11 @@ pub fn setup_then_submit(
     let pp = devnet_pp();
 
     let u = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(bridge, &read_fixture(setup_fixture), &u, &pp, None, setup_keys);
+    sign_submit(lib, &read_fixture(setup_fixture), &u, &pp, None, setup_keys);
     wait_for_block();
 
     let u2 = devkit_get_utxos(INTENT_SENDER);
-    sign_submit(bridge, &read_fixture(fixture), &u2, &pp, None, keys);
+    sign_submit(lib, &read_fixture(fixture), &u2, &pp, None, keys);
 }
 
 // Confirm a mint actually landed on-chain: the receiver holds a non-lovelace asset. ("Submit
@@ -456,21 +497,21 @@ pub fn pp_lovelace(pp: &Value, key: &str) -> u64 {
 // sign_submit, additionally returning the tx fee so callers can assert the sender's exact balance
 // change (the ledger read-back "submit accepted" alone can't give).
 pub fn sign_submit_fee(
-    bridge: &Bridge,
+    lib: &Mesmo,
     yaml: &str,
     utxos: &Value,
     pp: &Value,
     exec_units: Option<&Value>,
     keys: &[&str],
 ) -> u64 {
-    let result = bridge
+    // The signer count is known here, exactly as it is for a real caller: one witness per key
+    // role beyond the input-implied payment key.
+    let additional_signers = keys.len().saturating_sub(1) as u32;
+    let result = lib
         .quicktx()
-        .build(yaml, utxos, pp, exec_units)
+        .build(yaml, utxos, pp, exec_units, additional_signers)
         .expect("build");
-    let signed = bridge
-        .account()
-        .sign_tx_with_keys(INTENT_MNEMONIC, ccl::Network::Testnet, 0, 0, &result.tx_cbor, keys)
-        .expect("sign");
+    let signed = intent_sign(lib, &result.tx_cbor, keys);
     match devkit_try_submit(&signed) {
         Ok(_) => result.fee.parse().expect("parse fee"),
         Err(e) => panic!("submit: {}", e),

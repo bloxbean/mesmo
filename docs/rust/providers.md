@@ -8,7 +8,7 @@ cardano-client-lib = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
-use ccl::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
+use mesmo::providers::{ChainDataProvider, YaciProvider, BlockfrostProvider, BlockfrostEvaluator};
 ```
 
 ## ChainDataProvider
@@ -36,7 +36,7 @@ impl Default for YaciProvider;  // = new(DEFAULT_URL)
 
 ```rust
 let provider = YaciProvider::default();
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ### BlockfrostProvider
@@ -54,7 +54,7 @@ impl BlockfrostProvider {
 
 ```rust
 let provider = BlockfrostProvider::new(&std::env::var("BF_PROJECT_ID")?, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Evaluators
@@ -81,7 +81,7 @@ POSTs the draft transaction CBOR to `/utils/txs/evaluate` (Blockfrost / Ogmios-c
 
 ```rust
 let evaluator = BlockfrostEvaluator::new(&project_id, "preprod")?;
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, Some(&evaluator))?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, Some(&evaluator))?;
 // two-pass: draft build (offline units) → remote evaluate → rebuild with returned units
 ```
 
@@ -91,6 +91,6 @@ Chain data flows through `serde_json::Value`, which keeps JSON integers exact (`
 
 ## Timeouts & errors
 
-HTTP failures surface as `CclError { code: CCL_ERROR_GENERAL, message: "<context>: <cause>" }`.
+HTTP failures surface as `MesmoError { code: MESMO_ERROR_GENERAL, message: "<context>: <cause>" }`.
 
 > **Caveat:** the provider HTTP calls currently set no explicit request timeout, so a hung endpoint can block the calling thread indefinitely. If your application can't tolerate that, wrap provider calls in your own timeout mechanism or implement the `ChainDataProvider` trait over an HTTP client you configure.

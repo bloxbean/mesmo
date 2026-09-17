@@ -1,0 +1,17 @@
+/* Starlight theme accents for Mesmo. */
+:root {
+	--sl-color-accent-low: #12253a;
+	--sl-color-accent: #2f6fce;
+	--sl-color-accent-high: #a8c7f0;
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #d8e6f9;
+	--sl-color-accent: #1d5bb8;
+	--sl-color-accent-high: #123a75;
+}
+
+/* Slightly tighter tables — the docs are table-heavy. */
+.sl-markdown-content table {
+	font-size: var(--sl-text-sm);
+}

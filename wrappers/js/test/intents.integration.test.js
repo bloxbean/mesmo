@@ -9,18 +9,18 @@
 // funded fresh on the devnet per test for isolation. They SKIP when DevKit is not running, so they
 // are exercised only by the CI "Integration Tests (DevKit)" job, not locally.
 //
-// Mirrors wrappers/go/ccl/intents_integration_test.go.
+// Mirrors wrappers/go/mesmo/intents_integration_test.go.
 //
 // Requires:
 // - Yaci DevKit running on port 10000
 // - Native library built: ./gradlew :core:nativeCompile
 //
 // Run with:
-//   cd wrappers/js && CCL_LIB_PATH=../../core/build/native/nativeCompile \
+//   cd wrappers/js && MESMO_LIB_PATH=../../core/build/native/nativeCompile \
 //     DYLD_LIBRARY_PATH=../../core/build/native/nativeCompile bun test test/intents.integration.test.js
 
 import { describe, it, expect, beforeAll, afterAll, setDefaultTimeout } from "bun:test";
-import { CclBridge, TESTNET } from "../src/index.js";
+import { Mesmo, TESTNET, SigningRole } from "../src/index.js";
 import { DevKitHelper } from "./devkit-helper.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -63,7 +63,7 @@ function readFixture(rel) {
 }
 
 describe("Intents Integration (DevKit)", () => {
-  let bridge;
+  let lib;
   let devkit;
   let skip = false;
 
@@ -75,11 +75,11 @@ describe("Intents Integration (DevKit)", () => {
       console.log("Skipping: Yaci DevKit not available on port 10000");
       return;
     }
-    bridge = new CclBridge();
+    lib = new Mesmo();
   });
 
   afterAll(() => {
-    if (bridge) bridge.close();
+    if (lib) lib.close();
   });
 
   // --- helpers (mirror the Go test harness) ---
@@ -104,11 +104,23 @@ describe("Intents Integration (DevKit)", () => {
   }
 
   // signSubmit builds the YAML with the given UTXOs + params, signs with the key roles, and submits.
-  async function signSubmit(yaml, utxos, pp, execUnits, keys) {
-    const result = execUnits != null
-      ? bridge.quicktx.build(yaml, utxos, pp, execUnits)
-      : bridge.quicktx.build(yaml, utxos, pp);
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, keys);
+  // The fee's witness budget defaults to keys.length - 1 (the signer count is known here, exactly as
+  // it is for a real caller); pass additionalSigners explicitly where the inputs imply no payment
+  // key (e.g. a script-only-input spend).
+  function rolesMask(keys) {
+    const map = { payment: SigningRole.PAYMENT, stake: SigningRole.STAKE, drep: SigningRole.DREP };
+    return keys.reduce((mask, k) => mask | map[k], 0);
+  }
+
+  function intentSign(txCbor, keys, addressIndex = 0) {
+    using acct = lib.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET, 0, addressIndex);
+    return acct.signTx(txCbor, rolesMask(keys));
+  }
+
+  async function signSubmit(yaml, utxos, pp, execUnits, keys, additionalSigners = null) {
+    const budget = additionalSigners ?? Math.max(0, keys.length - 1);
+    const result = lib.quicktx.build(yaml, utxos, pp, execUnits ?? null, budget);
+    const signed = intentSign(result.tx_cbor, keys);
     return submitExpectHash(signed);
   }
 
@@ -158,6 +170,24 @@ describe("Intents Integration (DevKit)", () => {
   }
 
   // --- Stake certificates ---
+
+  // ADR-0016 end-to-end: build offline, sign with a managed Account handle (typed role mask, no
+  // mnemonic in the signing call), and have the node accept the transaction.
+  it("submits a transaction signed via a managed Account handle", async () => {
+    if (skip) return;
+    await resetAndFund();
+    const utxos = await devkit.getUtxos(INTENT_SENDER);
+    const built = lib.quicktx.build(
+      readFixture("stake_registration.yaml"), utxos, await devnetPP(), null, 1);
+    const acct = lib.accounts.fromMnemonic(INTENT_MNEMONIC, TESTNET);
+    let signed;
+    try {
+      signed = acct.signTx(built.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
+    } finally {
+      acct.close();
+    }
+    await submitExpectHash(signed);
+  });
 
   // Mirrors Go TestIntegrationStakeRegistration. The stake-registration certificate is witnessed by
   // the stake key, so sign with payment+stake.
@@ -281,9 +311,9 @@ describe("Intents Integration (DevKit)", () => {
   });
 
   // Mirrors Go TestIntegrationDRepKeyRequired (negative). A DRep-registration certificate must be
-  // witnessed by the DRep key, so signing with the payment key alone (ccl_account_sign_tx, no drep
+  // witnessed by the DRep key, so signing with the payment key alone (SigningRole.PAYMENT only, no drep
   // witness) must be rejected by the node (MissingVKeyWitnessesUTXOW). This proves the extra witness
-  // sign_tx_with_keys adds is genuinely required — not cosmetic — complementing the positive
+  // the stake role adds is genuinely required — not cosmetic — complementing the positive
   // registration test above.
   it("rejects a DRep registration signed with the payment key only", async () => {
     if (skip) return;
@@ -294,10 +324,10 @@ describe("Intents Integration (DevKit)", () => {
     const pp = await devnetPP();
 
     const utxos = await devkit.getUtxos(INTENT_SENDER);
-    const built = bridge.quicktx.build(readFixture("drep_registration.yaml"), utxos, pp);
+    const built = lib.quicktx.build(readFixture("drep_registration.yaml"), utxos, pp, null, 1);
 
     // Sign with the payment key ONLY, omitting the DRep-key witness.
-    const signedPaymentOnly = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 0, built.tx_cbor);
+    const signedPaymentOnly = intentSign(built.tx_cbor, ['payment']);
     const res = await devkit.submitTx(signedPaymentOnly);
     // The node must reject it — so no 64-char tx hash comes back, only the ledger error body.
     expect(res).not.toMatch(TX_HASH_RE);
@@ -353,9 +383,9 @@ describe("Intents Integration (DevKit)", () => {
 
     // Submit an info proposal. Its build-result tx hash is the gov action id we vote on.
     const u3 = await devkit.getUtxos(INTENT_SENDER);
-    const proposal = bridge.quicktx.build(readFixture("governance_proposal.yaml"), u3, pp);
+    const proposal = lib.quicktx.build(readFixture("governance_proposal.yaml"), u3, pp);
     const actionTxHash = proposal.tx_hash;
-    const signedProposal = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, proposal.tx_cbor, ["payment"]);
+    const signedProposal = intentSign(proposal.tx_cbor, ["payment"]);
     await submitExpectHash(signedProposal);
     await devkit.waitForBlock(3000);
 
@@ -404,7 +434,7 @@ describe("Intents Integration (DevKit)", () => {
   });
 
   // The offline Scalus evaluator is the DEFAULT costing path: when a caller supplies no execution
-  // units, libccl computes them in-process (ADR-0013). Every other Plutus test supplies units
+  // units, libmesmo computes them in-process (ADR-0013). Every other Plutus test supplies units
   // manually (they must, to submit a failing script), so this is the only test proving the node
   // accepts Scalus-computed budgets end-to-end — the path out-of-the-box users are on.
   it("mints under a Plutus script with Scalus-computed units (no exec units supplied)", async () => {
@@ -425,7 +455,7 @@ describe("Intents Integration (DevKit)", () => {
 
   // Negative validation: redeemer 0 makes the same validator evaluate to false, so phase-2
   // validation fails and the node must reject the tx. Exec units are supplied manually — the
-  // bridge's StaticTransactionEvaluator stamps them without running the script, which is exactly
+  // lib's StaticTransactionEvaluator stamps them without running the script, which is exactly
   // what lets a validation-failing tx reach the node.
   it("rejects the Aiken redeemer-check mint with a wrong redeemer", async () => {
     if (skip) return;
@@ -435,9 +465,9 @@ describe("Intents Integration (DevKit)", () => {
     await devkit.waitForBlock(3000);
 
     const utxos = await devkit.getUtxos(INTENT_SENDER);
-    const result = bridge.quicktx.build(readFixture("plutus/aiken_mint_fail.yaml"),
+    const result = lib.quicktx.build(readFixture("plutus/aiken_mint_fail.yaml"),
       utxos, await devnetPP(), [{ mem: 2000000, steps: 500000000 }]);
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, ["payment"]);
+    const signed = intentSign(result.tx_cbor, ["payment"]);
     const res = await devkit.submitTx(signed);
     expect(TX_HASH_RE.test(res)).toBe(false); // the node must reject, not return a tx hash
   });
@@ -504,10 +534,9 @@ describe("Intents Integration (DevKit)", () => {
   // signSubmit, additionally returning the tx fee so callers can assert the sender's exact
   // balance change (the ledger read-back "submit accepted" alone can't give).
   async function signSubmitFee(yaml, utxos, pp, execUnits, keys) {
-    const result = execUnits != null
-      ? bridge.quicktx.build(yaml, utxos, pp, execUnits)
-      : bridge.quicktx.build(yaml, utxos, pp);
-    const signed = bridge.account.signTxWithKeys(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor, keys);
+    const result = lib.quicktx.build(yaml, utxos, pp, execUnits ?? null,
+      Math.max(0, keys.length - 1));
+    const signed = intentSign(result.tx_cbor, keys);
     await submitExpectHash(signed);
     return Number(result.fee);
   }
@@ -646,13 +675,13 @@ describe("Intents Integration (DevKit)", () => {
     const pp = await resetAndFund();
 
     // Build a native script the sender's payment key satisfies, and its script address.
-    const info = bridge.address.info(INTENT_SENDER);
-    const script = JSON.parse(bridge.script.nativeFromJson(
+    const info = lib.address.info(INTENT_SENDER);
+    const script = JSON.parse(lib.script.nativeFromJson(
       JSON.stringify({ type: "sig", keyHash: info.payment_credential_hash })));
     // nativeFromJson's cbor_hex is the hash preimage (leading 0x00 language tag); the TxPlan
     // native_script block wants the bare script CBOR.
     const scriptHex = script.cbor_hex.slice(2);
-    const scriptAddress = bridge.address.fromBytes("70" + script.script_hash); // testnet script enterprise
+    const scriptAddress = lib.address.fromBytes("70" + script.script_hash); // testnet script enterprise
 
     // Step 1: lock 5 ADA at the script address.
     const lockYaml = `
@@ -702,7 +731,7 @@ transaction:
           script_hex: ${scriptHex}
 `;
     const feeUtxos = await devkit.getUtxos(INTENT_SENDER);
-    await signSubmit(spendYaml, [...scriptUtxos, ...feeUtxos], pp, null, ["payment"]);
+    await signSubmit(spendYaml, [...scriptUtxos, ...feeUtxos], pp, null, ["payment"], 1);
 
     await assertUtxoConsumed(scriptAddress, lockHash);
   });
@@ -739,9 +768,9 @@ transaction:
       ...(await devkit.getUtxos(INTENT_SENDER)),
       ...(await devkit.getUtxos(INTENT_SENDER2)),
     ];
-    const result = bridge.quicktx.build(readFixture("compose.yaml"), utxos, pp);
-    const once = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 0, result.tx_cbor);
-    const twice = bridge.account.signTx(INTENT_MNEMONIC, TESTNET, 0, 1, once);
+    const result = lib.quicktx.build(readFixture("compose.yaml"), utxos, pp);
+    const once = intentSign(result.tx_cbor, ['payment']);
+    const twice = intentSign(once, ['payment'], 1);
     await submitExpectHash(twice);
     await devkit.waitForBlock(3000);
 

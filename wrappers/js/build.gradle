@@ -4,7 +4,7 @@ task copyNativeLib(type: Copy) {
     dependsOn nativeLibTask
     from project(':core').layout.buildDirectory.dir('native/nativeCompile')
     into layout.buildDirectory.dir('native')
-    include 'libccl.*'
+    include 'libmesmo.*'
     include '*.h'
 }
 
@@ -13,16 +13,16 @@ task test(type: Exec) {
     workingDir projectDir
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'DYLD_LIBRARY_PATH', nativeDir
     environment 'LD_LIBRARY_PATH', nativeDir
 
     // On Windows invoke via `cmd /c` (which understands `&&`) rather than `bash` (a bare `bash`
     // resolves to WSL on Windows runners, which has no distro).
     if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
-        commandLine 'cmd', '/c', 'bun install && bun run typecheck && bun test test/ccl.test.js test/intents.e2e.test.js test/providers.test.js'
+        commandLine 'cmd', '/c', 'bun install && bun run typecheck && bun test test/mesmo.test.js test/intents.e2e.test.js test/providers.test.js'
     } else {
-        commandLine 'bash', '-c', 'bun install && bun run typecheck && bun test test/ccl.test.js test/intents.e2e.test.js test/providers.test.js'
+        commandLine 'bash', '-c', 'bun install && bun run typecheck && bun test test/mesmo.test.js test/intents.e2e.test.js test/providers.test.js'
     }
 }
 
@@ -33,30 +33,30 @@ task integrationTest(type: Exec) {
     workingDir projectDir
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'DYLD_LIBRARY_PATH', nativeDir
     environment 'LD_LIBRARY_PATH', nativeDir
 
     commandLine 'bash', '-c', 'bun install && bun run typecheck && bun test test/'
 }
 
-// Stage the platform's libccl.* into libs/ (pure Gradle — no shell — so it works on Windows).
+// Stage the platform's libmesmo.* into libs/ (pure Gradle — no shell — so it works on Windows).
 // Keeps the committed .gitkeep; only the binaries and stale tarballs are managed here.
 task stagePackLib {
     dependsOn copyNativeLib
     doLast {
-        delete fileTree('libs') { include 'libccl.*' }
+        delete fileTree('libs') { include 'libmesmo.*' }
         delete fileTree(projectDir) { include '*.tgz' }
         copy {
             from layout.buildDirectory.dir('native')
             into 'libs'
-            include 'libccl.so', 'libccl.dylib', 'libccl.dll'
+            include 'libmesmo.so', 'libmesmo.dylib', 'libmesmo.dll'
         }
     }
 }
 
 // Build an npm package tarball that bundles the native library into libs/, so `npm install`
-// needs no CCL_LIB_PATH. Produces bloxbean-cardano-client-lib-<version>.tgz in the project dir.
+// needs no MESMO_LIB_PATH. Produces bloxbean-cardano-client-lib-<version>.tgz in the project dir.
 task pack(type: Exec) {
     dependsOn stagePackLib
     workingDir projectDir

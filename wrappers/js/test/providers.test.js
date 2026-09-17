@@ -87,7 +87,7 @@ describe("buildWith", () => {
 
   it("with no evaluator, fetches then builds once (offline Scalus default)", async () => {
     const { quicktx, calls } = stubQuickTx();
-    await quicktx.buildWith("YAML", provider, "addrX");
+    await quicktx.buildWith("YAML", provider, ["addrX"]);
     expect(calls).toEqual([["YAML", utxos, pp, null]]);
   });
 
@@ -100,12 +100,27 @@ describe("buildWith", () => {
         return [{ mem: 1, steps: 2 }];
       },
     };
-    await quicktx.buildWith("YAML", provider, "addrX", evaluator);
+    await quicktx.buildWith("YAML", provider, ["addrX"], evaluator);
     expect(calls).toEqual([
       ["YAML", utxos, pp, null],                    // draft
       ["YAML", utxos, pp, [{ mem: 1, steps: 2 }]],  // rebuild
     ]);
   });
+  it("merges and de-dupes UTXOs across senders by (tx_hash, output_index)", async () => {
+    const shared = { tx_hash: "a".repeat(64), output_index: 0, address: "addrA",
+      amount: [{ unit: "lovelace", quantity: "9" }] };
+    const onlyB = { tx_hash: "b".repeat(64), output_index: 1, address: "addrB",
+      amount: [{ unit: "lovelace", quantity: "7" }] };
+    const twoSender = {
+      utxos: async (addr) => (addr === "addrA" ? [shared] : [shared, onlyB]),
+      protocolParams: async () => pp,
+    };
+    const { quicktx, calls } = stubQuickTx();
+    await quicktx.buildWith("YAML", twoSender, ["addrA", "addrB"]);
+    // The shared UTXO must appear exactly once — overlapping senders must not double-fund.
+    expect(calls).toEqual([["YAML", [shared, onlyB], pp, null]]);
+  });
+
 });
 
 describe("parseEvaluation", () => {
@@ -144,6 +159,8 @@ describe("BlockfrostEvaluator", () => {
   it("throws on an unknown network without baseUrl", () => {
     expect(() => new BlockfrostEvaluator("proj", { network: "nope" })).toThrow();
   });
+
+
 });
 
 describe("numeric precision", () => {

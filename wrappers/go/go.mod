@@ -1,4 +1,4 @@
-module github.com/bloxbean/cardano-client-bindings/wrappers/go
+module github.com/bloxbean/mesmo/wrappers/go
 
 go 1.21
 

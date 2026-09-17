@@ -1,12 +1,12 @@
 # Cardano Client Lib for Rust
 
-The `cardano-client-lib` crate (imported as `ccl`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libccl`, a GraalVM native-image build of CCL fetched automatically at build time.
+The `mesmo` crate (imported as `mesmo`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Rust as a native library. No JVM at runtime: the crate links against `libmesmo`, a GraalVM native-image build of CCL fetched automatically at build time.
 
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API reference](api.md) | Every type and method: `Bridge`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api.md) | Every type and method: `Mesmo`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions.md) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers.md) | The `providers` feature: fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting.md) | Native library fetching, platform support, common errors |
@@ -27,36 +27,37 @@ Until then, use a git dependency:
 
 ```toml
 [dependencies]
-cardano-client-lib = { git = "https://github.com/bloxbean/cardano-client-bindings", package = "cardano-client-lib" }
+cardano-client-lib = { git = "https://github.com/bloxbean/mesmo", package = "cardano-client-lib" }
 ```
 
-The import name is `ccl` regardless: `use ccl::{Bridge, Network};`.
+The import name is `mesmo` regardless: `use mesmo::{Mesmo, Network};`.
 
-**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libccl` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `CCL_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-obtained).
+**First build needs network access:** crates.io can't host the ~50 MB native library, so `build.rs` downloads the prebuilt `libmesmo` for your platform from the project's GitHub releases (once, cached in the build directory). An rpath is set automatically — **no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` needed at runtime**. To build against a local library instead, set `MESMO_LIB_PATH` — see [troubleshooting](troubleshooting.md#how-the-native-library-is-obtained).
 
 Features:
 
 | Feature | Default | Adds |
 |---|---|---|
-| `providers` | off | `ccl::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
+| `providers` | off | `mesmo::providers` module (Yaci/Blockfrost chain-data providers + evaluators, pulls in `ureq`) |
 
 ## Quick start
 
 ```rust
-use ccl::{Bridge, Network};
+use mesmo::{Mesmo, Network};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bridge = Bridge::new()?; // torn down automatically on drop (RAII)
+    let lib = Mesmo::new()?; // torn down automatically on drop (RAII)
 
-    // Create a new account (24-word mnemonic, testnet addresses).
-    let created = bridge.account().create(Network::Testnet)?;
-    let account: serde_json::Value = serde_json::from_str(&created)?;
-    println!("{}", account["base_address"]);  // addr_test1...
-    println!("{}", account["stake_address"]); // stake_test1...
+    // Create a new managed account (testnet). Its info never contains the phrase;
+    // export the recovery phrase once, deliberately.
+    let account = lib.accounts().create(Network::Testnet)?;
+    let info = account.info()?;
+    println!("{}", info["base_address"]);  // addr_test1...
+    println!("{}", info["stake_address"]); // stake_test1...
+    let mnemonic = account.export_recovery_phrase()?;
 
-    // Restore it later from the mnemonic.
-    let mnemonic = account["mnemonic"].as_str().unwrap();
-    let _restored = bridge.account().from_mnemonic(mnemonic, Network::Testnet, 0, 0)?;
+    // Restore it later from the phrase.
+    let _restored = lib.accounts().from_mnemonic(&mnemonic, Network::Testnet, 0, 0)?;
     Ok(())
 }
 ```
@@ -79,20 +80,20 @@ transaction:
               quantity: "5000000"
 "#);
 
-let result = bridge.quicktx().build(&yaml, &utxos, &protocol_params, None)?;
+let result = lib.quicktx().build(&yaml, &utxos, &protocol_params, None)?;
 // result.tx_cbor, result.tx_hash, result.fee
 
-let signed = bridge.account().sign_tx(mnemonic, Network::Testnet, 0, 0, &result.tx_cbor)?;
+let signed = sender.sign_tx(&result.tx_cbor, SigningRole::PAYMENT)?; // sender = lib.accounts().from_mnemonic(...)
 // submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider (requires the `providers` feature), fetching the chain data is one call:
 
 ```rust
-use ccl::providers::YaciProvider;
+use mesmo::providers::YaciProvider;
 
 let provider = YaciProvider::default(); // local Yaci DevKit
-let result = bridge.quicktx().build_with(&yaml, &provider, &sender, None)?;
+let result = lib.quicktx().build_with(&yaml, &provider, &[sender.as_str()], 0, None)?;
 ```
 
 ## Design in one paragraph
@@ -101,12 +102,12 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Threading
 
-`Bridge` is deliberately **`!Send` and `!Sync`**: the underlying GraalVM isolate thread is bound to the OS thread that created it, so moving a bridge across threads would corrupt the VM. The compiler enforces this — create **one `Bridge` per thread**. Teardown is RAII (`Drop`); there is no `close()` to forget, and the borrow checker prevents use-after-free of the bridge by the API handles.
+`Mesmo` is deliberately **`!Send` and `!Sync`**: the underlying GraalVM isolate thread is bound to the OS thread that created it, so moving a Mesmo across threads would corrupt the VM. The compiler enforces this — create **one `Mesmo` per thread**. Teardown is RAII (`Drop`); there is no `close()` to forget, and the borrow checker prevents use-after-free of Mesmo by the API handles.
 
 ## Networks
 
 ```rust
-pub enum Network { Mainnet, Testnet, Preprod, Preview }
+pub enum Network { Mainnet, Testnet }
 ```
 
 Every key-derivation method takes a typed `Network` — there is no integer API. Note the underlying values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Mainnet` → ordinal 0, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).

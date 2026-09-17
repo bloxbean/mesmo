@@ -3,7 +3,7 @@
 Both behaviours these tests pin down used to end the *process*, not the test — GraalVM aborts, which
 Python cannot catch — so each test here is one that could not previously fail politely.
 
-Each test builds its own CclLib rather than using the shared `ccl` fixture: they close it, and one
+Each test builds its own Mesmo rather than using the shared `mesmo` fixture: they close it, and one
 attaches extra threads to its isolate.
 """
 
@@ -14,22 +14,23 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from ccl import CclClosedError, CclLib, Network
+from mesmo import MesmoClosedError, Mesmo, Network
 
 
 def test_shared_instance_is_usable_from_many_threads():
-    """One CclLib, many threads.
+    """One Mesmo, many threads.
 
     A GraalVM IsolateThread belongs to the OS thread that created it. This class used to hand the
     creating thread's handle to every caller, so any threaded server (Flask/FastAPI/gunicorn) would
     eventually die with "Must either be at a safepoint or in native mode" — a fatal VM error, not an
-    exception. Each thread now attaches its own handle (see CclLib._thread).
+    exception. Each thread now attaches its own handle (see Mesmo._thread).
     """
-    with CclLib() as lib:
+    with Mesmo() as lib:
 
         def work(_):
-            account = lib.account.create(Network.TESTNET)
-            info = lib.address.info(account["base_address"])
+            with lib.accounts.create(Network.TESTNET) as acct:
+                base_address = acct.info["base_address"]
+            info = lib.address.info(base_address)
             return info["network_id"]
 
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -46,18 +47,18 @@ def test_calls_after_close_raise_instead_of_aborting():
     the native side and GraalVM killed the process ("Failed to enter the specified IsolateThread
     context"). Uncatchable, and no traceback pointed at the call.
     """
-    lib = CclLib()
+    lib = Mesmo()
     lib.close()
 
-    with pytest.raises(CclClosedError):
-        lib.account.create(Network.TESTNET)
+    with pytest.raises(MesmoClosedError):
+        lib.accounts.create(Network.TESTNET)
 
-    with pytest.raises(CclClosedError):
+    with pytest.raises(MesmoClosedError):
         lib.version()
 
 
 def test_close_is_idempotent():
-    lib = CclLib()
+    lib = Mesmo()
     lib.close()
     lib.close()  # must not tear the isolate down twice
 
@@ -66,27 +67,27 @@ def test_failed_load_raises_cleanly():
     """A library that won't load must surface the OSError, not an AttributeError from __del__.
 
     __init__ raised before the isolate fields existed, so __del__ -> close() tripped over the
-    half-built object and printed "'CclLib' object has no attribute '_thread'" on top of the real
-    error — the first thing a newcomer with a bad CCL_LIB_PATH ever saw.
+    half-built object and printed "'Mesmo' object has no attribute '_thread'" on top of the real
+    error — the first thing a newcomer with a bad MESMO_LIB_PATH ever saw.
 
-    This has to run in a subprocess with the library-path variables stripped. Pointing CclLib at a
+    This has to run in a subprocess with the library-path variables stripped. Pointing Mesmo at a
     nonexistent directory is not enough on its own: macOS's dyld searches DYLD_LIBRARY_PATH for the
     *leaf name* of a dylib even when it was given an absolute path, so with DYLD_LIBRARY_PATH set —
-    which is exactly what the Gradle test task does — "/nonexistent/libccl.dylib" cheerfully
+    which is exactly what the Gradle test task does — "/nonexistent/libmesmo.dylib" cheerfully
     resolves to the real library and nothing fails. (Linux's glibc does not do this for paths
     containing a slash, so the bug was macOS-only and invisible locally.)
     """
     code = (
-        "from ccl import CclLib\n"
+        "from mesmo import Mesmo\n"
         "try:\n"
-        "    CclLib(lib_path='/nonexistent-ccl-dir')\n"
+        "    Mesmo(lib_path='/nonexistent-mesmo-dir')\n"
         "except OSError as e:\n"
         "    print('OSERROR:', str(e).splitlines()[0])\n"
         "else:\n"
         "    print('NO-ERROR')\n"
     )
     env = {k: v for k, v in os.environ.items()
-           if k not in ("CCL_LIB_PATH", "DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH")}
+           if k not in ("MESMO_LIB_PATH", "DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH")}
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                           timeout=120, env=env)
 
@@ -107,12 +108,12 @@ def test_use_after_close_does_not_kill_the_interpreter():
     check it exits cleanly.
     """
     code = (
-        "from ccl import CclLib, CclClosedError\n"
-        "lib = CclLib()\n"
+        "from mesmo import Mesmo, MesmoClosedError\n"
+        "lib = Mesmo()\n"
         "lib.close()\n"
         "try:\n"
-        "    lib.account.create(1)\n"
-        "except CclClosedError:\n"
+        "    lib.accounts.create(1)\n"
+        "except MesmoClosedError:\n"
         "    print('raised')\n"
         "print('survived')\n"
     )

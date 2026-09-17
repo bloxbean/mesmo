@@ -1,11 +1,11 @@
 name: Build Rust crate
 
-# Reusable (workflow_call) build + validation of the `cardano-client-lib` crate — everything except
+# Reusable (workflow_call) build + validation of the `mesmo` crate — everything except
 # publishing. Called by publish-rust.yml (release) and publish-rust-dry-run.yml (PR validation).
 #
 # The version comes from `version` in gradle.properties (single source of truth); on a v* tag the tag
 # must match it. Cargo.toml's `version` is stamped from it at build time (scripts/set-crate-version.sh)
-# — never hand-maintained. The release tag build.rs fetches libccl from is derived from that in turn,
+# — never hand-maintained. The release tag build.rs fetches libmesmo from is derived from that in turn,
 # so the crate has exactly one version site. Mirrors build-js-packages.yml.
 
 on:
@@ -45,19 +45,20 @@ jobs:
       CRATE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1.6.6
         with:
-          java-version: '25.0.3'
+          version: '25.3.4.1'
           distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
 
-      # cargo's verification build runs build.rs, which needs libccl. Build it here and point
-      # CCL_LIB_PATH at it, so the verify uses the in-tree lib rather than downloading a release
+      # cargo's verification build runs build.rs, which needs libmesmo. Build it here and point
+      # MESMO_LIB_PATH at it, so the verify uses the in-tree lib rather than downloading a release
       # (which, for an unreleased version, doesn't exist yet).
       - name: Build native library (for the verification build)
         run: ./gradlew :core:nativeCompile
       - name: Point build.rs at the in-tree lib
-        run: echo "CCL_LIB_PATH=$PWD/core/build/native/nativeCompile" >> "$GITHUB_ENV"
+        run: echo "MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile" >> "$GITHUB_ENV"
 
       # Single source of truth: stamp the crate version; build.rs derives the release tag from it.
       - name: Stamp crate version from gradle.properties

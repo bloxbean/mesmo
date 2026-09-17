@@ -7,15 +7,15 @@
 // Bun's built-in fetch.
 //
 // A provider implements two async methods:
-//   utxos(address)      -> array of UTXO objects at the address (no selection — the bridge selects)
+//   utxos(address)      -> array of UTXO objects at the address (no selection — the lib selects)
 //   protocolParams()    -> protocol parameters object
 //
 // Use one directly, or via quicktx.buildWith:
 //
-//   import { CclBridge, BlockfrostProvider } from "@bloxbean/cardano-client-lib";
-//   const bridge = new CclBridge();
+//   import { Mesmo, BlockfrostProvider } from "@bloxbean/mesmo";
+//   const lib = new Mesmo();
 //   const provider = new BlockfrostProvider(projectId, { network: "preprod" }); // or new YaciProvider()
-//   const result = await bridge.quicktx.buildWith(txplanYaml, provider, senderAddress);
+//   const result = await lib.quicktx.buildWith(txplanYaml, provider, senderAddress);
 
 import { parse as losslessParse } from "lossless-json";
 
@@ -128,7 +128,7 @@ export class BlockfrostProvider extends ChainDataProvider {
 //
 // The native library computes execution units offline with Scalus when you supply none (ADR-0013).
 // A TransactionEvaluator lets you compute them with a *remote* evaluator instead. HTTP is a wrapper
-// concern — libccl never makes network calls (ADR-0002). Use one via
+// concern — libmesmo never makes network calls (ADR-0002). Use one via
 // `quicktx.buildWith(yaml, provider, sender, evaluator)`.
 
 // Interface marker: an evaluator exposes `evaluate(txCbor, utxos)` returning `[{ mem, steps }]`,

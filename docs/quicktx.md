@@ -9,7 +9,7 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 
 ## Overview
 
-- **Single function**: `ccl_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json)` → returns `0` on success.
+- **Single function**: `mesmo_quicktx_build(thread, yaml, utxos_json, protocol_params_json, exec_units_json, additional_signers)` → returns `0` on success.
 - **Result**: a YAML document with `tx_cbor` (unsigned transaction), `tx_hash`, and `fee`.
 - **Fully offline**: the caller supplies UTXOs and protocol parameters — the native library makes no
   HTTP calls and never submits. (The native entry point has no provider mode; each wrapper offers a
@@ -20,12 +20,13 @@ The whole interface is YAML: **TxPlan YAML in → YAML result out**.
 ### Entry point
 
 ```c
-int ccl_quicktx_build(
+int mesmo_quicktx_build(
     graal_isolatethread_t* thread,
     const char* yaml,                  // TxPlan YAML
     const char* utxos_json,            // JSON array of UTXOs
     const char* protocol_params_json,  // JSON protocol parameters
-    const char* exec_units_json        // JSON [{mem, steps}] per redeemer, or null (Plutus only; null = compute offline with the embedded Scalus evaluator)
+    const char* exec_units_json,       // JSON [{mem, steps}] per redeemer, or null (Plutus only; null = compute offline with the embedded Scalus evaluator)
+    int additional_signers             // vkey witnesses to budget for fee estimation, beyond those the input UTXOs imply (>= 0)
 );
 ```
 
@@ -33,7 +34,7 @@ int ccl_quicktx_build(
 
 | Code | Meaning |
 |------|---------|
-| `0`  | Success — retrieve the result via `ccl_get_result(thread)` |
+| `0`  | Success — retrieve the result via `mesmo_get_result(thread)` |
 | `-2` | Invalid argument (e.g. missing YAML or protocol parameters) |
 | `-8` | Insufficient funds (UTXOs can't cover outputs + fees) |
 | `-10`| Transaction build failure (e.g. malformed TxPlan) |
@@ -100,9 +101,9 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 | `native_script` | Attach a native script |
 | `script_collect_from` / `script_minting` / `validator` | Plutus script operations |
 
-> The exact YAML fields for each intent come from CCL's TxPlan serialization. This bridge passes the
+> The exact YAML fields for each intent come from CCL's TxPlan serialization. This Mesmo passes the
 > YAML through unchanged, so the authoritative field reference is the CCL `quicktx` module
-> (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre4`). Known-good shapes for every intent
+> (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre5`). Known-good shapes for every intent
 > are cataloged in [Intent catalog — verified shapes](#intent-catalog--verified-shapes) below.
 
 > **Plutus script transactions** build fully offline with no extra input: when `exec_units_json` is
@@ -110,8 +111,10 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 > [Scalus](https://scalus.org) UPLC evaluator (see [ADR-0013](adr/0013-transaction-evaluators.md)).
 > To supply your own units instead — from Ogmios, Blockfrost, Aiken, or any other evaluator — pass
 > `exec_units_json`, a JSON array of `[{mem, steps}]`, one per redeemer in transaction order; the
-> bridge then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
+> Mesmo then wires CCL's `StaticTransactionEvaluator` to stamp them on without running the script.
 > Explicit units always take precedence over the Scalus default.
+
+> **Witness budgeting is caller-supplied.** `additional_signers` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate (`payment`+`stake` signing), `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
 
 ---
 
@@ -215,14 +218,14 @@ transaction:
             - unit: lovelace
               quantity: "2000000"
         - type: metadata
-          metadata: '{"674": {"msg": "Hello from Cardano Client Bindings"}}'
+          metadata: '{"674": {"msg": "Hello from Mesmo"}}'
 ```
 
 ### 5. Plutus mint (with caller-supplied execution units)
 
 A script intent goes under `scripts:` (the validator) with the operation in `intents:`. Execution
 units are optional — omitted, the embedded Scalus evaluator computes them offline; this example
-supplies them explicitly, in which case the bridge stamps them on without running the script.
+supplies them explicitly, in which case Mesmo stamps them on without running the script.
 
 ```yaml
 version: 1.0
@@ -284,9 +287,9 @@ The shapes below are taken from the repository's integration-test fixtures
 (`test-fixtures/quicktx-intents/`), which every wrapper submits against a real devnet in CI — they
 are known-good. Each snippet shows the `intents:` (and where relevant `inputs:`/`scripts:`) block;
 the surrounding skeleton (`version`, `context.fee_payer`, `tx.from`, `tx.change_address`) is the
-same as in the examples above. The **Sign with** column lists the key roles for
-`sign_tx_with_keys` — certificates must be witnessed by their key or the node rejects the
-transaction with `MissingVKeyWitnessesUTXOW`.
+same as in the examples above. The **Sign with** column lists the signing roles for the managed
+account's `sign_tx` (combine `SigningRole` flags with `|`) — certificates must be witnessed by
+their key or the node rejects the transaction with `MissingVKeyWitnessesUTXOW`.
 
 ### Staking
 
@@ -339,7 +342,7 @@ intents:
     drep_credential_type: key_hash
 ```
 
-The credential hex is the DRep `verification_key_hash` from the governance API (`drep_key_from_mnemonic`).
+The credential hex is the DRep `public_key_hash` from the stateless key utility (`crypto.derive_key(mnemonic, role="drep")`).
 
 ### Governance — voting
 
@@ -498,9 +501,10 @@ Mint under a Plutus policy (`script_minting`, shown in [example 5](#5-plutus-min
 
 ## Using it from the wrappers
 
-Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?)` that marshals the chain
-data to JSON, calls `ccl_quicktx_build`, and parses the YAML result — plus a `build_with(yaml,
-provider, sender, evaluator?)` convenience that fetches the chain data from a provider first (see
+Each wrapper exposes a thin `build(yaml, utxos, protocolParams, execUnits?, additionalSigners)` that
+marshals the chain data to JSON, calls `mesmo_quicktx_build`, and parses the YAML result — plus a
+`build_with(yaml, provider, senders, additionalSigners, evaluator?)` convenience that fetches the
+chain data from a provider first (see
 each wrapper's providers guide). The result is an object/dict/struct with `tx_cbor`, `tx_hash`, and
 `fee`. Both return an **unsigned** transaction — sign `tx_cbor` with the account sign API, then
 submit it yourself.
@@ -508,48 +512,58 @@ submit it yourself.
 > **Signing stake/governance transactions.** `sign_tx` adds only the **payment** key. Certificates
 > in stake registration/deregistration/delegation, reward withdrawal, and DRep/vote operations must
 > also be witnessed by the **stake** (or **DRep**) key, or the node rejects the tx with
-> `MissingVKeyWitnessesUTXOW`. Use `sign_tx_with_keys(..., keys)` (Go `SignTxWithKeys`, JS
-> `signTxWithKeys`) with the roles you need, e.g. `["payment", "stake"]` or `["payment", "drep"]`
-> (roles: `payment`, `stake`, `drep`, `committee_cold`, `committee_hot`).
+> `MissingVKeyWitnessesUTXOW`. Sign through a managed account handle with the roles you need,
+> e.g. `SigningRole.PAYMENT | SigningRole.STAKE` or `PAYMENT | DREP`
+> (roles: `PAYMENT`, `STAKE`, `DREP`, `COMMITTEE_COLD`, `COMMITTEE_HOT`).
 
 ### Python
 
 ```python
-from ccl import CclLib
+from mesmo import Mesmo, Network, SigningRole
 
-lib = CclLib()
-result = lib.quicktx.build(txplan_yaml, utxos, protocol_params)  # -> {"tx_cbor","tx_hash","fee"}
-signed = lib.account.sign_tx(mnemonic, result["tx_cbor"], CclLib.TESTNET, 0, 0)
+lib = Mesmo()
+# additional_signers: witnesses beyond the input-implied payment key(s) — here 1 (a stake cert)
+result = lib.quicktx.build(txplan_yaml, utxos, protocol_params, additional_signers=1)
+with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as acct:
+    signed = acct.sign_tx(result["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
 ```
 
 ### JavaScript (Bun)
 
 ```javascript
-import { CclBridge, TESTNET } from '@bloxbean/cardano-client-lib';
+import { Mesmo, TESTNET, SigningRole } from '@bloxbean/mesmo';
 
-const bridge = new CclBridge();
-const result = bridge.quicktx.build(txplanYaml, utxos, protocolParams);
-const signed = bridge.account.signTx(mnemonic, TESTNET, 0, 0, result.tx_cbor);
+const lib = new Mesmo();
+const result = lib.quicktx.build(txplanYaml, utxos, protocolParams, null, 1);
+using acct = lib.accounts.fromMnemonic(mnemonic, TESTNET);
+const signed = acct.signTx(result.tx_cbor, SigningRole.PAYMENT | SigningRole.STAKE);
 ```
 
 ### Go
 
 ```go
-bridge, _ := ccl.New()
-defer bridge.Close()
+lib, _ := mesmo.New()
+defer lib.Close()
 
-result, _ := bridge.QuickTx.Build(txplanYaml, utxos, protocolParams)
-signed, _ := bridge.Account.SignTx(mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+result, _ := lib.QuickTx.Build(txplanYaml, utxos, protocolParams, 1)
+acct, _ := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)
+defer acct.Close()
+signed, _ := acct.SignTx(result.TxCbor, mesmo.RolePayment|mesmo.RoleStake)
 ```
 
 ### Rust
 
 ```rust
-let bridge = ccl::Bridge::new().unwrap();
+let lib = mesmo::Mesmo::new().unwrap();
 
-let result = bridge.quicktx().build(&txplan_yaml, &utxos, &protocol_params).unwrap();
-let signed = bridge.account()
-    .sign_tx(&mnemonic, ccl::network::TESTNET, 0, 0, &result.tx_cbor)
+use mesmo::accounts::SigningRole;
+
+let result = lib.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None, 1).unwrap();
+let acct = lib.accounts()
+    .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
+    .unwrap();
+let signed = acct
+    .sign_tx(&result.tx_cbor, SigningRole::PAYMENT | SigningRole::STAKE)
     .unwrap();
 ```
 

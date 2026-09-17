@@ -1,5 +1,5 @@
 # Bundled native library — staged at wheel-build time from :core:nativeCompile, never committed.
-ccl/_libs/libccl.*
+mesmo/_libs/libmesmo.*
 # Build outputs
 dist/
 *.egg-info/

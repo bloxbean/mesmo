@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #4f8ef7;
+  --color-brand-dark: #2563c9;
+  --color-brand-light: #8ab6ff;
+  --color-teal: #14b8a6;
+  --color-surface-dark: #070b16;
+  --color-surface: #0a0f1e;
+  --color-surface-light: #121a30;
+  --color-surface-border: #1e2a45;
+  --color-text: #e4e4e7;
+  --color-text-muted: #9aa3b2;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+}
+
+/* Gradient headline text */
+.grad-text {
+  background: linear-gradient(92deg, #8ab6ff 0%, #4f8ef7 45%, #14b8a6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Card with gradient border glow on hover */
+.glow-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(18, 26, 48, 0.6), rgba(10, 15, 30, 0.8));
+  border: 1px solid var(--color-surface-border);
+  border-radius: 1rem;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.glow-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(79, 142, 247, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(79, 142, 247, 0.15),
+    0 12px 40px -12px rgba(79, 142, 247, 0.35);
+}
+
+/* Terminal window */
+.term {
+  background: linear-gradient(180deg, #0d1426, #0a101f);
+  border: 1px solid var(--color-surface-border);
+  border-radius: 1rem;
+  box-shadow:
+    0 0 0 1px rgba(79, 142, 247, 0.08),
+    0 24px 70px -20px rgba(0, 0, 0, 0.8),
+    0 0 90px -30px rgba(79, 142, 247, 0.35);
+}
+.term-tab {
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.term-tab:hover { color: #fff; }
+.term-tab[aria-selected='true'] {
+  color: #fff;
+  border-color: var(--color-brand);
+}
+
+/* Animated dash flow along SVG connection lines */
+.flow-line {
+  stroke-dasharray: 6 10;
+  animation: flow 1.6s linear infinite;
+}
+@keyframes flow {
+  to { stroke-dashoffset: -16; }
+}
+.pulse-slow { animation: pulse-soft 3.5s ease-in-out infinite; }
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-line, .pulse-slow { animation: none; }
+}
+
+/* Soft radial glow blobs behind sections */
+.glow-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+}

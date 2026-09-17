@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@bloxbean/cardano-client-bridge",
+      "name": "@bloxbean/mesmo",
       "dependencies": {
         "lossless-json": "^4.3.0",
         "yaml": "^2.3.0",
@@ -12,11 +12,11 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "@bloxbean/cardano-client-lib-linux-aarch64": "0.1.0-pre6",
-        "@bloxbean/cardano-client-lib-linux-musl-x86_64": "0.1.0-pre6",
-        "@bloxbean/cardano-client-lib-linux-x86_64": "0.1.0-pre6",
-        "@bloxbean/cardano-client-lib-macos-aarch64": "0.1.0-pre6",
-        "@bloxbean/cardano-client-lib-windows-x86_64": "0.1.0-pre6",
+        "@bloxbean/mesmo-linux-aarch64": "0.1.0-pre6",
+        "@bloxbean/mesmo-linux-musl-x86_64": "0.1.0-pre6",
+        "@bloxbean/mesmo-linux-x86_64": "0.1.0-pre6",
+        "@bloxbean/mesmo-macos-aarch64": "0.1.0-pre6",
+        "@bloxbean/mesmo-windows-x86_64": "0.1.0-pre6",
       },
     },
   },
@@ -61,10 +61,10 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
-    "lossless-json": ["lossless-json@4.3.0", "", {}, "sha512-ToxOC+SsduRmdSuoLZLYAr5zy1Qu7l5XhmPWM3zefCZ5IcrzW/h108qbJUKfOlDlhvhjUK84+8PSVX0kxnit0g=="],
+    "lossless-json": ["lossless-json@4.3.1", "", {}, "sha512-SqD/Bg3ZfltBJ2Z14hJ/BihnvtV553WO4g9/ePtlp4lrnl9jF3AdIJt53A/Wkg/0Li+LMfxaBqgx1MiFZdQlpQ=="],
 
     "typescript": ["typescript@7.0.2", "", { "optionalDependencies": { "@typescript/typescript-aix-ppc64": "7.0.2", "@typescript/typescript-darwin-arm64": "7.0.2", "@typescript/typescript-darwin-x64": "7.0.2", "@typescript/typescript-freebsd-arm64": "7.0.2", "@typescript/typescript-freebsd-x64": "7.0.2", "@typescript/typescript-linux-arm": "7.0.2", "@typescript/typescript-linux-arm64": "7.0.2", "@typescript/typescript-linux-loong64": "7.0.2", "@typescript/typescript-linux-mips64el": "7.0.2", "@typescript/typescript-linux-ppc64": "7.0.2", "@typescript/typescript-linux-riscv64": "7.0.2", "@typescript/typescript-linux-s390x": "7.0.2", "@typescript/typescript-linux-x64": "7.0.2", "@typescript/typescript-netbsd-arm64": "7.0.2", "@typescript/typescript-netbsd-x64": "7.0.2", "@typescript/typescript-openbsd-arm64": "7.0.2", "@typescript/typescript-openbsd-x64": "7.0.2", "@typescript/typescript-sunos-x64": "7.0.2", "@typescript/typescript-win32-arm64": "7.0.2", "@typescript/typescript-win32-x64": "7.0.2" }, "bin": { "tsc": "bin/tsc" } }, "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA=="],
 
-    "yaml": ["yaml@2.9.0", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA=="],
+    "yaml": ["yaml@2.9.0", "", { "bin": "bin.mjs" }, ""],
   }
 }

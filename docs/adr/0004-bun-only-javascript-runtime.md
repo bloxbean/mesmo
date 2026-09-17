@@ -6,7 +6,7 @@
 
 ## Context
 
-The JavaScript wrapper needs FFI into `libccl`. Node.js FFI libraries (`ffi-napi`, `koffi`) crash
+The JavaScript wrapper needs FFI into `libmesmo`. Node.js FFI libraries (`ffi-napi`, `koffi`) crash
 against the GraalVM native-image library due to stack-boundary detection issues (notably on macOS
 ARM64). Bun ships a built-in, stable FFI (`bun:ffi`).
 

@@ -1,12 +1,12 @@
 name: Publish Rust crate
 
-# Publishes the `cardano-client-lib` crate to crates.io on a v* tag via crates.io trusted publishing
+# Publishes the `mesmo` crate to crates.io on a v* tag via crates.io trusted publishing
 # (OIDC — no API token secret). The build/validation lives in build-rust-crate.yml (run on PRs by
 # publish-rust-dry-run.yml); workflow_dispatch runs only that build job here as a manual dry run —
 # the publish job is skipped entirely, so no environment approval is requested for a no-op.
 #
 # The crate ships SOURCE ONLY — crates.io can't host the native binary, so the crate's build.rs
-# fetches the matching libccl from this repo's GitHub release at the *consumer's* build time. So the
+# fetches the matching libmesmo from this repo's GitHub release at the *consumer's* build time. So the
 # release must exist before/with the publish (see RELEASING.md).
 #
 # Version: `version` in gradle.properties is the single source of truth. Cargo.toml's `version` is
@@ -26,7 +26,7 @@ jobs:
     needs: build
     # Job-level, not step-level: the `release` approval fires when the job *starts*, so
     # gating only the final steps would make a workflow_dispatch dry run page a release code owner
-    # to approve a job that builds libccl for ~10 minutes and then skips the actual publish.
+    # to approve a job that builds libmesmo for ~10 minutes and then skips the actual publish.
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     # Final human gate before the irreversible crates.io publish (a published version can never be
@@ -43,18 +43,19 @@ jobs:
       CRATE_VERSION: ${{ needs.build.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1.6.6
         with:
-          java-version: '25.0.3'
+          version: '25.3.4.1'
           distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
 
-      # `cargo publish` verify-builds the crate, which runs build.rs. Point it at an in-tree libccl so
+      # `cargo publish` verify-builds the crate, which runs build.rs. Point it at an in-tree libmesmo so
       # the verify doesn't depend on the release tarball already being downloadable.
       - name: Build native library (for the verification build)
         run: ./gradlew :core:nativeCompile
       - name: Point build.rs at the in-tree lib
-        run: echo "CCL_LIB_PATH=$PWD/core/build/native/nativeCompile" >> "$GITHUB_ENV"
+        run: echo "MESMO_LIB_PATH=$PWD/core/build/native/nativeCompile" >> "$GITHUB_ENV"
 
       - name: Stamp crate version from gradle.properties
         run: ./wrappers/rust/scripts/set-crate-version.sh "$CRATE_VERSION"

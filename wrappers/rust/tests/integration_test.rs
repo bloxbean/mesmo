@@ -1,124 +1,108 @@
-use ccl::{Bridge, TxResult};
+use mesmo::{Mesmo, TxResult};
 use serde_json::{json, Value};
 
 // A known valid transaction CBOR hex (built from Java tests)
 const SAMPLE_TX_CBOR: &str = "84a300d901028182582073198b7ad003862b9798106b88fbccfca464b1a38afb34958275c4a7d7d8d002010181825839009493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e32c728d3861e164cab28cb8f006448139c8f1740ffb8e7aa9e5232dc1a001e8480021a00029810a0f5f6";
 
-fn get_mnemonic(bridge: &Bridge) -> String {
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
+fn create_managed(lib: &Mesmo, network: mesmo::Network) -> (serde_json::Value, String) {
+    let acct = lib
+        .accounts()
+        .create(network)
         .expect("Failed to create account");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    json["mnemonic"].as_str().unwrap().to_string()
+    let info = acct.info().expect("Failed to get info");
+    let phrase = acct
+        .export_recovery_phrase()
+        .expect("Failed to export recovery phrase");
+    (info, phrase)
 }
 
-fn get_testnet_mnemonic(bridge: &Bridge) -> String {
-    let result = bridge
-        .account()
-        .create(ccl::Network::Testnet)
-        .expect("Failed to create account");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    json["mnemonic"].as_str().unwrap().to_string()
+fn get_mnemonic(lib: &Mesmo) -> String {
+    create_managed(lib, mesmo::Network::Mainnet).1
+}
+
+fn get_testnet_mnemonic(lib: &Mesmo) -> String {
+    create_managed(lib, mesmo::Network::Testnet).1
 }
 
 #[test]
 fn test_version() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let version = bridge.version().expect("Failed to get version");
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let version = lib.version().expect("Failed to get version");
     assert_eq!(version, "0.1.0");
 }
 
 #[test]
 fn test_account_create() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    assert!(json["base_address"].as_str().unwrap().starts_with("addr1"));
-    assert!(
-        json["mnemonic"]
-            .as_str()
-            .unwrap()
-            .split_whitespace()
-            .count()
-            == 24
-    );
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (info, phrase) = create_managed(&lib, mesmo::Network::Mainnet);
+    assert!(info["base_address"].as_str().unwrap().starts_with("addr1"));
+    assert!(phrase.split_whitespace().count() == 24);
+    assert!(info.get("mnemonic").is_none());
 }
 
 #[test]
 fn test_account_from_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
+    let lib = Mesmo::new().expect("Failed to create lib");
 
-    let created = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let created_json: serde_json::Value = serde_json::from_str(&created).expect("Invalid JSON");
-    let mnemonic = created_json["mnemonic"].as_str().unwrap();
+    let (created_info, mnemonic) = create_managed(&lib, mesmo::Network::Mainnet);
 
-    let restored = bridge
-        .account()
-        .from_mnemonic(mnemonic, ccl::Network::Mainnet, 0, 0)
+    let restored = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
         .expect("Failed to restore account");
-    let restored_json: serde_json::Value = serde_json::from_str(&restored).expect("Invalid JSON");
+    let restored_info = restored.info().expect("Failed to get info");
 
-    assert_eq!(
-        created_json["base_address"],
-        restored_json["base_address"]
-    );
+    assert_eq!(created_info["base_address"], restored_info["base_address"]);
 }
 
 #[test]
-fn test_account_get_private_key() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+fn test_crypto_derive_key() {
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let priv_key = bridge
-        .account()
-        .get_private_key(&mnemonic, ccl::Network::Mainnet, 0, 0)
-        .expect("Failed to get private key");
-    assert_eq!(priv_key.len(), 128); // 64 bytes extended BIP32-ED25519
+    let key_json = lib
+        .crypto()
+        .derive_key(&mnemonic, 0, 0, "payment")
+        .expect("Failed to derive key");
+    let key: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    assert_eq!(key["private_key"].as_str().unwrap().len(), 128); // 64 bytes extended BIP32-ED25519
 }
 
 #[test]
 fn test_account_get_drep_id() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let drep_id = bridge
-        .account()
-        .get_drep_id(&mnemonic, ccl::Network::Mainnet, 0)
-        .expect("Failed to get DRep ID");
-    assert!(drep_id.starts_with("drep1"));
+    let acct = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
+        .expect("Failed to open account");
+    let info = acct.info().expect("Failed to get info");
+    assert!(info["drep_id"].as_str().unwrap().starts_with("drep1"));
 }
 
 #[test]
 fn test_account_sign_tx() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_testnet_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_testnet_mnemonic(&lib);
 
-    let signed = bridge
-        .account()
-        .sign_tx(&mnemonic, ccl::Network::Testnet, 0, 0, SAMPLE_TX_CBOR)
+    let acct = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Testnet, 0, 0)
+        .expect("Failed to open account");
+    let signed = acct
+        .sign_tx(SAMPLE_TX_CBOR, mesmo::accounts::SigningRole::PAYMENT)
         .expect("Failed to sign tx");
     assert!(signed.len() > SAMPLE_TX_CBOR.len());
 }
 
 #[test]
 fn test_address_info() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    let addr = json["base_address"].as_str().unwrap();
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (info, _phrase) = create_managed(&lib, mesmo::Network::Mainnet);
+    let addr = info["base_address"].as_str().unwrap();
 
-    let info_str = bridge.address().info(addr).expect("Failed to get address info");
+    let info_str = lib.address().info(addr).expect("Failed to get address info");
     let info: serde_json::Value = serde_json::from_str(&info_str).expect("Invalid JSON");
     assert_eq!(info["type"].as_str().unwrap(), "Base");
     assert_eq!(info["network_id"].as_i64().unwrap(), 1);
@@ -132,51 +116,45 @@ fn test_address_info() {
 /// inversion back into a bug: renumbering `Network` to match the on-chain ids would make every
 /// caller silently derive keys for the *wrong network*, and this test is what stops that landing.
 #[test]
-fn test_network_ordinals_are_ccl_not_onchain() {
+fn test_network_ordinals_are_mesmo_not_onchain() {
     // The CCL ordinals the native library expects. Do not renumber to match on-chain ids.
-    assert_eq!(ccl::Network::Mainnet as i32, 0);
-    assert_eq!(ccl::Network::Testnet as i32, 1);
-    assert_eq!(ccl::Network::Preprod as i32, 2);
-    assert_eq!(ccl::Network::Preview as i32, 3);
-    assert_eq!(ccl::Network::Mainnet.as_i32(), 0);
-    assert_eq!(i32::from(ccl::Network::Testnet), 1);
+    assert_eq!(mesmo::Network::Mainnet as i32, 0);
+    assert_eq!(mesmo::Network::Testnet as i32, 1);
+    assert_eq!(mesmo::Network::Mainnet.as_i32(), 0);
+    assert_eq!(i32::from(mesmo::Network::Testnet), 1);
 
-    let bridge = Bridge::new().expect("Failed to create bridge");
+    let lib = Mesmo::new().expect("Failed to create lib");
 
-    let on_chain_network_id = |network: ccl::Network| -> i64 {
-        let created = bridge
-            .account()
+    let on_chain_network_id = |network: mesmo::Network| -> i64 {
+        let created = lib
+            .accounts()
             .create(network)
             .expect("Failed to create account");
-        let json: serde_json::Value = serde_json::from_str(&created).expect("Invalid JSON");
+        let json = created.info().expect("Failed to get info");
         let addr = json["base_address"].as_str().unwrap();
-        let info_str = bridge.address().info(addr).expect("Failed to get address info");
+        let info_str = lib.address().info(addr).expect("Failed to get address info");
         let info: serde_json::Value = serde_json::from_str(&info_str).expect("Invalid JSON");
         info["network_id"].as_i64().expect("missing network_id")
     };
 
     // Inverted on purpose: Network::Mainnet is ordinal 0, but a mainnet address is on-chain id 1.
-    assert_eq!(on_chain_network_id(ccl::Network::Mainnet), 1);
-    assert_eq!(on_chain_network_id(ccl::Network::Testnet), 0);
+    assert_eq!(on_chain_network_id(mesmo::Network::Mainnet), 1);
+    assert_eq!(on_chain_network_id(mesmo::Network::Testnet), 0);
 }
 
 #[test]
 fn test_address_to_from_bytes() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    let addr = json["base_address"].as_str().unwrap();
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (info, _phrase) = create_managed(&lib, mesmo::Network::Mainnet);
+    let addr = info["base_address"].as_str().unwrap();
 
-    let hex_bytes = bridge
+    let hex_bytes = lib
         .address()
         .to_bytes(addr)
         .expect("Failed to convert to bytes");
     assert!(!hex_bytes.is_empty());
 
-    let restored = bridge
+    let restored = lib
         .address()
         .from_bytes(&hex_bytes)
         .expect("Failed to convert from bytes");
@@ -185,23 +163,19 @@ fn test_address_to_from_bytes() {
 
 #[test]
 fn test_address_validate() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
+    let lib = Mesmo::new().expect("Failed to create lib");
 
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    let addr = json["base_address"].as_str().unwrap();
+    let (info, _phrase) = create_managed(&lib, mesmo::Network::Mainnet);
+    let addr = info["base_address"].as_str().unwrap();
 
-    assert!(bridge.address().validate(addr));
-    assert!(!bridge.address().validate("invalid_address"));
+    assert!(lib.address().validate(addr));
+    assert!(!lib.address().validate("invalid_address"));
 }
 
 #[test]
 fn test_crypto_blake2b_256() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let hash = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let hash = lib
         .crypto()
         .blake2b_256("48656c6c6f")
         .expect("Failed to hash");
@@ -210,8 +184,8 @@ fn test_crypto_blake2b_256() {
 
 #[test]
 fn test_crypto_blake2b_224() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let hash = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let hash = lib
         .crypto()
         .blake2b_224("48656c6c6f")
         .expect("Failed to hash");
@@ -220,54 +194,65 @@ fn test_crypto_blake2b_224() {
 
 #[test]
 fn test_crypto_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = lib
         .crypto()
         .generate_mnemonic(24)
         .expect("Failed to generate mnemonic");
     assert_eq!(mnemonic.split_whitespace().count(), 24);
-    assert!(bridge.crypto().validate_mnemonic(&mnemonic));
-    assert!(!bridge.crypto().validate_mnemonic("invalid mnemonic"));
+    assert!(lib.crypto().validate_mnemonic(&mnemonic));
+    assert!(!lib.crypto().validate_mnemonic("invalid mnemonic"));
 }
 
 #[test]
 fn test_crypto_sign() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let priv_key = bridge
-        .account()
-        .get_private_key(&mnemonic, ccl::Network::Mainnet, 0, 0)
-        .expect("Failed to get private key");
-    // Use first 32 bytes (64 hex chars) for standard Ed25519
-    let priv_key_32 = &priv_key[..64];
-
-    let message_hex = "68656c6c6f";
-    let signature = bridge
+    let key_json = lib
         .crypto()
-        .sign(message_hex, priv_key_32)
+        .derive_key(&mnemonic, 0, 0, "payment")
+        .expect("Failed to derive key");
+    let key: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    let priv_key = key["private_key"].as_str().unwrap().to_string();
+    // Round-trip regression pin: the whole extended key must sign AND verify against
+    // the key's own public key; half of it (a clamped scalar, not a seed) must not.
+    let pub_key = key["public_key"].as_str().unwrap();
+    let message_hex = "68656c6c6f";
+    let signature = lib
+        .crypto()
+        .sign(message_hex, &priv_key)
         .expect("Failed to sign");
     assert_eq!(signature.len(), 128);
+    assert!(lib.crypto().verify(&signature, message_hex, pub_key));
+
+    let wrong = lib
+        .crypto()
+        .sign(message_hex, &priv_key[..64])
+        .expect("Failed to sign with seed form");
+    assert!(!lib.crypto().verify(&wrong, message_hex, pub_key));
 }
 
 #[test]
 fn test_crypto_verify_rejects_wrong_signature() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let pub_key = bridge
-        .account()
-        .get_public_key(&mnemonic, ccl::Network::Mainnet, 0, 0)
-        .expect("Failed to get public key");
+    let key_json = lib
+        .crypto()
+        .derive_key(&mnemonic, 0, 0, "payment")
+        .expect("Failed to derive key");
+    let key: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    let pub_key = key["public_key"].as_str().unwrap().to_string();
 
     let fake_sig = "00".repeat(64);
-    assert!(!bridge.crypto().verify(&fake_sig, "68656c6c6f", &pub_key));
+    assert!(!lib.crypto().verify(&fake_sig, "68656c6c6f", &pub_key));
 }
 
 #[test]
 fn test_tx_hash() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let hash = bridge.tx().hash(SAMPLE_TX_CBOR).expect("Failed to get tx hash");
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let hash = lib.tx().hash(SAMPLE_TX_CBOR).expect("Failed to get tx hash");
     assert_eq!(hash.len(), 64);
     assert_eq!(
         hash,
@@ -277,8 +262,8 @@ fn test_tx_hash() {
 
 #[test]
 fn test_tx_to_json() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let tx_json = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let tx_json = lib
         .tx()
         .to_json(SAMPLE_TX_CBOR)
         .expect("Failed to convert to JSON");
@@ -288,8 +273,8 @@ fn test_tx_to_json() {
 
 #[test]
 fn test_tx_deserialize() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let deserialized = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let deserialized = lib
         .tx()
         .deserialize(SAMPLE_TX_CBOR)
         .expect("Failed to deserialize");
@@ -299,8 +284,8 @@ fn test_tx_deserialize() {
 
 #[test]
 fn test_plutus_data_hash() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let hash = bridge
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let hash = lib
         .plutus()
         .data_hash("182a")
         .expect("Failed to hash datum");
@@ -313,20 +298,16 @@ fn test_plutus_data_hash() {
 
 #[test]
 fn test_script_native_from_json() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let acct_json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (acct_json, _phrase) = create_managed(&lib, mesmo::Network::Mainnet);
     let addr = acct_json["base_address"].as_str().unwrap();
 
-    let info_str = bridge.address().info(addr).expect("Failed to get address info");
+    let info_str = lib.address().info(addr).expect("Failed to get address info");
     let info: serde_json::Value = serde_json::from_str(&info_str).expect("Invalid JSON");
     let key_hash = info["payment_credential_hash"].as_str().unwrap();
 
     let script_json = format!(r#"{{"type":"sig","keyHash":"{}"}}"#, key_hash);
-    let result = bridge
+    let result = lib
         .script()
         .native_from_json(&script_json)
         .expect("Failed to parse native script");
@@ -340,27 +321,23 @@ fn test_script_native_from_json() {
 
 #[test]
 fn test_script_hash() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .account()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create account");
-    let acct_json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (acct_json, _phrase) = create_managed(&lib, mesmo::Network::Mainnet);
     let addr = acct_json["base_address"].as_str().unwrap();
 
-    let info_str = bridge.address().info(addr).expect("Failed to get address info");
+    let info_str = lib.address().info(addr).expect("Failed to get address info");
     let info: serde_json::Value = serde_json::from_str(&info_str).expect("Invalid JSON");
     let key_hash = info["payment_credential_hash"].as_str().unwrap();
 
     let script_json = format!(r#"{{"type":"sig","keyHash":"{}"}}"#, key_hash);
-    let result = bridge
+    let result = lib
         .script()
         .native_from_json(&script_json)
         .expect("Failed to parse native script");
     let parsed: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
     let cbor_hex = parsed["cbor_hex"].as_str().unwrap();
 
-    let hash = bridge
+    let hash = lib
         .script()
         .hash(cbor_hex, 0)
         .expect("Failed to hash script");
@@ -369,80 +346,79 @@ fn test_script_hash() {
 
 #[test]
 fn test_gov_drep_key_from_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let gov_result = bridge
-        .gov()
-        .drep_key_from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0)
-        .expect("Failed to get DRep key");
-    let parsed: serde_json::Value = serde_json::from_str(&gov_result).expect("Invalid JSON");
-    assert!(parsed["drep_id"].as_str().unwrap().starts_with("drep1"));
-    assert!(parsed["verification_key"].is_string());
+    let acct = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
+        .expect("Failed to open account");
+    let info = acct.info().expect("Failed to get info");
+    assert!(info["drep_id"].as_str().unwrap().starts_with("drep1"));
+    let key_json = lib
+        .crypto()
+        .derive_key(&mnemonic, 0, 0, "drep")
+        .expect("Failed to derive drep key");
+    let parsed: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    assert!(parsed["public_key"].is_string());
 }
 
 #[test]
 fn test_gov_committee_cold_key_from_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let gov_result = bridge
-        .gov()
-        .committee_cold_key_from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0)
-        .expect("Failed to get committee cold key");
-    let parsed: serde_json::Value = serde_json::from_str(&gov_result).expect("Invalid JSON");
-    assert!(parsed["id"].as_str().unwrap().starts_with("cc_cold1"));
-    assert!(parsed["verification_key"].is_string());
+    let acct = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
+        .expect("Failed to open account");
+    let info = acct.info().expect("Failed to get info");
+    assert!(info["committee_cold_id"].as_str().unwrap().starts_with("cc_cold1"));
+    let key_json = lib
+        .crypto()
+        .derive_key(&mnemonic, 0, 0, "committee_cold")
+        .expect("Failed to derive committee_cold key");
+    let parsed: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    assert!(parsed["public_key"].is_string());
 }
 
 #[test]
 fn test_gov_committee_hot_key_from_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let mnemonic = get_mnemonic(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let mnemonic = get_mnemonic(&lib);
 
-    let gov_result = bridge
-        .gov()
-        .committee_hot_key_from_mnemonic(&mnemonic, ccl::Network::Mainnet, 0)
-        .expect("Failed to get committee hot key");
-    let parsed: serde_json::Value = serde_json::from_str(&gov_result).expect("Invalid JSON");
-    assert!(parsed["id"].as_str().unwrap().starts_with("cc_hot1"));
-    assert!(parsed["verification_key"].is_string());
+    let acct = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
+        .expect("Failed to open account");
+    let info = acct.info().expect("Failed to get info");
+    assert!(info["committee_hot_id"].as_str().unwrap().starts_with("cc_hot1"));
+    let key_json = lib
+        .crypto()
+        .derive_key(&mnemonic, 0, 0, "committee_hot")
+        .expect("Failed to derive committee_hot key");
+    let parsed: serde_json::Value = serde_json::from_str(&key_json).expect("Invalid JSON");
+    assert!(parsed["public_key"].is_string());
 }
 
 #[test]
 fn test_wallet_create() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let result = bridge
-        .wallet()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create wallet");
-    let json: serde_json::Value = serde_json::from_str(&result).expect("Invalid JSON");
-    assert_eq!(
-        json["mnemonic"]
-            .as_str()
-            .unwrap()
-            .split_whitespace()
-            .count(),
-        24
-    );
-    assert!(json["stake_address"].is_string());
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (info, phrase) = create_managed(&lib, mesmo::Network::Mainnet);
+    assert_eq!(phrase.split_whitespace().count(), 24);
+    assert!(info["stake_address"].is_string());
 }
 
 #[test]
 fn test_wallet_from_mnemonic() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let created = bridge
-        .wallet()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create wallet");
-    let created_json: serde_json::Value = serde_json::from_str(&created).expect("Invalid JSON");
-    let mnemonic = created_json["mnemonic"].as_str().unwrap();
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (created_json, mnemonic) = create_managed(&lib, mesmo::Network::Mainnet);
 
-    let restored = bridge
-        .wallet()
-        .from_mnemonic(mnemonic, ccl::Network::Mainnet)
-        .expect("Failed to restore wallet");
-    let restored_json: serde_json::Value = serde_json::from_str(&restored).expect("Invalid JSON");
+    let restored = lib
+        .accounts()
+        .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, 0)
+        .expect("Failed to restore account");
+    let restored_json = restored.info().expect("Failed to get info");
 
     assert_eq!(
         created_json["stake_address"],
@@ -452,25 +428,22 @@ fn test_wallet_from_mnemonic() {
 
 #[test]
 fn test_wallet_get_address() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let created = bridge
-        .wallet()
-        .create(ccl::Network::Mainnet)
-        .expect("Failed to create wallet");
-    let created_json: serde_json::Value = serde_json::from_str(&created).expect("Invalid JSON");
-    let mnemonic = created_json["mnemonic"].as_str().unwrap();
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let (_, mnemonic) = create_managed(&lib, mesmo::Network::Mainnet);
 
-    let addr0 = bridge
-        .wallet()
-        .get_address(mnemonic, ccl::Network::Mainnet, 0)
-        .expect("Failed to get address 0");
+    // Address enumeration is one managed handle per CIP-1852 payment leaf.
+    let addr_at = |index: u32| -> String {
+        let acct = lib
+            .accounts()
+            .from_mnemonic(&mnemonic, mesmo::Network::Mainnet, 0, index)
+            .expect("Failed to open account");
+        let info = acct.info().expect("Failed to get info");
+        info["base_address"].as_str().unwrap().to_string()
+    };
+
+    let addr0 = addr_at(0);
     assert!(addr0.starts_with("addr1"));
-
-    let addr1 = bridge
-        .wallet()
-        .get_address(mnemonic, ccl::Network::Mainnet, 1)
-        .expect("Failed to get address 1");
-    assert_ne!(addr0, addr1);
+    assert_ne!(addr0, addr_at(1));
 }
 
 // --- QuickTx Tests ---
@@ -537,19 +510,14 @@ fn make_utxos(address: &str, lovelace: u64) -> Value {
     }])
 }
 
-fn get_testnet_address(bridge: &Bridge) -> (String, String) {
-    let result = bridge
-        .account()
-        .create(ccl::Network::Testnet)
-        .expect("Failed to create account");
-    let json: Value = serde_json::from_str(&result).expect("Invalid JSON");
-    let addr = json["base_address"].as_str().unwrap().to_string();
-    let mnemonic = json["mnemonic"].as_str().unwrap().to_string();
+fn get_testnet_address(lib: &Mesmo) -> (String, String) {
+    let (info, mnemonic) = create_managed(lib, mesmo::Network::Testnet);
+    let addr = info["base_address"].as_str().unwrap().to_string();
     (addr, mnemonic)
 }
 
-fn get_testnet_addr(bridge: &Bridge) -> String {
-    get_testnet_address(bridge).0
+fn get_testnet_addr(lib: &Mesmo) -> String {
+    get_testnet_address(lib).0
 }
 
 fn assert_tx_result(result: &TxResult) {
@@ -576,23 +544,23 @@ fn payment_yaml(from: &str, to: &str, quantity: &str) -> String {
 
 #[test]
 fn test_quicktx_simple_payment() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let sender = get_testnet_addr(&bridge);
-    let receiver = get_testnet_addr(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let sender = get_testnet_addr(&lib);
+    let receiver = get_testnet_addr(&lib);
 
     let yaml = payment_yaml(&sender, &receiver, "5000000");
-    let result = bridge
+    let result = lib
         .quicktx()
-        .build(&yaml, &make_utxos(&sender, 100_000_000), &test_protocol_params(), None)
+        .build(&yaml, &make_utxos(&sender, 100_000_000), &test_protocol_params(), None, 0)
         .expect("Build failed");
     assert_tx_result(&result);
 }
 
 #[test]
 fn test_quicktx_variable_substitution() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let sender = get_testnet_addr(&bridge);
-    let receiver = get_testnet_addr(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let sender = get_testnet_addr(&lib);
+    let receiver = get_testnet_addr(&lib);
 
     let yaml = format!(
         "version: 1.0\n\
@@ -609,22 +577,22 @@ fn test_quicktx_variable_substitution() {
          \x20           - unit: lovelace\n\
          \x20             quantity: ${{amount}}\n"
     );
-    let result = bridge
+    let result = lib
         .quicktx()
-        .build(&yaml, &make_utxos(&sender, 100_000_000), &test_protocol_params(), None)
+        .build(&yaml, &make_utxos(&sender, 100_000_000), &test_protocol_params(), None, 0)
         .expect("Build failed");
     assert_tx_result(&result);
 }
 
 #[test]
 fn test_quicktx_insufficient_funds() {
-    let bridge = Bridge::new().expect("Failed to create bridge");
-    let sender = get_testnet_addr(&bridge);
-    let receiver = get_testnet_addr(&bridge);
+    let lib = Mesmo::new().expect("Failed to create lib");
+    let sender = get_testnet_addr(&lib);
+    let receiver = get_testnet_addr(&lib);
 
     let yaml = payment_yaml(&sender, &receiver, "200000000");
-    let result = bridge
+    let result = lib
         .quicktx()
-        .build(&yaml, &make_utxos(&sender, 1_000_000), &test_protocol_params(), None);
+        .build(&yaml, &make_utxos(&sender, 1_000_000), &test_protocol_params(), None, 0);
     assert!(result.is_err(), "expected insufficient funds error");
 }

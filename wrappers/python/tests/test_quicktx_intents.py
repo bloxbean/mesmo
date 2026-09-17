@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from ccl._ffi import CclError
-from ccl.network import Network
+from mesmo._ffi import MesmoError
+from mesmo.network import Network
 
 FIXTURES = Path(__file__).resolve().parents[3] / "test-fixtures" / "quicktx-intents"
 
@@ -54,38 +54,39 @@ def _assert_built(result):
 
 @pytest.mark.parametrize("fixture", sorted(glob.glob(str(FIXTURES / "*.yaml"))),
                          ids=lambda p: Path(p).stem)
-def test_intent_builds(ccl, fixture):
+def test_intent_builds(mesmo, fixture):
     yaml = Path(fixture).read_text()
-    _assert_built(ccl.quicktx.build(yaml, _utxos(), PROTOCOL_PARAMS))
+    _assert_built(mesmo.quicktx.build(yaml, _utxos(), PROTOCOL_PARAMS))
 
 
 # The mnemonic the fixtures are derived from (account 0/0 == SENDER).
 INTENT_MNEMONIC = "test walk nut penalty hip pave soap entry language right filter choice"
 
 
-def test_sign_with_stake_key(ccl):
-    # A stake registration must be witnessed by the stake key too; sign_tx_with_keys adds it.
+def test_sign_with_stake_key(mesmo):
+    # A stake registration must be witnessed by the stake key too; the stake role adds it.
     yaml = (FIXTURES / "stake_registration.yaml").read_text()
     utxos = [{"tx_hash": "a" * 64, "output_index": 0, "address": SENDER,
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
-    built = ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
+    built = mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
 
-    signed_payment = ccl.account.sign_tx(INTENT_MNEMONIC, built["tx_cbor"], Network.TESTNET, 0, 0)
-    signed_stake = ccl.account.sign_tx_with_keys(
-        INTENT_MNEMONIC, built["tx_cbor"], ["payment", "stake"], Network.TESTNET, 0, 0)
+    from mesmo import SigningRole
+    with mesmo.accounts.from_mnemonic(INTENT_MNEMONIC, Network.TESTNET) as acct:
+        signed_payment = acct.sign_tx(built["tx_cbor"])
+        signed_stake = acct.sign_tx(built["tx_cbor"], SigningRole.PAYMENT | SigningRole.STAKE)
     assert len(signed_stake) > len(signed_payment)
 
 
-def test_plutus_mint(ccl):
+def test_plutus_mint(mesmo):
     yaml = (FIXTURES / "plutus" / "script_minting.yaml").read_text()
     utxos = [{"tx_hash": "a" * 64, "output_index": 0, "address": SENDER,
               "amount": [{"unit": "lovelace", "quantity": "2000000000"}]}]
-    _assert_built(ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
-    with pytest.raises(CclError):
-        ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
+    _assert_built(mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
+    with pytest.raises(MesmoError):
+        mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
 
 
-def test_plutus_spend(ccl):
+def test_plutus_spend(mesmo):
     yaml = (FIXTURES / "plutus" / "script_collect_from.yaml").read_text()
     utxos = [
         {"tx_hash": SCRIPT_TX_HASH, "output_index": 0, "address": SCRIPT_ADDR,
@@ -93,6 +94,6 @@ def test_plutus_spend(ccl):
         {"tx_hash": "a" * 64, "output_index": 0, "address": SENDER,
          "amount": [{"unit": "lovelace", "quantity": "2000000000"}]},
     ]
-    _assert_built(ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
-    with pytest.raises(CclError):
-        ccl.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)
+    _assert_built(mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS, exec_units=EXEC_UNITS))
+    with pytest.raises(MesmoError):
+        mesmo.quicktx.build(yaml, utxos, PROTOCOL_PARAMS)

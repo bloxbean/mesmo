@@ -9,7 +9,7 @@
 The native library ([ADR-0001](0001-native-shared-library-ffi.md)) exposes a C ABI. We want first-class
 support in **Python, Go, Rust, and JavaScript**, with consistent behavior and minimal maintenance.
 Early wrappers carried large per-language *fluent builders* (~10k LOC across the four) whose only job
-was emitting the bridge's transaction format; these drifted and duplicated logic.
+was emitting Mesmo's transaction format; these drifted and duplicated logic.
 
 ## Decision
 

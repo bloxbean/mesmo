@@ -7,9 +7,9 @@
 // Run from wrappers/js:
 //
 //   LIB_DIR=../../core/build/native/nativeCompile
-//   CCL_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
+//   MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
 //     bun examples/transaction.js
-import { CclBridge, TESTNET } from '../src/index.js';
+import { Mesmo, TESTNET } from '../src/index.js';
 
 // Minimal protocol parameters (CCL test-resource values).
 const protocolParams = {
@@ -21,16 +21,18 @@ const protocolParams = {
   max_collateral_inputs: 3,
 };
 
-const bridge = new CclBridge();
+const lib = new Mesmo();
 try {
-  const sender = bridge.account.create(TESTNET);
-  const receiver = bridge.account.create(TESTNET);
+  using sender = lib.accounts.create(TESTNET); // managed handle — signs below
+  using receiver = lib.accounts.create(TESTNET);
+  const senderAddress = sender.info.base_address;
+  const receiverAddress = receiver.info.base_address;
 
   // A static UTXO the sender controls (100 ADA), instead of querying a node.
   const utxos = [{
     tx_hash: 'a'.repeat(64),
     output_index: 0,
-    address: sender.base_address,
+    address: senderAddress,
     amount: [{ unit: 'lovelace', quantity: '100000000' }],
   }];
 
@@ -39,26 +41,26 @@ try {
 version: 1.0
 transaction:
   - tx:
-      from: ${sender.base_address}
+      from: ${senderAddress}
       intents:
         - type: payment
-          address: ${receiver.base_address}
+          address: ${receiverAddress}
           amounts:
             - unit: lovelace
               quantity: "5000000"
 `;
 
   // Build the unsigned transaction offline.
-  const result = bridge.quicktx.build(yaml, utxos, protocolParams);
+  const result = lib.quicktx.build(yaml, utxos, protocolParams);
   console.log('Built unsigned transaction from TxPlan YAML');
   console.log('  tx hash:', result.tx_hash);
   console.log('  fee    :', result.fee);
   console.log('  cbor   :', result.tx_cbor.slice(0, 80), '...');
 
-  // Sign it with the sender's mnemonic.
-  const signed = bridge.account.signTx(sender.mnemonic, TESTNET, 0, 0, result.tx_cbor);
+  // Sign it with the sender's managed handle — no mnemonic in the call.
+  const signed = sender.signTx(result.tx_cbor);
   console.log('Signed transaction cbor:', signed.slice(0, 80), '...');
   console.log('\nNext step (not shown): submit `signed` to a Cardano node over HTTP.');
 } finally {
-  bridge.close();
+  lib.close();
 }

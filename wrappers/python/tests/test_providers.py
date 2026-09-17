@@ -6,12 +6,12 @@ the DevKit integration tests.
 """
 from unittest import mock
 
-from ccl.providers import YaciProvider, BlockfrostProvider, ChainDataProvider
-from ccl.quicktx import QuickTx
+from mesmo.providers import YaciProvider, BlockfrostProvider, ChainDataProvider
+from mesmo.quicktx import QuickTx
 
 
 def test_yaci_provider_urls():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = {"ok": True}
         p = YaciProvider()
         p.utxos("addr_test1xyz")
@@ -23,14 +23,14 @@ def test_yaci_provider_urls():
 
 
 def test_yaci_provider_custom_base_url_trailing_slash():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = []
         YaciProvider(base_url="http://host:9999/api/").utxos("addrX")
     assert get.call_args.args[0] == "http://host:9999/api/addresses/addrX/utxos"
 
 
 def test_blockfrost_network_url_and_project_id_header():
-    with mock.patch("ccl.providers._http_get_json") as get:
+    with mock.patch("mesmo.providers._http_get_json") as get:
         get.return_value = {}
         BlockfrostProvider("proj123", network="preprod").protocol_params()
     url = get.call_args.args[0]
@@ -56,7 +56,7 @@ def test_blockfrost_utxos_paginate_and_inject_address():
     def fake_get(url, headers=None, timeout=30):
         return page1 if "page=1" in url else page2 if "page=2" in url else []
 
-    with mock.patch("ccl.providers._http_get_json", side_effect=fake_get):
+    with mock.patch("mesmo.providers._http_get_json", side_effect=fake_get):
         utxos = BlockfrostProvider("p", network="preview").utxos("addr_test1abc")
 
     assert len(utxos) == 101                       # paged until a short page
@@ -76,13 +76,14 @@ def test_build_with_composes_fetch_and_build():
         def protocol_params(self):
             return sentinel_pp
 
-    qt = QuickTx(bridge=None)
+    qt = QuickTx(lib=None)
     calls = []
-    qt.build = lambda y, u, p, e=None: (calls.append((y, u, p, e)), {"tx_cbor": "DRAFT"})[1]
+    qt.build = lambda y, u, p, e=None, additional_signers=0: (
+        calls.append((y, u, p, e, additional_signers)), {"tx_cbor": "DRAFT"})[1]
 
     # No evaluator → fetch chain data, then build once with no units (the offline Scalus default).
-    qt.build_with("YAML", StubProvider(), "addrX")
-    assert calls == [("YAML", sentinel_utxos, sentinel_pp, None)]
+    qt.build_with("YAML", StubProvider(), ["addrX"])
+    assert calls == [("YAML", sentinel_utxos, sentinel_pp, None, 0)]
 
     # With an evaluator → two-pass: draft build, evaluate(draft), rebuild with the returned units.
     calls.clear()
@@ -93,8 +94,32 @@ def test_build_with_composes_fetch_and_build():
             assert utxos == sentinel_utxos
             return [{"mem": 1, "steps": 2}]
 
-    qt.build_with("YAML", StubProvider(), "addrX", evaluator=StubEvaluator())
+    qt.build_with("YAML", StubProvider(), ["addrX"], evaluator=StubEvaluator())
     assert calls == [
-        ("YAML", sentinel_utxos, sentinel_pp, None),                      # draft
-        ("YAML", sentinel_utxos, sentinel_pp, [{"mem": 1, "steps": 2}]),  # rebuild
+        ("YAML", sentinel_utxos, sentinel_pp, None, 0),                      # draft
+        ("YAML", sentinel_utxos, sentinel_pp, [{"mem": 1, "steps": 2}], 0),  # rebuild
     ]
+
+
+def test_build_with_merges_and_dedupes_utxos_across_senders():
+    """Multi-sender fetch: UTXOs are merged per sender and de-duplicated by
+    (tx_hash, output_index) — overlapping senders must not double-fund the build."""
+    shared = {"tx_hash": "a" * 64, "output_index": 0, "address": "addrA",
+              "amount": [{"unit": "lovelace", "quantity": "9"}]}
+    only_b = {"tx_hash": "b" * 64, "output_index": 1, "address": "addrB",
+              "amount": [{"unit": "lovelace", "quantity": "7"}]}
+
+    class TwoSenderProvider(ChainDataProvider):
+        def utxos(self, address):
+            return [shared] if address == "addrA" else [shared, only_b]
+
+        def protocol_params(self):
+            return {"min_fee_a": 44}
+
+    qt = QuickTx(lib=None)
+    calls = []
+    qt.build = lambda y, u, p, e=None, additional_signers=0: (
+        calls.append(u), {"tx_cbor": "DRAFT"})[1]
+
+    qt.build_with("YAML", TwoSenderProvider(), ["addrA", "addrB"])
+    assert calls == [[shared, only_b]], "the shared UTXO must appear exactly once"

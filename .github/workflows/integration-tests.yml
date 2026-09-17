@@ -14,10 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1.6.6
         with:
-          java-version: '25.0.3'
+          version: '25.3.4.1'
           distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
@@ -33,7 +34,7 @@ jobs:
         run: python3 -m pip install --break-system-packages pytest pyyaml
 
       - name: Install Yaci DevKit
-        # Pinned to the newest release (cardano-client-bindings tracks latest, incl. previews).
+        # Pinned to the newest release (mesmo tracks latest, incl. previews).
         run: npm install -g @bloxbean/yaci-devkit@0.12.0-beta5
 
       # Start the devnet in the background; it warms up while the native lib builds.

@@ -67,10 +67,11 @@ jobs:
             npm_cpu: x64
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
+      - uses: graalvm/setup-graalvm@v1.6.6
         with:
-          java-version: '25.0.3'
+          version: '25.3.4.1'
           distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build native library
         shell: bash
         run: ./gradlew :core:nativeCompile
@@ -80,23 +81,23 @@ jobs:
           set -eux
           ND=core/build/native/nativeCompile
           rm -rf package && mkdir -p package
-          cp "$ND/libccl.${{ matrix.libext }}" package/
+          cp "$ND/libmesmo.${{ matrix.libext }}" package/
           cat > package/package.json <<JSON
           {
-            "name": "@bloxbean/cardano-client-lib-${{ matrix.platform }}",
+            "name": "@bloxbean/mesmo-${{ matrix.platform }}",
             "version": "${PKG_VERSION}",
-            "description": "CCL Bridge native library for ${{ matrix.platform }}",
+            "description": "Mesmo native library for ${{ matrix.platform }}",
             "os": ["${{ matrix.npm_os }}"],
             "cpu": ["${{ matrix.npm_cpu }}"],
-            "files": ["libccl.${{ matrix.libext }}"],
+            "files": ["libmesmo.${{ matrix.libext }}"],
             "license": "MIT",
             "repository": {
               "type": "git",
-              "url": "git+https://github.com/bloxbean/cardano-client-bindings.git"
+              "url": "git+https://github.com/bloxbean/mesmo.git"
             }
           }
           JSON
-          echo "CCL Bridge native library for \`${{ matrix.platform }}\`. Installed automatically as an optionalDependency of \`@bloxbean/cardano-client-lib\`." > package/README.md
+          echo "Mesmo native library for \`${{ matrix.platform }}\`. Installed automatically as an optionalDependency of \`@bloxbean/mesmo\`." > package/README.md
           tar czf "platform-${{ matrix.platform }}.tgz" package
       - uses: actions/upload-artifact@v4
         with:
@@ -119,12 +120,12 @@ jobs:
           - platform: linux-x86_64
             runner: ubuntu-24.04
             image: quay.io/pypa/manylinux_2_28_x86_64
-            graalvm_url: https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-x64_bin.tar.gz
+            graalvm_url: https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-x64_bin.tar.gz
             npm_cpu: x64
           - platform: linux-aarch64
             runner: ubuntu-24.04-arm
             image: quay.io/pypa/manylinux_2_28_aarch64
-            graalvm_url: https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-aarch64_bin.tar.gz
+            graalvm_url: https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-aarch64_bin.tar.gz
             npm_cpu: arm64
     container:
       image: ${{ matrix.image }}
@@ -132,7 +133,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Ensure build prerequisites
         run: dnf install -y zlib-devel || true
-      - name: Install Oracle GraalVM 25.0.3
+      - name: Install Oracle GraalVM 25.3
         run: |
           set -eux
           mkdir -p /opt/graalvm
@@ -147,24 +148,24 @@ jobs:
           set -eux
           ND=core/build/native/nativeCompile
           rm -rf package && mkdir -p package
-          cp "$ND/libccl.so" package/
+          cp "$ND/libmesmo.so" package/
           cat > package/package.json <<JSON
           {
-            "name": "@bloxbean/cardano-client-lib-${{ matrix.platform }}",
+            "name": "@bloxbean/mesmo-${{ matrix.platform }}",
             "version": "${PKG_VERSION}",
-            "description": "CCL Bridge native library for ${{ matrix.platform }}",
+            "description": "Mesmo native library for ${{ matrix.platform }}",
             "os": ["linux"],
             "cpu": ["${{ matrix.npm_cpu }}"],
             "libc": ["glibc"],
-            "files": ["libccl.so"],
+            "files": ["libmesmo.so"],
             "license": "MIT",
             "repository": {
               "type": "git",
-              "url": "git+https://github.com/bloxbean/cardano-client-bindings.git"
+              "url": "git+https://github.com/bloxbean/mesmo.git"
             }
           }
           JSON
-          echo "CCL Bridge native library for ${{ matrix.platform }}. Installed automatically as an optionalDependency of @bloxbean/cardano-client-lib." > package/README.md
+          echo "Mesmo native library for ${{ matrix.platform }}. Installed automatically as an optionalDependency of @bloxbean/mesmo." > package/README.md
           tar czf "platform-${{ matrix.platform }}.tgz" package
       - uses: actions/upload-artifact@v4
         with:
@@ -186,12 +187,12 @@ jobs:
       PKG_VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Oracle GraalVM 25.0.3
+      - name: Install Oracle GraalVM 25.3
         run: |
           set -eux
           mkdir -p /opt/graalvm
           curl -fsSL -o /tmp/graalvm.tar.gz \
-            "https://download.oracle.com/graalvm/25/archive/graalvm-jdk-25.0.3_linux-x64_bin.tar.gz"
+            "https://gds.oracle.com/download/graal/25i3/latest/graalvm-jdk-25i3-25_linux-x64_bin.tar.gz"
           tar xzf /tmp/graalvm.tar.gz -C /opt/graalvm --strip-components=1
           echo "JAVA_HOME=/opt/graalvm" >> "$GITHUB_ENV"
           echo "/opt/graalvm/bin" >> "$GITHUB_PATH"
@@ -212,13 +213,13 @@ jobs:
           sudo make install
           sudo cp /usr/local/musl/lib/libz.a /usr/lib/x86_64-linux-musl/ 2>/dev/null || true
 
-      - name: Build libccl.so against musl
+      - name: Build libmesmo.so against musl
         run: ./gradlew :core:nativeCompile -PmuslBuild --no-daemon --stacktrace
 
       - name: Assert it really is musl-linked
         run: |
           set -eux
-          SO=core/build/native/nativeCompile/libccl.so
+          SO=core/build/native/nativeCompile/libmesmo.so
           # A glibc build NEEDs libc.so.6; the musl one must not. Guards against silently shipping a
           # glibc .so under a musl package name — which would fail only on a user's Alpine box.
           if readelf -d "$SO" | grep -q 'libc.so.6'; then
@@ -231,24 +232,24 @@ jobs:
           set -eux
           ND=core/build/native/nativeCompile
           rm -rf package && mkdir -p package
-          cp "$ND/libccl.so" package/
+          cp "$ND/libmesmo.so" package/
           cat > package/package.json <<JSON
           {
-            "name": "@bloxbean/cardano-client-lib-linux-musl-x86_64",
+            "name": "@bloxbean/mesmo-linux-musl-x86_64",
             "version": "${PKG_VERSION}",
-            "description": "CCL Bridge native library for linux-musl-x86_64 (Alpine)",
+            "description": "Mesmo native library for linux-musl-x86_64 (Alpine)",
             "os": ["linux"],
             "cpu": ["x64"],
             "libc": ["musl"],
-            "files": ["libccl.so"],
+            "files": ["libmesmo.so"],
             "license": "MIT",
             "repository": {
               "type": "git",
-              "url": "git+https://github.com/bloxbean/cardano-client-bindings.git"
+              "url": "git+https://github.com/bloxbean/mesmo.git"
             }
           }
           JSON
-          echo "CCL Bridge native library for linux-musl-x86_64 (Alpine / musl). Installed automatically as an optionalDependency of @bloxbean/cardano-client-lib." > package/README.md
+          echo "Mesmo native library for linux-musl-x86_64 (Alpine / musl). Installed automatically as an optionalDependency of @bloxbean/mesmo." > package/README.md
           tar czf "platform-linux-musl-x86_64.tgz" package
       - uses: actions/upload-artifact@v4
         with:
@@ -287,7 +288,7 @@ jobs:
         run: |
           set -eux
           # The published main package carries no lib (libs/ stays empty); the platform packages do.
-          rm -f wrappers/js/libs/libccl.*
+          rm -f wrappers/js/libs/libmesmo.*
           npm pack --pack-destination "$PWD/dist" ./wrappers/js
       - name: List built packages
         run: ls -la dist pkgs

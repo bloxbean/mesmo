@@ -10,33 +10,44 @@ export { ChainDataProvider, YaciProvider, BlockfrostProvider } from './providers
 export { TransactionEvaluator, BlockfrostEvaluator } from './providers.js';
 
 // Error codes
-export const CCL_SUCCESS = 0;
-export const CCL_ERROR_GENERAL = -1;
-export const CCL_ERROR_INVALID_ARGUMENT = -2;
-export const CCL_ERROR_SERIALIZATION = -3;
-export const CCL_ERROR_CRYPTO = -4;
-export const CCL_ERROR_INVALID_NETWORK = -5;
-export const CCL_ERROR_INVALID_MNEMONIC = -6;
-export const CCL_ERROR_INVALID_ADDRESS = -7;
-export const CCL_ERROR_INSUFFICIENT_FUNDS = -8;
-export const CCL_ERROR_INVALID_TRANSACTION = -9;
-export const CCL_ERROR_TX_BUILD = -10;
+export const MESMO_SUCCESS = 0;
+export const MESMO_ERROR_GENERAL = -1;
+export const MESMO_ERROR_INVALID_ARGUMENT = -2;
+export const MESMO_ERROR_SERIALIZATION = -3;
+export const MESMO_ERROR_CRYPTO = -4;
+export const MESMO_ERROR_INVALID_NETWORK = -5;
+export const MESMO_ERROR_INVALID_MNEMONIC = -6;
+export const MESMO_ERROR_INVALID_ADDRESS = -7;
+export const MESMO_ERROR_INSUFFICIENT_FUNDS = -8;
+export const MESMO_ERROR_INVALID_TRANSACTION = -9;
+export const MESMO_ERROR_TX_BUILD = -10;
+export const MESMO_ERROR_INVALID_HANDLE = -11;
 
 // Network selectors.
 //
 // WARNING — these are CCL's `Network` *enum ordinals*, NOT Cardano's on-chain network id. They are
 // inverted with respect to it: on-chain, testnet is 0 and mainnet is 1, whereas here MAINNET is 0
-// and TESTNET is 1. Never pass a raw number: `account.create(0)` derives a **mainnet** key, not a
+// and TESTNET is 1. Never pass a raw number: `accounts.create(0)` derives a **mainnet** key, not a
 // testnet one. Always pass one of these constants.
 //
 // The genuine on-chain id is the `network_id` field returned by `address.info()` — an account made
 // with MAINNET (0) has `address.info().network_id === 1`, and one made with TESTNET (1) has 0.
 export const MAINNET = 0;
 export const TESTNET = 1;
-export const PREPROD = 2;
-export const PREVIEW = 3;
 
-const NETWORKS = new Set([MAINNET, TESTNET, PREPROD, PREVIEW]);
+const NETWORKS = new Set([MAINNET, TESTNET]);
+
+/**
+ * Typed signing roles for managed accounts. Combine with `|`; witnesses are applied in canonical
+ * order (payment, stake, DRep, committee cold, committee hot) regardless of combination order.
+ */
+export const SigningRole = Object.freeze({
+  PAYMENT: 1,
+  STAKE: 1 << 1,
+  DREP: 1 << 2,
+  COMMITTEE_COLD: 1 << 3,
+  COMMITTEE_HOT: 1 << 4,
+});
 
 // Validate a `network` argument at the wrapper boundary. Without this an out-of-range value reaches
 // the native library, which fails with an opaque error (or, for a valid-looking ordinal, silently
@@ -44,38 +55,38 @@ const NETWORKS = new Set([MAINNET, TESTNET, PREPROD, PREVIEW]);
 function checkNetwork(network) {
   if (network === undefined || network === null) {
     throw new TypeError(
-      'network is required: pass MAINNET, TESTNET, PREPROD or PREVIEW. ' +
+      'network is required: pass MAINNET or TESTNET. ' +
       'These are CCL enum ordinals (MAINNET === 0), not Cardano\'s on-chain network id.'
     );
   }
   if (!NETWORKS.has(network)) {
     throw new RangeError(
-      `invalid network ${JSON.stringify(network)}: expected MAINNET (0), TESTNET (1), PREPROD (2) ` +
-      'or PREVIEW (3). These are CCL enum ordinals, not Cardano\'s on-chain network id ' +
+      `invalid network ${JSON.stringify(network)}: expected MAINNET (0) or TESTNET (1). ` +
+      'These are CCL enum ordinals, not Cardano\'s on-chain network id ' +
       '(on-chain: 0 = testnet, 1 = mainnet — the inverse).'
     );
   }
   return network;
 }
 
-export class CclError extends Error {
+export class MesmoError extends Error {
   constructor(code, message) {
-    super(`CCL Error ${code}: ${message}`);
-    this.name = 'CclError';
+    super(`Mesmo error ${code}: ${message}`);
+    this.name = 'MesmoError';
     this.code = code;
   }
 }
 
 /**
- * Thrown when a CclBridge is used after close().
+ * Thrown when a Mesmo instance is used after close().
  *
  * Without it the stale isolate handle reaches the native library and GraalVM aborts the whole
  * process — uncatchable, with no JS stack trace.
  */
-export class CclClosedError extends Error {
+export class MesmoClosedError extends Error {
   constructor() {
-    super('CclBridge is closed; create a new one (or move the call inside its `using`/try block)');
-    this.name = 'CclClosedError';
+    super('Mesmo is closed; create a new one (or move the call inside its `using`/try block)');
+    this.name = 'MesmoClosedError';
   }
 }
 
@@ -104,7 +115,7 @@ function cstr(str) {
 // Yaci DevKit :10000 local-cluster proxy — returns numeric `cost_models` only (empirically verified:
 // no `cost_models_raw`), even though the DevKit's own yaci-store serves the ordered form on :8080.
 // Remove this whole function once every endpoint we fetch params from returns `cost_models_raw` —
-// tracked in bloxbean/cardano-client-bindings#11.
+// tracked in bloxbean/mesmo#11.
 export function normalizeCostModels(protocolParams) {
   if (!protocolParams || typeof protocolParams !== 'object') return protocolParams;
 
@@ -142,15 +153,15 @@ export function normalizeCostModels(protocolParams) {
 
 function libFilename() {
   const platform = os.platform();
-  if (platform === 'darwin') return 'libccl.dylib';
-  if (platform === 'win32') return 'libccl.dll';
-  return 'libccl.so';
+  if (platform === 'darwin') return 'libmesmo.dylib';
+  if (platform === 'win32') return 'libmesmo.dll';
+  return 'libmesmo.so';
 }
 
 // Is this a musl-based Linux (Alpine)? os.platform() reports "linux" for both glibc and musl, so —
 // exactly as the Go loader does — detect musl by its dynamic loader, a file only musl systems ship.
 // Without this an Alpine user resolves to the glibc package and gets a load failure, because the
-// glibc libccl.so cannot load under musl.
+// glibc libmesmo.so cannot load under musl.
 function isMuslLinux() {
   if (os.platform() !== 'linux') return false;
   const loader = os.arch() === 'arm64'
@@ -160,7 +171,7 @@ function isMuslLinux() {
 }
 
 // The per-platform npm package suffix for the current runtime, e.g. "macos-aarch64". Mirrors the
-// native build/release matrix; used to locate the `@bloxbean/cardano-client-lib-<suffix>` optionalDependency.
+// native build/release matrix; used to locate the `@bloxbean/mesmo-<suffix>` optionalDependency.
 export function platformSuffix() {
   const p = os.platform();
   const a = os.arch();
@@ -172,8 +183,8 @@ export function platformSuffix() {
     // cannot load here. See ADR-0008.
     if (a === 'arm64') {
       throw new Error(
-        'No prebuilt libccl for musl/aarch64 (Alpine on ARM): GraalVM\'s --libc=musl is x86_64-only. ' +
-        'Build libccl from source and set CCL_LIB_PATH.'
+        'No prebuilt libmesmo for musl/aarch64 (Alpine on ARM): GraalVM\'s --libc=musl is x86_64-only. ' +
+        'Build libmesmo from source and set MESMO_LIB_PATH.'
       );
     }
     return 'linux-musl-x86_64';
@@ -183,18 +194,18 @@ export function platformSuffix() {
 
 // Locate the native library, in priority order:
 //   1. an explicit `libPath` argument (a directory), if given;
-//   2. the CCL_LIB_PATH env var (a directory) — for development against a locally built lib;
+//   2. the MESMO_LIB_PATH env var (a directory) — for development against a locally built lib;
 //   3. a copy bundled directly in this package (`libs/`) — a local `pack` or single-package install;
-//   4. the `@bloxbean/cardano-client-lib-<platform>` optionalDependency package — the published layout;
+//   4. the `@bloxbean/mesmo-<platform>` optionalDependency package — the published layout;
 //   5. the bare filename, letting the OS loader search its default paths.
 export function resolveLibFile(libPath) {
   const name = libFilename();
   if (libPath) return path.join(libPath, name);
-  if (process.env.CCL_LIB_PATH) return path.join(process.env.CCL_LIB_PATH, name);
+  if (process.env.MESMO_LIB_PATH) return path.join(process.env.MESMO_LIB_PATH, name);
   const bundled = path.join(import.meta.dir, '..', 'libs', name);
   if (existsSync(bundled)) return bundled;
   try {
-    const fromPkg = Bun.resolveSync(`@bloxbean/cardano-client-lib-${platformSuffix()}/${name}`, import.meta.dir);
+    const fromPkg = Bun.resolveSync(`@bloxbean/mesmo-${platformSuffix()}/${name}`, import.meta.dir);
     if (fromPkg && existsSync(fromPkg)) return fromPkg;
   } catch {
     // platform package not installed — fall through to the bare filename
@@ -202,15 +213,15 @@ export function resolveLibFile(libPath) {
   return name;
 }
 
-// Native libccl version this wrapper expects, kept in lockstep with the package version. On
-// construction the wrapper compares it against ccl_version() and fails fast on a skew.
+// Native libmesmo version this wrapper expects, kept in lockstep with the package version. On
+// construction the wrapper compares it against mesmo_version() and fails fast on a skew.
 const EXPECTED_LIB_VERSION = '0.1.0';
 
 // Strip any pre-release / build suffix: '0.1.0-preview1' -> '0.1.0'.
 function baseVersion(v) {
   return v.split(/[-+]/, 1)[0].trim();
 }
-export class CclBridge {
+export class Mesmo {
   constructor(libPath) {
     const libFile = resolveLibFile(libPath);
 
@@ -225,67 +236,57 @@ export class CclBridge {
         args: [FFIType.ptr],
         returns: FFIType.i32,
       },
-      ccl_version: { args: [FFIType.ptr], returns: FFIType.i32 },
-      ccl_get_result: { args: [FFIType.ptr], returns: FFIType.ptr },
-      ccl_get_last_error: { args: [FFIType.ptr], returns: FFIType.ptr },
-      ccl_free_string: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
+      mesmo_version: { args: [FFIType.ptr], returns: FFIType.i32 },
+      mesmo_get_result: { args: [FFIType.ptr], returns: FFIType.ptr },
+      mesmo_get_last_error: { args: [FFIType.ptr], returns: FFIType.ptr },
+      mesmo_free_string: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
 
-      // Account
-      ccl_account_create: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_from_mnemonic: { args: [FFIType.ptr, FFIType.i32, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_private_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_public_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_get_drep_id: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_account_sign_tx: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32, FFIType.cstring], returns: FFIType.i32 },
-      ccl_account_sign_tx_multi: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.i32, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      // Managed account handles (ADR-0016)
+      mesmo_account_open_mnemonic: { args: [FFIType.ptr, FFIType.i32, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.ptr], returns: FFIType.i32 },
+      mesmo_account_get_info: { args: [FFIType.ptr, FFIType.i64], returns: FFIType.i32 },
+      mesmo_account_sign_tx_handle: { args: [FFIType.ptr, FFIType.i64, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
+      mesmo_account_close: { args: [FFIType.ptr, FFIType.i64], returns: FFIType.i32 },
+      mesmo_account_create_handle: { args: [FFIType.ptr, FFIType.i32, FFIType.ptr], returns: FFIType.i32 },
+      mesmo_account_export_recovery_phrase: { args: [FFIType.ptr, FFIType.i64, FFIType.ptr], returns: FFIType.i32 },
 
       // Address
-      ccl_address_info: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_address_validate: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_address_to_bytes: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_address_from_bytes: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_address_info: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_address_validate: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_address_to_bytes: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_address_from_bytes: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
 
       // Crypto
-      ccl_crypto_blake2b_256: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_crypto_blake2b_224: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_crypto_generate_mnemonic: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-      ccl_crypto_validate_mnemonic: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_crypto_sign: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
-      ccl_crypto_verify: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_blake2b_256: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_blake2b_224: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_generate_mnemonic: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
+      mesmo_crypto_validate_mnemonic: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_sign: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_verify: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_crypto_derive_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32, FFIType.cstring], returns: FFIType.i32 },
 
       // Transaction
-      ccl_tx_sign_with_secret_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
-      ccl_tx_hash: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_tx_to_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_tx_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_tx_deserialize: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_tx_sign_with_secret_key: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_tx_hash: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_tx_to_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_tx_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_tx_deserialize: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
 
       // Plutus
-      ccl_plutus_data_hash: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_plutus_data_to_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_plutus_data_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_plutus_data_hash: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_plutus_data_to_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_plutus_data_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
 
       // Script
-      ccl_script_native_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
-      ccl_script_hash: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
-
-      // Governance
-      ccl_gov_drep_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_gov_committee_cold_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-      ccl_gov_committee_hot_key_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
-
-      // Wallet
-      ccl_wallet_create: { args: [FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
-      ccl_wallet_from_mnemonic: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
-      ccl_wallet_get_address: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32, FFIType.i32], returns: FFIType.i32 },
+      mesmo_script_native_from_json: { args: [FFIType.ptr, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_script_hash: { args: [FFIType.ptr, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
 
       // QuickTx
-      ccl_quicktx_build: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring, FFIType.cstring], returns: FFIType.i32 },
+      mesmo_quicktx_build: { args: [FFIType.ptr, FFIType.cstring, FFIType.cstring, FFIType.cstring, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
     });
     } catch (e) {
       throw new Error(
         `Failed to load the CCL native library (${libFile}): ${e.message}\n` +
-        `Install a package that bundles it, or set CCL_LIB_PATH to the directory containing ${libFilename()}.`
+        `Install a package that bundles it, or set MESMO_LIB_PATH to the directory containing ${libFilename()}.`
       );
     }
 
@@ -303,15 +304,13 @@ export class CclBridge {
     this._checkVersion();
 
     // Namespace APIs
-    this.account = new AccountApi(this);
     this.address = new AddressApi(this);
     this.crypto = new CryptoApi(this);
     this.tx = new TxApi(this);
     this.plutus = new PlutusApi(this);
     this.script = new ScriptApi(this);
-    this.gov = new GovApi(this);
-    this.wallet = new WalletApi(this);
     this.quicktx = new QuickTxApi(this);
+    this.accounts = new AccountsApi(this);
   }
 
   /**
@@ -321,44 +320,52 @@ export class CclBridge {
    * close() tears the isolate down; passing its stale handle back to the native side makes GraalVM
    * abort the *process* ("Failed to enter the specified IsolateThread context") — not a JS
    * exception, so try/catch cannot see it and no stack points at the offending call. Any stray async
-   * callback racing the `finally { bridge.close() }` that the examples teach would kill the process.
+   * callback racing the `finally { lib.close() }` that the examples teach would kill the process.
    * Throwing a real Error here turns that into something catchable and debuggable.
    *
-   * @throws {CclClosedError} if the bridge has been closed
+   * @throws {MesmoClosedError} if the lib has been closed
    */
   get _thread() {
     if (this._threadPtr === null) {
-      throw new CclClosedError();
+      throw new MesmoClosedError();
     }
     return this._threadPtr;
   }
 
   _getResult() {
-    const resultPtr = this._lib.ccl_get_result(this._thread);
+    const resultPtr = this._lib.mesmo_get_result(this._thread);
     if (!resultPtr) return '';
     const result = new CString(resultPtr);
     const str = result.toString();
-    this._lib.ccl_free_string(this._thread, resultPtr);
+    this._lib.mesmo_free_string(this._thread, resultPtr);
     return str;
   }
 
   _getError() {
-    const errorPtr = this._lib.ccl_get_last_error(this._thread);
+    const errorPtr = this._lib.mesmo_get_last_error(this._thread);
     if (!errorPtr) return '';
     const error = new CString(errorPtr);
     const str = error.toString();
-    this._lib.ccl_free_string(this._thread, errorPtr);
+    this._lib.mesmo_free_string(this._thread, errorPtr);
     return str;
   }
 
   _check(rc) {
-    if (rc !== CCL_SUCCESS) {
-      throw new CclError(rc, this._getError());
+    if (rc !== MESMO_SUCCESS) {
+      throw new MesmoError(rc, this._getError());
     }
     return this._getResult();
   }
 
-  /** Tear down the isolate. Idempotent; any later call throws {@link CclClosedError}. */
+  // Like _check, but never touches the read-once result slot — for calls whose result (if any)
+  // is delivered out-of-band (out-params) or that produce none.
+  _checkRc(rc) {
+    if (rc !== MESMO_SUCCESS) {
+      throw new MesmoError(rc, this._getError());
+    }
+  }
+
+  /** Tear down the isolate. Idempotent; any later call throws {@link MesmoClosedError}. */
   close() {
     if (this._threadPtr !== null) {
       this._lib.graal_tear_down_isolate(this._threadPtr);
@@ -366,25 +373,25 @@ export class CclBridge {
     }
   }
 
-  /** Enables `using bridge = new CclBridge()` — closes automatically at end of scope. */
+  /** Enables `using lib = new Mesmo()` — closes automatically at end of scope. */
   [Symbol.dispose]() {
     this.close();
   }
 
   version() {
-    return this._check(this._lib.ccl_version(this._thread));
+    return this._check(this._lib.mesmo_version(this._thread));
   }
 
-  // Fail fast on a native-lib / wrapper version skew (bypass with CCL_SKIP_VERSION_CHECK).
+  // Fail fast on a native-lib / wrapper version skew (bypass with MESMO_SKIP_VERSION_CHECK).
   _checkVersion() {
-    if (process.env.CCL_SKIP_VERSION_CHECK) return;
+    if (process.env.MESMO_SKIP_VERSION_CHECK) return;
     const libVer = this.version();
     if (baseVersion(libVer) !== baseVersion(EXPECTED_LIB_VERSION)) {
       throw new Error(
-        `libccl version '${libVer}' is incompatible with the @bloxbean/cardano-client-lib wrapper ` +
+        `libmesmo version '${libVer}' is incompatible with the @bloxbean/mesmo wrapper ` +
         `(expects '${EXPECTED_LIB_VERSION}'). The native library and wrapper must be the same version ` +
-        `— reinstall the package, or set CCL_LIB_PATH to a matching libccl. ` +
-        `Set CCL_SKIP_VERSION_CHECK=1 to bypass.`
+        `— reinstall the package, or set MESMO_LIB_PATH to a matching libmesmo. ` +
+        `Set MESMO_SKIP_VERSION_CHECK=1 to bypass.`
       );
     }
   }
@@ -392,73 +399,8 @@ export class CclBridge {
 
 // --- Namespace API classes ---
 
-class AccountApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /**
-   * Create a new account (random 24-word mnemonic) on `network`.
-   *
-   * @param {0|1|2|3} network - MAINNET (0), TESTNET (1), PREPROD (2) or PREVIEW (3). Required, and a
-   *   CCL enum ordinal — **not** Cardano's on-chain network id, which is inverted (on-chain: 0 =
-   *   testnet, 1 = mainnet). An account created with MAINNET (the ordinal 0) has an
-   *   `address.info().network_id` of 1; one created with TESTNET (the ordinal 1) has 0.
-   * @returns {{mnemonic: string, base_address: string, enterprise_address: string, stake_address: string, change_address: string}}
-   */
-  create(network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(this._b._lib.ccl_account_create(this._b._thread, network)));
-  }
-
-  /** Restore an account from a mnemonic. `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_account_from_mnemonic(this._b._thread, network, cstr(mnemonic), accountIndex, addressIndex)));
-  }
-
-  /** Extended private key (hex). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getPrivateKey(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_private_key(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex));
-  }
-
-  /** Public key (hex). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getPublicKey(mnemonic, network, accountIndex = 0, addressIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_public_key(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex));
-  }
-
-  /** DRep ID (bech32). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  getDrepId(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_get_drep_id(this._b._thread, cstr(mnemonic), network, accountIndex));
-  }
-
-  /** Sign a transaction with the account's payment key. `network` is a CCL ordinal (MAINNET === 0). */
-  signTx(mnemonic, network, accountIndex, addressIndex, txCborHex) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_account_sign_tx(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex, cstr(txCborHex)));
-  }
-
-  // Sign with one or more of the account's keys, selected by role (any of: payment, stake, drep,
-  // committee_cold, committee_hot, applied in order). Use for transactions whose certificates also
-  // need the stake or DRep key — stake registration/delegation/withdrawal and DRep/vote operations.
-  //
-  // `network` is a CCL enum ordinal (MAINNET === 0), not the on-chain network id.
-  signTxWithKeys(mnemonic, network, accountIndex, addressIndex, txCborHex, keys) {
-    checkNetwork(network);
-    const keysStr = Array.isArray(keys) ? keys.join(",") : keys;
-    return this._b._check(
-      this._b._lib.ccl_account_sign_tx_multi(this._b._thread, cstr(mnemonic), network, accountIndex, addressIndex, cstr(txCborHex), cstr(keysStr)));
-  }
-}
-
 class AddressApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   /**
    * Decode a bech32 address.
@@ -471,156 +413,123 @@ class AddressApi {
    * @returns {{type: string, network_id: 0|1, payment_credential_hash?: string, delegation_credential_hash?: string, is_pubkey_payment: boolean, is_script_payment: boolean}}
    */
   info(bech32) {
-    return JSON.parse(this._b._check(this._b._lib.ccl_address_info(this._b._thread, cstr(bech32))));
+    return JSON.parse(this._b._check(this._b._lib.mesmo_address_info(this._b._thread, cstr(bech32))));
   }
 
   validate(bech32) {
-    return this._b._lib.ccl_address_validate(this._b._thread, cstr(bech32)) === CCL_SUCCESS;
+    return this._b._lib.mesmo_address_validate(this._b._thread, cstr(bech32)) === MESMO_SUCCESS;
   }
 
   toBytes(bech32) {
-    return this._b._check(this._b._lib.ccl_address_to_bytes(this._b._thread, cstr(bech32)));
+    return this._b._check(this._b._lib.mesmo_address_to_bytes(this._b._thread, cstr(bech32)));
   }
 
   fromBytes(hexBytes) {
-    return this._b._check(this._b._lib.ccl_address_from_bytes(this._b._thread, cstr(hexBytes)));
+    return this._b._check(this._b._lib.mesmo_address_from_bytes(this._b._thread, cstr(hexBytes)));
   }
 }
 
 class CryptoApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   blake2b256(dataHex) {
-    return this._b._check(this._b._lib.ccl_crypto_blake2b_256(this._b._thread, cstr(dataHex)));
+    return this._b._check(this._b._lib.mesmo_crypto_blake2b_256(this._b._thread, cstr(dataHex)));
   }
 
   blake2b224(dataHex) {
-    return this._b._check(this._b._lib.ccl_crypto_blake2b_224(this._b._thread, cstr(dataHex)));
+    return this._b._check(this._b._lib.mesmo_crypto_blake2b_224(this._b._thread, cstr(dataHex)));
   }
 
   generateMnemonic(wordCount = 24) {
-    return this._b._check(this._b._lib.ccl_crypto_generate_mnemonic(this._b._thread, wordCount));
+    return this._b._check(this._b._lib.mesmo_crypto_generate_mnemonic(this._b._thread, wordCount));
   }
 
   validateMnemonic(mnemonic) {
-    return this._b._lib.ccl_crypto_validate_mnemonic(this._b._thread, cstr(mnemonic)) === CCL_SUCCESS;
+    return this._b._lib.mesmo_crypto_validate_mnemonic(this._b._thread, cstr(mnemonic)) === MESMO_SUCCESS;
   }
 
+  /**
+   * Ed25519 sign. `skHex` is a 32-byte seed (64 hex chars) or a 64-byte BIP32-Ed25519
+   * extended key (128 hex chars, e.g. from {@link CryptoApi#deriveKey}) — detected by length.
+   */
   sign(messageHex, skHex) {
-    return this._b._check(this._b._lib.ccl_crypto_sign(this._b._thread, cstr(messageHex), cstr(skHex)));
+    return this._b._check(this._b._lib.mesmo_crypto_sign(this._b._thread, cstr(messageHex), cstr(skHex)));
   }
 
   verify(signatureHex, messageHex, pkHex) {
-    return this._b._lib.ccl_crypto_verify(this._b._thread, cstr(signatureHex), cstr(messageHex), cstr(pkHex)) === CCL_SUCCESS;
+    return this._b._lib.mesmo_crypto_verify(this._b._thread, cstr(signatureHex), cstr(messageHex), cstr(pkHex)) === MESMO_SUCCESS;
+  }
+
+  /**
+   * Stateless CIP-1852 key derivation — the explicit "raw key material" utility.
+   *
+   * `role` is one of "payment", "change", "stake", "drep", "committee_cold", "committee_hot".
+   * Returns `{path, private_key, public_key, public_key_hash}`; pass `private_key` whole to
+   * {@link CryptoApi#sign}, which detects the 64-byte extended form by length (never slice it —
+   * its first half is a clamped scalar, not a seed). Key derivation is
+   * network-independent. Prefer managed accounts for signing — handles never expose key bytes.
+   */
+  deriveKey(mnemonic, accountIndex = 0, addressIndex = 0, role = "payment") {
+    return JSON.parse(this._b._check(this._b._lib.mesmo_crypto_derive_key(
+      this._b._thread, cstr(mnemonic), accountIndex, addressIndex, cstr(role))));
   }
 }
 
 class TxApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   hash(txCborHex) {
-    return this._b._check(this._b._lib.ccl_tx_hash(this._b._thread, cstr(txCborHex)));
+    return this._b._check(this._b._lib.mesmo_tx_hash(this._b._thread, cstr(txCborHex)));
   }
 
   signWithSecretKey(txCborHex, skCborHex) {
-    return this._b._check(this._b._lib.ccl_tx_sign_with_secret_key(this._b._thread, cstr(txCborHex), cstr(skCborHex)));
+    return this._b._check(this._b._lib.mesmo_tx_sign_with_secret_key(this._b._thread, cstr(txCborHex), cstr(skCborHex)));
   }
 
   toJson(txCborHex) {
-    return this._b._check(this._b._lib.ccl_tx_to_json(this._b._thread, cstr(txCborHex)));
+    return this._b._check(this._b._lib.mesmo_tx_to_json(this._b._thread, cstr(txCborHex)));
   }
 
   fromJson(txJson) {
-    return this._b._check(this._b._lib.ccl_tx_from_json(this._b._thread, cstr(txJson)));
+    return this._b._check(this._b._lib.mesmo_tx_from_json(this._b._thread, cstr(txJson)));
   }
 
   deserialize(txCborHex) {
-    return JSON.parse(this._b._check(this._b._lib.ccl_tx_deserialize(this._b._thread, cstr(txCborHex))));
+    return JSON.parse(this._b._check(this._b._lib.mesmo_tx_deserialize(this._b._thread, cstr(txCborHex))));
   }
 }
 
 class PlutusApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   dataHash(datumCborHex) {
-    return this._b._check(this._b._lib.ccl_plutus_data_hash(this._b._thread, cstr(datumCborHex)));
+    return this._b._check(this._b._lib.mesmo_plutus_data_hash(this._b._thread, cstr(datumCborHex)));
   }
 
   dataToJson(cborHex) {
-    return this._b._check(this._b._lib.ccl_plutus_data_to_json(this._b._thread, cstr(cborHex)));
+    return this._b._check(this._b._lib.mesmo_plutus_data_to_json(this._b._thread, cstr(cborHex)));
   }
 
   dataFromJson(json) {
-    return this._b._check(this._b._lib.ccl_plutus_data_from_json(this._b._thread, cstr(json)));
+    return this._b._check(this._b._lib.mesmo_plutus_data_from_json(this._b._thread, cstr(json)));
   }
 }
 
 class ScriptApi {
-  constructor(bridge) { this._b = bridge; }
+  constructor(lib) { this._b = lib; }
 
   nativeFromJson(json) {
-    return this._b._check(this._b._lib.ccl_script_native_from_json(this._b._thread, cstr(json)));
+    return this._b._check(this._b._lib.mesmo_script_native_from_json(this._b._thread, cstr(json)));
   }
 
   hash(scriptCborHex, scriptType = 0) {
-    return this._b._check(this._b._lib.ccl_script_hash(this._b._thread, cstr(scriptCborHex), scriptType));
-  }
-}
-
-// Every `network` below is a CCL enum ordinal (MAINNET === 0, TESTNET === 1, …), *not* Cardano's
-// on-chain network id — those are inverted (on-chain: 0 = testnet, 1 = mainnet).
-class GovApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /** DRep key + id. `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  drepKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_drep_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-
-  /** Constitutional-committee cold key. `network` is a CCL ordinal (MAINNET === 0). */
-  committeeColdKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_committee_cold_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-
-  /** Constitutional-committee hot key. `network` is a CCL ordinal (MAINNET === 0). */
-  committeeHotKeyFromMnemonic(mnemonic, network, accountIndex = 0) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_gov_committee_hot_key_from_mnemonic(this._b._thread, cstr(mnemonic), network, accountIndex)));
-  }
-}
-
-class WalletApi {
-  constructor(bridge) { this._b = bridge; }
-
-  /** Create a wallet (random mnemonic). `network` is a CCL ordinal (MAINNET === 0), not the on-chain id. */
-  create(network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(this._b._lib.ccl_wallet_create(this._b._thread, network)));
-  }
-
-  /** Restore a wallet from a mnemonic. `network` is a CCL ordinal (MAINNET === 0). */
-  fromMnemonic(mnemonic, network) {
-    checkNetwork(network);
-    return JSON.parse(this._b._check(
-      this._b._lib.ccl_wallet_from_mnemonic(this._b._thread, cstr(mnemonic), network)));
-  }
-
-  /** The wallet's address at `index`. `network` is a CCL ordinal (MAINNET === 0). */
-  getAddress(mnemonic, network, index = 0) {
-    checkNetwork(network);
-    return this._b._check(
-      this._b._lib.ccl_wallet_get_address(this._b._thread, cstr(mnemonic), network, index));
+    return this._b._check(this._b._lib.mesmo_script_hash(this._b._thread, cstr(scriptCborHex), scriptType));
   }
 }
 
 export class QuickTxApi {
-  constructor(bridge) {
-    this._b = bridge;
+  constructor(lib) {
+    this._b = lib;
   }
 
   /**
@@ -631,23 +540,30 @@ export class QuickTxApi {
    * @param {object} protocolParams - protocol parameters (CCL ProtocolParams model).
    * @param {Array<{mem: (number|string), steps: (number|string)}>} [execUnits] - optional redeemer
    *   execution units (one per redeemer, in transaction order) for Plutus script transactions.
-   *   Compute these with any evaluator (Ogmios, Blockfrost, Aiken, Scalus); the bridge does not run
+   *   Compute these with any evaluator (Ogmios, Blockfrost, Aiken, Scalus); the lib does not run
    *   the script.
+   * @param {number} [additionalSigners=0] - vkey witnesses the fee must budget beyond those implied
+   *   by the input UTXOs (one per sender). You know how many keys will sign: 0 for a plain payment,
+   *   1 for a stake or DRep certificate (["payment", "stake"] signing), 2 for both in one tx, the
+   *   number of sig keys for a native-script spend, plus one per plan-level required signer.
+   *   Undercounting yields a fee the node rejects with FeeTooSmallUTxO; overcounting only overpays
+   *   (~4,400 lovelace per extra witness).
    * @returns {{tx_cbor: string, tx_hash: string, fee: string}}
    */
-  build(txplanYaml, utxos, protocolParams, execUnits = null) {
+  build(txplanYaml, utxos, protocolParams, execUnits = null, additionalSigners = 0) {
     // losslessStringify, not JSON.stringify: a UTxO's lovelace amount or native-token quantity can
     // exceed 2^53, and providers parse those with lossless-json (see providers.js) so they arrive as
     // string-backed LosslessNumber. JSON.stringify would coerce them back through a float64 and
     // round — corrupting the amount fed into UTxO selection and change calculation. losslessStringify
     // emits them as exact bare integers (which the native side's Jackson parses as BigInteger);
     // regular numbers and strings pass through unchanged.
-    const rc = this._b._lib.ccl_quicktx_build(
+    const rc = this._b._lib.mesmo_quicktx_build(
       this._b._thread,
       cstr(txplanYaml),
       cstr(losslessStringify(utxos)),
       cstr(losslessStringify(normalizeCostModels(protocolParams))),
       execUnits != null ? cstr(losslessStringify(execUnits)) : null,
+      additionalSigners,
     );
     // The build result is a YAML document.
     return parseYaml(this._b._check(rc));
@@ -657,7 +573,7 @@ export class QuickTxApi {
    * Convenience: fetch chain data from a provider and build, in one call.
    *
    * Composes `provider.utxos(sender)` + `provider.protocolParams()` with {@link QuickTxApi#build}.
-   * The bridge stays offline — this only moves the optional HTTP fetch into wrapper code. See
+   * The lib stays offline — this only moves the optional HTTP fetch into wrapper code. See
    * `src/providers.js` for available providers (Yaci DevKit, Blockfrost) or supply your own object
    * with `utxos(address)` and `protocolParams()`.
    *
@@ -667,15 +583,164 @@ export class QuickTxApi {
    * @param {Array<{mem: (number|string), steps: (number|string)}>} [execUnits]
    * @returns {Promise<{tx_cbor: string, tx_hash: string, fee: string}>}
    */
-  async buildWith(txplanYaml, provider, sender, evaluator = null) {
-    const utxos = await provider.utxos(sender);
+  async buildWith(txplanYaml, provider, senders, evaluator = null, additionalSigners = 0) {
+    // UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so overlapping
+    // senders can't double-fund the build. For multi-sender transactions, TxPlan's
+    // context.fee_payer decides who pays the fee.
+    const utxos = [];
+    const seen = new Set();
+    for (const sender of senders) {
+      for (const u of await provider.utxos(sender)) {
+        const key = `${u.tx_hash}#${u.output_index}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          utxos.push(u);
+        }
+      }
+    }
     const protocolParams = await provider.protocolParams();
     let execUnits = null;
     if (evaluator != null) {
       // Two-pass: draft (units computed offline by Scalus) -> remote evaluate -> rebuild.
-      const draft = this.build(txplanYaml, utxos, protocolParams);
+      const draft = this.build(txplanYaml, utxos, protocolParams, null, additionalSigners);
       execUnits = await evaluator.evaluate(draft.tx_cbor, utxos);
     }
-    return this.build(txplanYaml, utxos, protocolParams, execUnits);
+    return this.build(txplanYaml, utxos, protocolParams, execUnits, additionalSigners);
+  }
+}
+
+/**
+ * A managed account (ADR-0016) bound to one CIP-1852 payment leaf
+ * (`m/1852'/1815'/account'/0/addressIndex`).
+ *
+ * One handle is one payment address; open further Accounts for further address indices. The
+ * stake/DRep/committee keys sit at their standard role indices independent of `addressIndex`, so
+ * Accounts at different address indices of one account index share a single stake/DRep identity.
+ *
+ * Lifecycle: call {@link Account#close} (idempotent) or use `using` / `Symbol.dispose`; any use
+ * after close throws a {@link MesmoError} with code `MESMO_ERROR_INVALID_HANDLE` (-11). String
+ * representations never contain secret material.
+ */
+// Best-effort GC fallback (ADR-0016 "wrapper finalizers are fallback protection"): a dropped
+// Account's native registry entry pins key material until process exit. Deterministic close()
+// or `using` remains the contract — this only narrows the leak. The callback must not touch
+// the read-once result slot (it ignores the return code) and must skip closed instances: the raw
+// _threadPtr guard is deliberate, the throwing _thread getter would be wrong in a finalizer.
+const accountFinalizer = new FinalizationRegistry(({ lib, handle }) => {
+  if (lib._threadPtr !== null && handle) {
+    try {
+      lib._lib.mesmo_account_close(lib._threadPtr, handle);
+    } catch {
+      // best-effort only
+    }
+  }
+});
+
+export class Account {
+  constructor(lib, handle) {
+    this._b = lib;
+    this._handle = handle;
+    this._info = null;
+    accountFinalizer.register(this, { lib, handle }, this);
+  }
+
+  /**
+   * Public account data: `{ base_address, enterprise_address, stake_address, change_address, network,
+   * account_index, address_index, drep_id, committee_cold_id, committee_cold_credential,
+   * committee_hot_id, committee_hot_credential }`. Never contains secrets.
+   */
+  get info() {
+    if (this._info === null) {
+      const rc = this._b._lib.mesmo_account_get_info(this._b._thread, this._handle);
+      // Immutable for the handle's lifetime: fetch once, memoize frozen.
+      this._info = Object.freeze(JSON.parse(this._b._check(rc)));
+    }
+    return this._info;
+  }
+
+  /**
+   * Sign a transaction with the selected roles; returns the signed CBOR hex.
+   *
+   * `roles` is a {@link SigningRole} combination (bit mask), e.g.
+   * `SigningRole.PAYMENT | SigningRole.STAKE` for a stake-certificate transaction. An empty mask
+   * is rejected — signing never silently uses every key.
+   */
+  signTx(txCborHex, roles = SigningRole.PAYMENT) {
+    const rc = this._b._lib.mesmo_account_sign_tx_handle(
+      this._b._thread, this._handle, cstr(txCborHex), roles);
+    return this._b._check(rc);
+  }
+
+  /**
+   * One-shot export of a freshly created account's recovery phrase.
+   *
+   * Only available on accounts from {@link AccountsApi#create}, and only once — the phrase is
+   * removed on retrieval. Accounts opened from a mnemonic throw (the caller already holds the
+   * phrase). Persist the returned value securely; nothing else ever returns it.
+   */
+  exportRecoveryPhrase() {
+    // Delivered via out-param in the SAME call — never through the read-once result slot.
+    // The native side destroys its pending copy only after the string is materialized, so a
+    // failed delivery is retryable instead of orphaning the only copy of the phrase.
+    const out = new BigUint64Array(1);
+    const rc = this._b._lib.mesmo_account_export_recovery_phrase(this._b._thread, this._handle, ptr(out));
+    this._b._checkRc(rc);
+    const phrasePtr = Number(out[0]);
+    const phrase = new CString(phrasePtr).toString();
+    this._b._lib.mesmo_free_string(this._b._thread, phrasePtr);
+    return phrase;
+  }
+
+  /** Release the native account state. Idempotent; further use throws with code -11. */
+  close() {
+    accountFinalizer.unregister(this); // closed deterministically; nothing left to finalize
+    const handle = this._handle;
+    this._handle = 0n; // 0 is never a valid handle
+    this._info = null;
+    if (handle && this._b._threadPtr !== null) {
+      const rc = this._b._lib.mesmo_account_close(this._b._thread, handle);
+      this._b._check(rc);
+    }
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+
+  toString() {
+    return this._handle ? `<mesmo.Account handle=${this._handle}>` : '<mesmo.Account closed>';
+  }
+}
+
+/** Managed-accounts namespace (`lib.accounts`, ADR-0016). */
+export class AccountsApi {
+  constructor(lib) {
+    this._b = lib;
+  }
+
+  /**
+   * Open an account from a mnemonic at fixed derivation indices; returns an {@link Account}.
+   * The mnemonic crosses the FFI boundary once, here; no later operation needs it.
+   */
+  fromMnemonic(mnemonic, network, accountIndex = 0, addressIndex = 0) {
+    checkNetwork(network);
+    const out = new BigInt64Array(1);
+    const rc = this._b._lib.mesmo_account_open_mnemonic(
+      this._b._thread, network, cstr(mnemonic), accountIndex, addressIndex, ptr(out));
+    this._b._check(rc);
+    return new Account(this._b, out[0]);
+  }
+
+  /**
+   * Create a brand-new account (fresh 24-word mnemonic); returns an {@link Account}.
+   * No secret is returned here — retrieve the recovery phrase once, deliberately, with
+   * {@link Account#exportRecoveryPhrase}.
+   */
+  create(network) {
+    checkNetwork(network);
+    const out = new BigInt64Array(1);
+    const rc = this._b._lib.mesmo_account_create_handle(this._b._thread, network, ptr(out));
+    this._b._check(rc);
+    return new Account(this._b, out[0]);
   }
 }

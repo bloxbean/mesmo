@@ -1,7 +1,7 @@
 """Build config for platform-specific wheels that bundle the native library.
 
 Metadata lives in pyproject.toml; this file only exists to (a) force a platform-tagged wheel — the
-package ships a prebuilt `libccl.*` under `ccl/_libs/`, so a wheel is not portable across OS/arch —
+package ships a prebuilt `libmesmo.*` under `mesmo/_libs/`, so a wheel is not portable across OS/arch —
 and (b) tag it `py3-none-<platform>` since the binding is pure-Python ctypes (works on any Python 3),
 only the bundled binary is platform-specific.
 """
@@ -35,7 +35,7 @@ class bdist_wheel(_bdist_wheel):
 setup(
     distclass=BinaryDistribution,
     cmdclass={"bdist_wheel": bdist_wheel},
-    packages=["ccl"],
-    package_data={"ccl": ["_libs/*"]},
+    packages=["mesmo"],
+    package_data={"mesmo": ["_libs/*"]},
     include_package_data=True,
 )

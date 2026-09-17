@@ -1,38 +1,36 @@
 # Go API Reference
 
-Everything lives in package `ccl`:
+Everything lives in package `mesmo`:
 
 ```go
-import "github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+import "github.com/bloxbean/mesmo/wrappers/go/mesmo"
 ```
 
-## Bridge
+## Mesmo
 
 ```go
-func New() (*Bridge, error)
-func (b *Bridge) Close() error
-func (b *Bridge) Version() (string, error)
+func New() (*Mesmo, error)
+func (b *Mesmo) Close() error
+func (b *Mesmo) Version() (string, error)
 
-var ErrBridgeClosed = errors.New("ccl: bridge is closed")
+var ErrClosed = errors.New("mesmo: closed")
 ```
 
 `New()` loads the native library (downloading it on first use — see [troubleshooting](troubleshooting.md#how-the-native-library-is-found)), creates a GraalVM isolate on a dedicated pinned OS thread, and verifies the library version matches the wrapper. The API groups are exported fields:
 
 ```go
-bridge.Account  // *AccountApi
-bridge.Address  // *AddressApi
-bridge.Crypto   // *CryptoApi
-bridge.Tx       // *TxApi
-bridge.Plutus   // *PlutusApi
-bridge.Script   // *ScriptApi
-bridge.Gov      // *GovApi
-bridge.Wallet   // *WalletApi
-bridge.QuickTx  // *QuickTxApi
+lib.Accounts // *AccountsApi (managed accounts, ADR-0016)
+lib.Address  // *AddressApi
+lib.Crypto   // *CryptoApi
+lib.Tx       // *TxApi
+lib.Plutus   // *PlutusApi
+lib.Script   // *ScriptApi
+lib.QuickTx  // *QuickTxApi
 ```
 
-**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrBridgeClosed` (test with `errors.Is`) — it never hangs or panics.
+**Lifecycle.** `Close()` tears down the isolate and is idempotent. Any call after `Close` returns `ErrClosed` (test with `errors.Is`) — it never hangs or panics.
 
-**Concurrency.** A `*Bridge` may be shared across goroutines; calls are serialized onto the bridge's single isolate thread. Create multiple bridges for parallelism.
+**Concurrency.** A `*Mesmo` may be shared across goroutines; calls are serialized onto Mesmo's single isolate thread. Create multiple instances for parallelism.
 
 ## Networks
 
@@ -42,29 +40,27 @@ type Network int
 const (
 	Mainnet Network = 0
 	Testnet Network = 1
-	Preprod Network = 2
-	Preview Network = 3
 )
 
 func (n Network) String() string  // "mainnet", "testnet", ...
 func (n Network) Valid() bool
 ```
 
-Every method that derives keys (`Account`, `Wallet`, `Gov`) requires a `Network` value. An out-of-range value returns a plain descriptive error before any native call.
+Account operations (`Accounts`) require a `Network` value; an out-of-range value returns a plain descriptive error before any native call. The stateless `Crypto.DeriveKey` takes none — key derivation is network-independent.
 
 > **Gotcha:** these constants are CCL enum ordinals, **not** Cardano's on-chain network id — the two are inverted for mainnet/testnet (`Mainnet = 0`, but a mainnet address's on-chain `network_id` is `1`). `AddressInfo.NetworkID` is the genuine on-chain value; never feed it back into an API that takes a `Network`.
 
 ## Errors
 
 ```go
-type CclError struct {
+type MesmoError struct {
 	Code    int
 	Message string
 }
-func (e *CclError) Error() string  // "CCL Error <code>: <message>"
+func (e *MesmoError) Error() string  // "Mesmo error <code>: <message>"
 ```
 
-Native failures surface as `*CclError` — match with `errors.As`. Error codes:
+Native failures surface as `*MesmoError` — match with `errors.As`. Error codes:
 
 | Constant | Code | Meaning |
 |---|---|---|
@@ -78,43 +74,44 @@ Native failures surface as `*CclError` — match with `errors.As`. Error codes:
 | `ErrInsufficientFunds` | -8 | UTXOs can't cover outputs + fee |
 | `ErrInvalidTransaction` | -9 | Bad transaction |
 | `ErrTxBuild` | -10 | TxPlan build failure (most common `QuickTx.Build` error — usually a malformed plan) |
+| `ErrInvalidHandle` | -11 | Unknown or closed account handle |
 
 Predicate methods (`Address.Validate`, `Crypto.ValidateMnemonic`, `Crypto.Verify`) return `bool` and never error.
 
-## bridge.Account
+## lib.Accounts — managed accounts
+
+Handle-based accounts (ADR-0016): open once, then operate without the mnemonic — the only
+account API.
 
 ```go
-func (a *AccountApi) Create(network Network) (*AccountInfo, error)
-func (a *AccountApi) FromMnemonic(mnemonic string, network Network, accountIndex, addressIndex int) (*AccountInfo, error)
-func (a *AccountApi) GetPublicKey(mnemonic string, network Network, accountIndex, addressIndex int) (string, error)
-func (a *AccountApi) GetPrivateKey(mnemonic string, network Network, accountIndex, addressIndex int) (string, error)
-func (a *AccountApi) GetDRepID(mnemonic string, network Network, accountIndex int) (string, error)
-func (a *AccountApi) SignTx(mnemonic string, network Network, accountIndex, addressIndex int, txCborHex string) (string, error)
-func (a *AccountApi) SignTxWithKeys(mnemonic string, network Network, accountIndex, addressIndex int, txCborHex string, keys ...string) (string, error)
+acct, err := lib.Accounts.FromMnemonic(mnemonic, mesmo.Testnet, 0, 0)  // or lib.Accounts.Create(...)
+defer acct.Close()
+
+info, _ := acct.Info()                            // *AccountPublicInfo — never the mnemonic
+signed, err := acct.SignTx(txCbor, mesmo.RolePayment|mesmo.RoleStake)
+// after Close: further use fails with ErrInvalidHandle (-11)
 ```
 
-```go
-type AccountInfo struct {
-	Mnemonic          string `json:"mnemonic"`
-	BaseAddress       string `json:"base_address"`
-	EnterpriseAddress string `json:"enterprise_address"`
-	StakeAddress      string `json:"stake_address"`
-	ChangeAddress     string `json:"change_address"`
-}
-```
+- `FromMnemonic(mnemonic, network, accountIndex, addressIndex)` — the mnemonic crosses the FFI
+  boundary once, here.
+- `Create(network)` — fresh 24-word account; **no secret in the result**. Retrieve the phrase once,
+  deliberately, with `acct.ExportRecoveryPhrase()` — a second call fails, as does export on a
+  mnemonic-opened account.
+- `SignTx(txCborHex, roles)` — typed `SigningRole` bit mask (`RolePayment`, `RoleStake`, `RoleDRep`,
+  `RoleCommitteeCold`, `RoleCommitteeHot`);
+  witnesses apply in canonical order. An empty mask is rejected.
+- `Close()` is explicit and idempotent — close Accounts like files. Like `os.File`, a dropped
+  Account is reclaimed best-effort by a GC finalizer (fallback only; timing is the GC's). All
+  Account calls ride the Mesmo's dedicated isolate thread, so concurrent goroutine use is safe
+  (and serialized). `String()` shows only the handle.
+- `Info()` returns public data only: the base/enterprise/stake/change addresses, network and
+  derivation indices, `DRepID`, and the committee identifiers (`CommitteeColdID`/`CommitteeHotID`, bech32,
+  plus `CommitteeColdCredential`/`CommitteeHotCredential` — hex blake2b-224 verification-key
+  hashes, as used in committee certificates).
 
-- `Create` generates a fresh 24-word mnemonic; treat `AccountInfo.Mnemonic` as a secret.
-- `GetPrivateKey` returns the 64-byte **extended** key as 128 hex chars. For raw Ed25519 signing (`Crypto.Sign`) use the first 64 hex chars.
-- `SignTx` witnesses with the payment key only. When a transaction carries certificates that need other witnesses, use `SignTxWithKeys` with roles in order — valid roles: `"payment"`, `"stake"`, `"drep"`, `"committee_cold"`, `"committee_hot"`:
+An account is bound to **one CIP-1852 payment leaf** (`m/1852'/1815'/account'/0/address_index`): one handle, one payment address — open further accounts for further address indices. The stake/DRep/committee keys sit at their standard role indices *independent of* `address_index`, so accounts at different address indices of one account index **share a single stake/DRep identity**.
 
-```go
-// A stake registration needs the payment key (fee) and the stake key (certificate):
-signed, err := bridge.Account.SignTxWithKeys(mnemonic, ccl.Testnet, 0, 0, result.TxCbor, "payment", "stake")
-```
-
-Without the extra witness the node rejects the transaction with `MissingVKeyWitnessesUTXOW`.
-
-## bridge.Address
+## lib.Address
 
 ```go
 func (a *AddressApi) Info(bech32 string) (*AddressInfo, error)
@@ -134,26 +131,34 @@ type AddressInfo struct {
 }
 ```
 
-## bridge.Crypto
+## lib.Crypto
 
 ```go
 func (c *CryptoApi) Blake2b256(dataHex string) (string, error)
 func (c *CryptoApi) Blake2b224(dataHex string) (string, error)
 func (c *CryptoApi) GenerateMnemonic(wordCount int) (string, error)   // 12 or 24
 func (c *CryptoApi) ValidateMnemonic(mnemonic string) bool
-func (c *CryptoApi) Sign(messageHex, skHex string) (string, error)    // Ed25519; 32-byte key (64 hex chars)
+func (c *CryptoApi) Sign(messageHex, skHex string) (string, error)    // Ed25519; 32-byte seed or 64-byte extended key (by length)
 func (c *CryptoApi) Verify(signatureHex, messageHex, pkHex string) bool
+func (c *CryptoApi) DeriveKey(mnemonic string, accountIndex, addressIndex int, role string) (*DerivedKey, error)
 ```
+
+`DeriveKey` is the stateless CIP-1852 "raw key material" utility — `role` is one of `"payment"`,
+`"change"`, `"stake"`, `"drep"`, `"committee_cold"`, `"committee_hot"`; it returns
+`{Path, PrivateKey, PublicKey, PublicKeyHash}`, plus — for the governance roles — the CIP-105
+bech32 encodings `Bech32VerificationKey`/`Bech32VerificationKeyHash` (what cardano-cli and GovTool
+accept for registration). Key derivation is network-independent. Prefer
+managed accounts for signing — handles never expose key bytes.
 
 Hash inputs are hex in → hex out:
 
 ```go
-digest, _ := bridge.Crypto.Blake2b256("48656c6c6f") // "Hello"
-priv, _ := bridge.Account.GetPrivateKey(mnemonic, ccl.Testnet, 0, 0)
-sig, _ := bridge.Crypto.Sign(msgHex, priv[:64])     // first 32 bytes of the extended key
+digest, _ := lib.Crypto.Blake2b256("48656c6c6f") // "Hello"
+key, _ := lib.Crypto.DeriveKey(mnemonic, 0, 0, "payment")
+sig, _ := lib.Crypto.Sign(msgHex, key.PrivateKey) // pass the extended key whole
 ```
 
-## bridge.Tx
+## lib.Tx
 
 ```go
 func (t *TxApi) Hash(txCborHex string) (string, error)
@@ -165,7 +170,7 @@ func (t *TxApi) Deserialize(txCborHex string) (string, error)
 
 `ToJson`/`Deserialize` return a JSON string with a `body` field (inputs/outputs/fee). `SignWithSecretKey` expects a CBOR-encoded secret key, not raw key hex — for mnemonic-based accounts prefer `Account.SignTx`.
 
-## bridge.Plutus
+## lib.Plutus
 
 ```go
 func (p *PlutusApi) DataHash(datumCborHex string) (string, error)   // 64 hex chars
@@ -174,10 +179,10 @@ func (p *PlutusApi) DataFromJson(jsonStr string) (string, error)    // returns C
 ```
 
 ```go
-hash, _ := bridge.Plutus.DataHash("182a")  // hash of PlutusData int 42
+hash, _ := lib.Plutus.DataHash("182a")  // hash of PlutusData int 42
 ```
 
-## bridge.Script
+## lib.Script
 
 ```go
 func (s *ScriptApi) NativeFromJson(jsonStr string) (string, error)              // JSON: {policy_id, script_hash, cbor_hex}
@@ -188,52 +193,23 @@ func (s *ScriptApi) Hash(scriptCborHex string, scriptType int) (string, error)  
 
 ```go
 scriptJSON := fmt.Sprintf(`{"type":"sig","keyHash":"%s"}`, info.PaymentCredentialHash)
-result, _ := bridge.Script.NativeFromJson(scriptJSON)
+result, _ := lib.Script.NativeFromJson(scriptJSON)
 // unmarshal result → policy_id, script_hash, cbor_hex
 ```
 
-## bridge.Gov
+## Governance identity and HD-wallet flows
+
+There is no separate Gov/Wallet API. Governance *identity* (DRep id, committee ids and
+credentials) is public data on `acct.Info()`; governance *signing* uses `SignTx` with the
+`RoleDRep`/`RoleCommittee*` roles; raw governance key material comes from `Crypto.DeriveKey`.
+An HD wallet is one recovery phrase with one managed handle per CIP-1852 payment leaf — pass
+`addressIndex` to `Accounts.FromMnemonic` to enumerate addresses.
+
+## lib.QuickTx
 
 ```go
-func (g *GovApi) DrepKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error)
-func (g *GovApi) CommitteeColdKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error)
-func (g *GovApi) CommitteeHotKeyFromMnemonic(mnemonic string, network Network, accountIndex int) (*GovKeyInfo, error)
-```
-
-```go
-type GovKeyInfo struct {
-	DrepID                    string `json:"drep_id,omitempty"` // drep1... (DRep keys)
-	ID                        string `json:"id,omitempty"`      // cc_cold1... / cc_hot1... (committee keys)
-	VerificationKey           string `json:"verification_key"`
-	VerificationKeyHash       string `json:"verification_key_hash"`
-	Bech32VerificationKey     string `json:"bech32_verification_key"`
-	Bech32VerificationKeyHash string `json:"bech32_verification_key_hash"`
-}
-```
-
-## bridge.Wallet
-
-HD wallet: one mnemonic, many sequential addresses.
-
-```go
-func (w *WalletApi) Create(network Network) (*WalletInfo, error)
-func (w *WalletApi) FromMnemonic(mnemonic string, network Network) (*WalletInfo, error)
-func (w *WalletApi) GetAddress(mnemonic string, network Network, index int) (string, error)
-```
-
-```go
-type WalletInfo struct {
-	Mnemonic     string   `json:"mnemonic"`
-	StakeAddress string   `json:"stake_address"`
-	Addresses    []string `json:"addresses"`
-}
-```
-
-## bridge.QuickTx
-
-```go
-func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interface{}, execUnits ...interface{}) (*TxResult, error)
-func (q *QuickTxApi) BuildWith(yaml string, provider ChainDataProvider, sender string, evaluator ...TransactionEvaluator) (*TxResult, error)
+func (q *QuickTxApi) Build(yaml string, utxos interface{}, protocolParams interface{}, additionalSigners int, execUnits ...interface{}) (*TxResult, error)
+func (q *QuickTxApi) BuildWith(yaml string, provider ChainDataProvider, senders []string, additionalSigners int, evaluator ...TransactionEvaluator) (*TxResult, error)
 ```
 
 ```go
@@ -248,11 +224,14 @@ type TxResult struct {
 - `utxos` is a slice of CCL `Utxo` objects (typically `[]map[string]interface{}`): `{tx_hash, output_index, address, amount: [{unit, quantity}]}`. `unit` is `"lovelace"` or `policyId + assetNameHex`. Quantities are best passed as **strings**.
 - `protocolParams` is the CCL `ProtocolParams` model (typically `map[string]interface{}`); unknown fields are ignored.
 - `execUnits` — for Plutus transactions, pass one value: a slice of `{mem, steps}` maps, one per redeemer in transaction order. When omitted, the native library computes them **offline** with the embedded Scalus evaluator.
-- **`BuildWith`** fetches UTXOs and protocol parameters from a [provider](providers.md), then builds. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
+- `additionalSigners` budgets vkey witnesses for fee estimation, **beyond those the input UTXOs imply** (one per sender). You know how many keys will sign: `0` for a plain payment, `1` for a stake or DRep certificate, `2` for both in one tx, the number of `sig` keys for a native-script spend, plus one per plan-level required signer. Undercounting yields a fee the node rejects with `FeeTooSmallUTxO`; overcounting only overpays (~4,400 lovelace per extra witness).
+- **`BuildWith`** fetches each sender's UTXOs from a [provider](providers.md) — merged and de-duplicated by `(tx_hash, output_index)` — plus protocol parameters, then builds. With multiple senders, TxPlan's `context.fee_payer` decides who pays the fee. With an evaluator it runs two passes: draft build → remote evaluation → rebuild with the returned units.
 
 ```go
-result, err := bridge.QuickTx.Build(yaml, utxos, params)
+result, err := lib.QuickTx.Build(yaml, utxos, params, 0)          // plain payment
 
-plutusResult, err := bridge.QuickTx.Build(yaml, utxos, params,
+stakeResult, err := lib.QuickTx.Build(yaml, utxos, params, 1)     // payment+stake signing
+
+plutusResult, err := lib.QuickTx.Build(yaml, utxos, params, 0,
 	[]map[string]interface{}{{"mem": 2000000, "steps": 500000000}})
 ```

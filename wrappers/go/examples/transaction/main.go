@@ -1,7 +1,7 @@
 // Build and sign a payment transaction fully offline from a TxPlan (YAML).
 //
 // The transaction is defined as a TxPlan YAML document; we supply the UTXOs and protocol
-// parameters ourselves (no node / no provider). The bridge builds the unsigned CBOR, which we
+// parameters ourselves (no node / no provider). The lib builds the unsigned CBOR, which we
 // then sign locally. Submitting it is a separate, online step.
 //
 // Run from wrappers/go:
@@ -15,7 +15,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/bloxbean/cardano-client-bindings/wrappers/go/ccl"
+	"github.com/bloxbean/mesmo/wrappers/go/mesmo"
 )
 
 // Minimal protocol parameters (CCL test-resource values), the CCL ProtocolParams model as a map.
@@ -29,20 +29,24 @@ var protocolParams = map[string]interface{}{
 }
 
 func main() {
-	bridge, err := ccl.New()
+	lib, err := mesmo.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer bridge.Close()
+	defer lib.Close()
 
-	sender, _ := bridge.Account.Create(ccl.Testnet)
-	receiver, _ := bridge.Account.Create(ccl.Testnet)
+	sender, _ := lib.Accounts.Create(mesmo.Testnet) // managed handle — signs below
+	defer sender.Close()
+	senderInfo, _ := sender.Info()
+	receiver, _ := lib.Accounts.Create(mesmo.Testnet)
+	receiverInfo, _ := receiver.Info()
+	receiver.Close()
 
 	// A static UTXO the sender controls (100 ADA), instead of querying a node.
 	utxos := []map[string]interface{}{{
 		"tx_hash":      strings.Repeat("a", 64),
 		"output_index": 0,
-		"address":      sender.BaseAddress,
+		"address":      senderInfo.BaseAddress,
 		"amount":       []map[string]interface{}{{"unit": "lovelace", "quantity": "100000000"}},
 	}}
 
@@ -58,10 +62,10 @@ transaction:
           amounts:
             - unit: lovelace
               quantity: "5000000"
-`, sender.BaseAddress, receiver.BaseAddress)
+`, senderInfo.BaseAddress, receiverInfo.BaseAddress)
 
 	// Build the unsigned transaction offline.
-	result, err := bridge.QuickTx.Build(yaml, utxos, protocolParams)
+	result, err := lib.QuickTx.Build(yaml, utxos, protocolParams, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,8 +74,8 @@ transaction:
 	fmt.Println("  fee    :", result.Fee)
 	fmt.Println("  cbor   :", result.TxCbor[:80], "...")
 
-	// Sign it with the sender's mnemonic.
-	signed, err := bridge.Account.SignTx(sender.Mnemonic, ccl.Testnet, 0, 0, result.TxCbor)
+	// Sign it with the sender's managed handle — no mnemonic in the call.
+	signed, err := sender.SignTx(result.TxCbor, mesmo.RolePayment)
 	if err != nil {
 		log.Fatal(err)
 	}

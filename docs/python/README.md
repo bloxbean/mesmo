@@ -1,6 +1,6 @@
 # Cardano Client Lib for Python
 
-The `ccl` Python package (distribution name: `cardano-client-lib`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Python as a native library. No JVM, no C extension: pure `ctypes` over `libccl`, a GraalVM native-image build of CCL.
+The `mesmo` Python package (distribution name: `cardano-client-lib`) brings [Cardano Client Lib (CCL)](https://github.com/bloxbean/cardano-client-lib)'s offline Cardano operations — key derivation, address handling, transaction building and signing, Plutus data, governance keys — to Python as a native library. No JVM, no C extension: pure `ctypes` over `libmesmo`, a GraalVM native-image build of CCL.
 
 Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 
@@ -8,7 +8,7 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 
 | Document | Contents |
 |---|---|
-| [API reference](api.md) | Every class and method: `CclLib`, account, address, crypto, tx, plutus, script, gov, wallet, quicktx |
+| [API reference](api.md) | Every class and method: `Mesmo`, accounts, address, crypto, tx, plutus, script, gov, wallet, quicktx |
 | [Building transactions](transactions.md) | The full workflow with worked examples: payments, staking, governance, minting, Plutus |
 | [Providers & evaluators](providers.md) | Fetching UTXOs/protocol params from Yaci DevKit or Blockfrost; remote script-cost evaluation |
 | [Troubleshooting](troubleshooting.md) | Native library resolution, platform support, common errors |
@@ -17,31 +17,34 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 ## Installation
 
 ```bash
-pip install cardano-client-lib
+pip install mesmo
 ```
 
-> If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/cardano-client-bindings/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
+> If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/mesmo/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
 
 For development against a locally built native library, skip the wheel and point the package at it:
 
 ```bash
-export PYTHONPATH=/path/to/cardano-client-bindings/wrappers/python
-export CCL_LIB_PATH=/path/to/cardano-client-bindings/core/build/native/nativeCompile
+export PYTHONPATH=/path/to/mesmo/wrappers/python
+export MESMO_LIB_PATH=/path/to/mesmo/core/build/native/nativeCompile
 ```
 
 ## Quick start
 
 ```python
-from ccl import CclLib, Network
+from mesmo import Mesmo, Network
 
-with CclLib() as lib:
-    # Create a new account (24-word mnemonic, testnet addresses).
-    account = lib.account.create(Network.TESTNET)
-    print(account["base_address"])   # addr_test1...
-    print(account["stake_address"])  # stake_test1...
+with Mesmo() as lib:
+    # Create a new managed account (testnet). Its info never contains the phrase;
+    # export the recovery phrase once, deliberately.
+    with lib.accounts.create(Network.TESTNET) as account:
+        print(account.info["base_address"])   # addr_test1...
+        print(account.info["stake_address"])  # stake_test1...
+        mnemonic = account.export_recovery_phrase()
 
-    # Restore it later from the mnemonic.
-    restored = lib.account.from_mnemonic(account["mnemonic"], Network.TESTNET)
+    # Restore it later from the phrase.
+    with lib.accounts.from_mnemonic(mnemonic, Network.TESTNET) as restored:
+        assert restored.info["base_address"] == account.info["base_address"]
 ```
 
 The context manager tears down the native isolate on exit; equivalently, call `lib.close()` in a `finally` block.
@@ -55,7 +58,7 @@ yaml = f"""
 version: 1.0
 transaction:
   - tx:
-      from: {account["base_address"]}
+      from: {sender.info["base_address"]}
       intents:
         - type: payment
           address: {receiver}
@@ -67,17 +70,17 @@ transaction:
 result = lib.quicktx.build(yaml, utxos, protocol_params)
 # result = {"tx_cbor": ..., "tx_hash": ..., "fee": ...}
 
-signed = lib.account.sign_tx(account["mnemonic"], result["tx_cbor"], Network.TESTNET)
+signed = sender.sign_tx(result["tx_cbor"])   # sender = lib.accounts.from_mnemonic(...)
 # submit `signed` with any HTTP client — the library never talks to the network
 ```
 
 With a provider, fetching the chain data is one call:
 
 ```python
-from ccl import YaciProvider
+from mesmo import YaciProvider
 
 provider = YaciProvider()  # local Yaci DevKit
-result = lib.quicktx.build_with(yaml, provider, account["base_address"])
+result = lib.quicktx.build_with(yaml, provider, [account["base_address"]])
 ```
 
 ## Design in one paragraph
@@ -86,17 +89,15 @@ The native library is **offline and stateless** — it derives, builds, signs, h
 
 ## Threading
 
-A single `CclLib` instance is **safe to share across threads** — each OS thread is attached to the GraalVM isolate lazily and gets its own native call state, so it works naturally in threaded web servers (Flask/FastAPI/gunicorn, `ThreadPoolExecutor`). Just never use an instance after `close()`; that raises `CclClosedError`.
+A single `Mesmo` instance is **safe to share across threads** — each OS thread is attached to the GraalVM isolate lazily and gets its own native call state, so it works naturally in threaded web servers (Flask/FastAPI/gunicorn, `ThreadPoolExecutor`). Just never use an instance after `close()`; that raises `MesmoClosedError`.
 
 ## Networks
 
 ```python
-from ccl import Network
+from mesmo import Network
 
 Network.MAINNET  # 0
 Network.TESTNET  # 1
-Network.PREPROD  # 2
-Network.PREVIEW  # 3
 ```
 
 Every key-derivation method requires an explicit `network` argument — there is no default; omitting it raises `TypeError`. `Network` is an `IntEnum`, and out-of-range ints raise `ValueError` at the wrapper boundary. Note the values are CCL enum ordinals, which are the **inverse** of Cardano's on-chain network id for mainnet/testnet (`Network.MAINNET == 0`, but a mainnet address's on-chain `network_id` is `1`). See [API reference → Networks](api.md#networks).

@@ -10,22 +10,22 @@
 //! [`QuickTxApi::build_with`](crate::QuickTxApi::build_with):
 //!
 //! ```no_run
-//! use ccl::Bridge;
-//! use ccl::providers::BlockfrostProvider;
+//! use mesmo::Mesmo;
+//! use mesmo::providers::BlockfrostProvider;
 //! # let yaml = "version: 1.0";
 //! # let sender = "addr_test1...";
-//! let bridge = Bridge::new()?;
+//! let lib = Mesmo::new()?;
 //! let provider = BlockfrostProvider::new("proj_id", "preprod")?; // or YaciProvider::default()
-//! let result = bridge.quicktx().build_with(yaml, &provider, sender, None)?;
-//! # Ok::<(), ccl::CclError>(())
+//! let result = lib.quicktx().build_with(yaml, &provider, &[sender], 0, None)?;
+//! # Ok::<(), mesmo::MesmoError>(())
 //! ```
 
-use crate::{error_codes, CclError, QuickTxApi, Result, TxResult};
+use crate::{error_codes, MesmoError, QuickTxApi, Result, TxResult};
 use serde_json::Value;
 
-fn http_err(ctx: &str, e: impl std::fmt::Display) -> CclError {
-    CclError {
-        code: error_codes::CCL_ERROR_GENERAL,
+fn http_err(ctx: &str, e: impl std::fmt::Display) -> MesmoError {
+    MesmoError {
+        code: error_codes::MESMO_ERROR_GENERAL,
         message: format!("{}: {}", ctx, e),
     }
 }
@@ -65,7 +65,7 @@ fn hex_decode(s: &str) -> Result<Vec<u8>> {
 /// Fetches the chain data [`QuickTxApi::build`](crate::QuickTxApi::build) needs. Implement to plug in
 /// any backend (Blockfrost, Koios, Ogmios, Yaci DevKit, ...).
 pub trait ChainDataProvider {
-    /// All UTXOs at `address` (no selection — the bridge selects internally), as a JSON array.
+    /// All UTXOs at `address` (no selection — the lib selects internally), as a JSON array.
     fn utxos(&self, address: &str) -> Result<Value>;
     /// Current protocol parameters, as a JSON object.
     fn protocol_params(&self) -> Result<Value>;
@@ -124,8 +124,8 @@ impl BlockfrostProvider {
 
     /// Provider for the given network (`"mainnet"` / `"preprod"` / `"preview"`).
     pub fn new(project_id: &str, network: &str) -> Result<Self> {
-        let base_url = Self::network_url(network).ok_or_else(|| CclError {
-            code: error_codes::CCL_ERROR_INVALID_ARGUMENT,
+        let base_url = Self::network_url(network).ok_or_else(|| MesmoError {
+            code: error_codes::MESMO_ERROR_INVALID_ARGUMENT,
             message: format!("unknown network {:?}; use BlockfrostProvider::with_url", network),
         })?;
         Ok(Self::with_url(project_id, base_url))
@@ -182,8 +182,8 @@ impl ChainDataProvider for BlockfrostProvider {
 }
 
 /// Computes a Plutus transaction's redeemer execution units. Implement to plug in any evaluator
-/// (Blockfrost, Ogmios, ...). The bridge computes them offline with Scalus when you supply none
-/// (ADR-0013); an evaluator lets you use a remote one instead. HTTP is a wrapper concern — libccl
+/// (Blockfrost, Ogmios, ...). The lib computes them offline with Scalus when you supply none
+/// (ADR-0013); an evaluator lets you use a remote one instead. HTTP is a wrapper concern — libmesmo
 /// never makes network calls (ADR-0002).
 pub trait TransactionEvaluator {
     /// `[{mem, steps}]`, one per redeemer in transaction order, for the draft `tx_cbor` (hex).
@@ -263,8 +263,8 @@ pub struct BlockfrostEvaluator {
 impl BlockfrostEvaluator {
     /// Evaluator for the given network (`"mainnet"` / `"preprod"` / `"preview"`).
     pub fn new(project_id: &str, network: &str) -> Result<Self> {
-        let base_url = BlockfrostProvider::network_url(network).ok_or_else(|| CclError {
-            code: error_codes::CCL_ERROR_INVALID_ARGUMENT,
+        let base_url = BlockfrostProvider::network_url(network).ok_or_else(|| MesmoError {
+            code: error_codes::MESMO_ERROR_INVALID_ARGUMENT,
             message: format!("unknown network {:?}; use BlockfrostEvaluator::with_url", network),
         })?;
         Ok(Self::with_url(project_id, base_url))
@@ -297,24 +297,42 @@ impl<'a> QuickTxApi<'a> {
     /// [`build`](QuickTxApi::build). With an `evaluator`, runs a two-pass (draft -> evaluate ->
     /// rebuild); without one, the native library's offline Scalus default computes any script units.
     /// To supply units yourself, call [`build`](QuickTxApi::build) directly.
+    /// `additional_signers` budgets fee witnesses beyond those implied by the input UTXOs — see
+    /// [`build`](QuickTxApi::build).
     pub fn build_with(
         &self,
         yaml: &str,
         provider: &dyn ChainDataProvider,
-        sender: &str,
+        senders: &[&str],
+        additional_signers: u32,
         evaluator: Option<&dyn TransactionEvaluator>,
     ) -> Result<TxResult> {
-        let utxos = provider.utxos(sender)?;
+        // UTXOs are fetched per sender and de-duplicated by (tx_hash, output_index), so
+        // overlapping senders can't double-fund the build. For multi-sender transactions,
+        // TxPlan's context.fee_payer decides who pays the fee.
+        let mut merged = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for sender in senders {
+            if let Some(arr) = provider.utxos(sender)?.as_array() {
+                for u in arr {
+                    let key = format!("{}#{}", u["tx_hash"], u["output_index"]);
+                    if seen.insert(key) {
+                        merged.push(u.clone());
+                    }
+                }
+            }
+        }
+        let utxos = serde_json::Value::Array(merged);
         let protocol_params = provider.protocol_params()?;
         let exec_units = match evaluator {
             Some(ev) => {
                 // Two-pass: draft (units computed offline by Scalus) -> remote evaluate -> rebuild.
-                let draft = self.build(yaml, &utxos, &protocol_params, None)?;
+                let draft = self.build(yaml, &utxos, &protocol_params, None, additional_signers)?;
                 Some(ev.evaluate(&draft.tx_cbor, &utxos)?)
             }
             None => None,
         };
-        self.build(yaml, &utxos, &protocol_params, exec_units.as_ref())
+        self.build(yaml, &utxos, &protocol_params, exec_units.as_ref(), additional_signers)
     }
 }
 

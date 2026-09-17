@@ -1,6 +1,6 @@
 {
   "preamble": {
-    "title": "ccl-bridge/redeemer-check",
+    "title": "mesmo/redeemer-check",
     "description": "Minimal mint validator for integration tests: passes iff the redeemer is the integer 42.",
     "version": "0.1.0",
     "plutusVersion": "v3",

@@ -4,7 +4,7 @@ task copyNativeLib(type: Copy) {
     dependsOn nativeLibTask
     from project(':core').layout.buildDirectory.dir('native/nativeCompile')
     into layout.buildDirectory.dir('native')
-    include 'libccl.*'
+    include 'libmesmo.*'
     include '*.h'
 }
 
@@ -13,7 +13,7 @@ task test(type: Exec) {
     workingDir projectDir
 
     def nativeDir = layout.buildDirectory.dir('native').get().asFile.absolutePath
-    environment 'CCL_LIB_PATH', nativeDir
+    environment 'MESMO_LIB_PATH', nativeDir
     environment 'DYLD_LIBRARY_PATH', nativeDir
     environment 'LD_LIBRARY_PATH', nativeDir
 

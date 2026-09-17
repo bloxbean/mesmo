@@ -5,7 +5,7 @@
 // Mirrors the Go intents_test.go for cross-wrapper parity.
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { CclBridge } from "../src/index.js";
+import { Mesmo } from "../src/index.js";
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -49,16 +49,16 @@ function assertBuilt(result) {
 }
 
 describe("QuickTx intents E2E", () => {
-  let bridge;
-  beforeAll(() => { bridge = new CclBridge(); });
-  afterAll(() => { if (bridge) bridge.close(); });
+  let lib;
+  beforeAll(() => { lib = new Mesmo(); });
+  afterAll(() => { if (lib) lib.close(); });
 
   const fixtures = readdirSync(FIXTURES).filter((f) => f.endsWith(".yaml")).sort();
 
   for (const f of fixtures) {
     it(`builds ${f.replace(".yaml", "")}`, () => {
       const yaml = readFileSync(join(FIXTURES, f), "utf8");
-      assertBuilt(bridge.quicktx.build(yaml, utxos(), PROTOCOL_PARAMS));
+      assertBuilt(lib.quicktx.build(yaml, utxos(), PROTOCOL_PARAMS));
     });
   }
 
@@ -68,9 +68,9 @@ describe("QuickTx intents E2E", () => {
     const yaml = readFileSync(join(FIXTURES, "plutus", "script_minting.yaml"), "utf8");
     const u = [{ tx_hash: "a".repeat(64), output_index: 0, address: SENDER,
                  amount: [{ unit: "lovelace", quantity: "2000000000" }] }];
-    assertBuilt(bridge.quicktx.build(yaml, u, PROTOCOL_PARAMS, EXEC_UNITS));
+    assertBuilt(lib.quicktx.build(yaml, u, PROTOCOL_PARAMS, EXEC_UNITS));
     // The Plutus path requires caller-supplied exec units; without them the build is rejected.
-    expect(() => bridge.quicktx.build(yaml, u, PROTOCOL_PARAMS)).toThrow();
+    expect(() => lib.quicktx.build(yaml, u, PROTOCOL_PARAMS)).toThrow();
   });
 
   it("builds a Plutus spend with execution units", () => {
@@ -81,21 +81,21 @@ describe("QuickTx intents E2E", () => {
       { tx_hash: "a".repeat(64), output_index: 0, address: SENDER,
         amount: [{ unit: "lovelace", quantity: "2000000000" }] },
     ];
-    assertBuilt(bridge.quicktx.build(yaml, u, PROTOCOL_PARAMS, EXEC_UNITS));
-    expect(() => bridge.quicktx.build(yaml, u, PROTOCOL_PARAMS)).toThrow();
+    assertBuilt(lib.quicktx.build(yaml, u, PROTOCOL_PARAMS, EXEC_UNITS));
+    expect(() => lib.quicktx.build(yaml, u, PROTOCOL_PARAMS)).toThrow();
   });
 
   it("builds a Plutus lock (pay to a script address with a datum hash)", () => {
     // Locking funds at a script address is a plain payment carrying a datum hash — no script runs,
     // so no exec units are required (unlike the spend that later unlocks it).
     const yaml = readFileSync(join(FIXTURES, "plutus", "plutus_lock.yaml"), "utf8");
-    assertBuilt(bridge.quicktx.build(yaml, utxos(), PROTOCOL_PARAMS));
+    assertBuilt(lib.quicktx.build(yaml, utxos(), PROTOCOL_PARAMS));
   });
 
   it("derives the datum hash the lock fixture commits to", () => {
     // plutus_lock.yaml locks under datum_hash 9e1199… — the Plutus data hash of the integer 42
-    // (CBOR 182a). Assert the bridge computes the exact value the fixture embeds, tying the
+    // (CBOR 182a). Assert the lib computes the exact value the fixture embeds, tying the
     // plutus.dataHash primitive to the on-fixture datum.
-    expect(bridge.plutus.dataHash("182a")).toBe(SCRIPT_DATUM_HASH);
+    expect(lib.plutus.dataHash("182a")).toBe(SCRIPT_DATUM_HASH);
   });
 });
