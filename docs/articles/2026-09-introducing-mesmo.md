@@ -119,6 +119,10 @@ defer lib.Close()
 
 account, _ := lib.Accounts.Create(mesmo.Mainnet)
 defer account.Close()
+phrase, _ := account.ExportRecoveryPhrase() // one-shot backup export
+
+restored, _ := lib.Accounts.FromMnemonic(phrase, mesmo.Mainnet, 0, 0) // mnemonic enters once
+defer restored.Close()
 
 result, _ := lib.QuickTx.Build(txplanYAML, utxos, protocolParams)
 ```
@@ -137,6 +141,8 @@ use mesmo::{Mesmo, Network};
 
 let lib = Mesmo::new()?;
 let account = lib.accounts().create(Network::Mainnet)?;
+let phrase = account.export_recovery_phrase()?; // one-shot backup export
+let restored = lib.accounts().from_mnemonic(&phrase, Network::Mainnet, 0, 0)?; // mnemonic enters once
 
 let result = lib.quicktx().build(&txplan_yaml, &utxos, &protocol_params, None)?;
 // teardown is RAII — no close() to forget
@@ -157,6 +163,8 @@ const lib = new Mesmo();
 
 using account = lib.accounts.create(MAINNET);
 console.log(account.info.base_address);
+const phrase = account.exportRecoveryPhrase();          // one-shot backup export
+using restored = lib.accounts.fromMnemonic(phrase, MAINNET); // mnemonic enters once
 
 const result = lib.quicktx.build(txplanYaml, utxos, protocolParams);
 lib.close();
