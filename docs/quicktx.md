@@ -103,7 +103,7 @@ Each intent has a `type` discriminator. The full set supported by CCL's TxPlan:
 
 > The exact YAML fields for each intent come from CCL's TxPlan serialization. This Mesmo passes the
 > YAML through unchanged, so the authoritative field reference is the CCL `quicktx` module
-> (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre4`). Known-good shapes for every intent
+> (`intent/*Intent.java` and the TxPlan tests at `v0.8.0-pre5`). Known-good shapes for every intent
 > are cataloged in [Intent catalog — verified shapes](#intent-catalog--verified-shapes) below.
 
 > **Plutus script transactions** build fully offline with no extra input: when `exec_units_json` is

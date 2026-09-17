@@ -12,7 +12,7 @@ precedence, so the contract described here remains valid; it is not the *only* p
 ## Context
 
 Building Plutus script transactions requires **execution units** (memory + CPU steps) per redeemer,
-normally produced by a UPLC evaluator. CCL `0.8.0-pre4` has no offline UPLC evaluator usable inside a
+normally produced by a UPLC evaluator. CCL `0.8.0-pre5` has no offline UPLC evaluator usable inside a
 GraalVM native image; running scripts in-library would mean bundling an evaluator (e.g.
 `aiken-java-binding`), which is not feasible/initializable in a native image today.
 

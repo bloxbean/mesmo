@@ -405,7 +405,7 @@ lib.close();
 
 ## Upstream
 
-- **Cardano Client Lib**: [bloxbean/cardano-client-lib](https://github.com/bloxbean/cardano-client-lib) v0.8.0-pre4
+- **Cardano Client Lib**: [bloxbean/cardano-client-lib](https://github.com/bloxbean/cardano-client-lib) v0.8.0-pre5
 - **GraalVM**: Oracle GraalVM 25.3.4.1 (`native-image --shared`)
 
 ## License
