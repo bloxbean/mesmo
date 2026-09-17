@@ -87,8 +87,16 @@ from mesmo import Mesmo, Network
 
 lib = Mesmo()
 
+# Create a fresh account: the mnemonic is generated inside the library and
+# stays behind the handle. Export it exactly once to back it up.
 with lib.accounts.create(Network.MAINNET) as account:
-    print(account.info["base_address"])      # public data only — never the mnemonic
+    print(account.info["base_address"])       # public data only
+    phrase = account.export_recovery_phrase() # deliberate one-shot export
+
+# Restore an existing account: the mnemonic enters once, at open —
+# never again as an argument to every call.
+with lib.accounts.from_mnemonic(phrase, Network.MAINNET) as account:
+    signed = account.sign_tx(tx_cbor)  # payment role by default; add SigningRole flags for certificates
 
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params)
 datum_hash = lib.plutus.data_hash("182a")
