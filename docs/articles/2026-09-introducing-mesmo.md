@@ -190,7 +190,7 @@ Two gaps, stated plainly: **macOS Intel** (Oracle GraalVM no longer ships Intel-
 
 A fallback is only trustworthy if its costs are stated plainly:
 
-- **Binary size.** You are adding a ~50 MB platform-specific native library to your dependency tree.
+- **Binary size.** You are adding a ~60 MB platform-specific native library to your dependency tree.
 - **Not a node client.** No node protocols, no chain sync, no submission — by design. Chain data for building comes through the `ChainDataProvider` interface (Yaci-Store and Blockfrost implementations included, or your own); submission is your HTTP stack's job.
 - **Platform coverage.** See the matrix above — a pure-language library has no such constraints.
 - **JavaScript means Bun, not Node.** Node's FFI bridges (ffi-napi, koffi) crash against GraalVM native libraries, so the JavaScript wrapper requires the [Bun](https://bun.sh) runtime. For teams committed to Node.js, that is a real adoption barrier today (the planned WebAssembly target is the eventual answer).
