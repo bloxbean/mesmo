@@ -1,6 +1,6 @@
 [project]
 name = "mesmo"
-version = "0.1.0-pre6"
+version = "0.1.0-pre7"
 description = "Python bindings for Cardano Client Lib (CCL) via GraalVM native library"
 readme = "README.md"
 license = "MIT"

@@ -167,6 +167,30 @@ These enforce the flow and are configured in GitHub settings, not code:
   machine (see step 3); PyPI accepts a *pending* publisher, so the first wheel upload creates the
   project.
 
+### npm dist-tags
+
+`publish-js.yml` publishes all six npm packages under one dist-tag, chosen from the version suffix.
+**While this project is pre-1.0, a `-preN` version is published as `latest`** — not `preview`.
+
+That is deliberate, and it has to be revisited at 1.0.0:
+
+- A bare `npm install @bloxbean/mesmo` resolves the `latest` tag and nothing else, and npmjs.com
+  renders the `latest` version's README on the package page. Publishing every release under
+  `preview` would leave `latest` pinned forever to `0.0.0-oidc-bootstrap.0`, the placeholder
+  published once to create the package name for trusted publishing — so a plain `npm install` would
+  fetch an empty stub. (npm sets `latest` on a package's first-ever version regardless of
+  `--tag`, and `npm deprecate` does not move a dist-tag.)
+- A semver *range* never matches a prerelease (`npm i @bloxbean/mesmo@^0.1.0` does not resolve
+  `0.1.0-pre7`), so the dist-tag is the only path by which a consumer gets a `-preN` build.
+
+**At 1.0.0**, flip the `*-preview*|*-pre*|*-alpha*` arm of the `case` in `publish-js.yml` back to
+`NPM_TAG=preview`, so a later `1.1.0-pre1` cannot displace the stable release on `latest`. The
+`beta` and `rc` arms already tag `beta` / `next` and need no change.
+
+Moving a tag after the fact is `npm dist-tag add <pkg>@<version> latest`, repeated for all six
+packages — and with the packages set to "require 2FA and disallow tokens" it is interactive-only,
+so it is worth getting the publish tag right instead.
+
 ## Release checklist
 
 1. [ ] Open a PR bumping `version` in `gradle.properties`, run `./gradlew syncVersions`, and commit

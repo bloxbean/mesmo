@@ -1,6 +1,6 @@
 [package]
 name = "mesmo"
-version = "0.1.0-pre6"
+version = "0.1.0-pre7"
 edition = "2021"
 description = "Rust bindings for Cardano Client Lib (CCL) via GraalVM native library"
 license = "MIT"
@@ -12,8 +12,8 @@ authors = ["bloxbean"]
 keywords = ["cardano", "cardano-client", "cardano-client-lib", "blockchain"]
 categories = ["api-bindings", "cryptography::cryptocurrencies"]
 
-# Published as `cardano-client-lib`, but imported as `mesmo` (e.g. `use mesmo::...`) — keep the short
-# crate identifier stable while the registry/dist name is descriptive.
+# Published and imported under one name: `cargo add mesmo`, `use mesmo::...`. The explicit [lib]
+# name pins the import identifier so it survives any future change to the package name.
 [lib]
 name = "mesmo"
 

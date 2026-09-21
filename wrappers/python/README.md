@@ -19,18 +19,20 @@ The native library is **bundled inside the platform wheel** — no separate down
 **Recommended — a platform wheel that bundles the native library:**
 
 ```bash
-pip install mesmo
+pip install --pre mesmo
 # or, a locally built wheel:
 pip install path/to/mesmo-*.whl
 ```
+
+`--pre` is required while every release is a pre-release: `0.1.0-preN` normalizes to `0.1.0rcN`
+under PEP 440, and pip skips pre-releases unless asked. It becomes unnecessary at 1.0.
 
 Wheels are published for `linux-x86_64`, `linux-aarch64`, `linux-musl-x86_64` (Alpine),
 `macos-aarch64`, and `windows-x86_64`. There is no source distribution — on any other platform,
 build `libmesmo` from source and point `MESMO_LIB_PATH` at it (see below).
 
-The distribution is named `cardano-client-lib`, but the import stays short: `import mesmo`. The wheel
-ships the matching `libmesmo.*` inside the package (`mesmo/_libs/`), so `import mesmo` just works — nothing
-else to set. Build one locally (needs `pip install build`):
+The wheel ships the matching `libmesmo.*` inside the package (`mesmo/_libs/`), so `import mesmo`
+just works — nothing else to set. Build one locally (needs `pip install build`):
 
 ```bash
 ./gradlew :wrappers:python:wheel     # -> wrappers/python/dist/mesmo-*.whl

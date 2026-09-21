@@ -61,8 +61,8 @@ jobs:
         run: node wrappers/js/scripts/set-package-version.mjs "$PKG_VERSION"
 
       # Publish only on a tag (workflow_dispatch stays a dry run). Platform packages first, then
-      # the main package (so its optionalDependencies already exist). Pre-release versions get a
-      # matching npm dist-tag so they never become `latest`.
+      # the main package (so its optionalDependencies already exist). Pre-1.0 the `-preN` line IS
+      # the release, so it takes `latest`; `beta`/`rc` builds get their own dist-tag.
       - name: Publish to npm
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -70,9 +70,14 @@ jobs:
           rm -f wrappers/js/libs/libmesmo.*
           NPM_TAG=latest
           case "$PKG_VERSION" in
-            *-preview*|*-pre*|*-alpha*) NPM_TAG=preview ;;
-            *-beta*)                    NPM_TAG=beta ;;
-            *-rc*)                      NPM_TAG=next ;;
+            *-beta*) NPM_TAG=beta ;;
+            *-rc*)   NPM_TAG=next ;;
+            # Pre-1.0 there is no stable line, so `-preN` is what a bare `npm install` has to
+            # resolve to: npm resolves a bare install through the `latest` tag only, and npmjs.com
+            # renders the `latest` version's README. Tagging these `preview` would strand `latest`
+            # on the 0.0.0-oidc-bootstrap.0 trusted-publishing placeholder. Revert this arm to
+            # NPM_TAG=preview at 1.0.0, so prereleases stop displacing the stable release.
+            *-preview*|*-pre*|*-alpha*) NPM_TAG=latest ;;
           esac
           # Leading ./ is required: npm reads a bare "pkgs/platform-x" as the github:owner/repo
           # shorthand and tries to git-fetch it, instead of publishing the local directory.

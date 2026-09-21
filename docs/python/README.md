@@ -17,8 +17,11 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 ## Installation
 
 ```bash
-pip install mesmo
+pip install --pre mesmo
 ```
+
+> `--pre` is required until 1.0: `0.1.0-preN` normalizes to `0.1.0rcN` under PEP 440, and pip skips
+> pre-releases unless asked.
 
 > If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/mesmo/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
 
