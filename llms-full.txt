@@ -89,7 +89,7 @@ Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/c
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install mesmo`, `from mesmo import Mesmo` | `Mesmo()` | `snake_case` |
+| Python ≥ 3.8 | `pip install --pre mesmo`, `from mesmo import Mesmo` | `Mesmo()` | `snake_case` |
 | Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `mesmo.New()` → `Mesmo` | `PascalCase` |
 | Rust ≥ 1.70 | crate `mesmo` (import as `mesmo`) | `mesmo::Mesmo::new()` | `snake_case`, methods return `Result` |
 | JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new Mesmo()` | `camelCase` |
@@ -425,7 +425,7 @@ Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libmesmo` with pur
 
 ```toml
 [dependencies]
-mesmo = { package = "mesmo", version = "0.1" }
+mesmo = "0.1"
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -433,10 +433,11 @@ Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `
 ### Python
 
 ```bash
-pip install mesmo
+pip install --pre mesmo
 ```
 
-Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`.
+Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`. `--pre` is
+required until 1.0 — every release is a pre-release, and pip skips those unless asked.
 
 ## First program
 
@@ -1966,16 +1967,16 @@ Once published to crates.io:
 
 ```toml
 [dependencies]
-cardano-client-lib = "0.1"
+mesmo = "0.1"
 # with the optional HTTP providers:
-# cardano-client-lib = { version = "0.1", features = ["providers"] }
+# mesmo = { version = "0.1", features = ["providers"] }
 ```
 
 Until then, use a git dependency:
 
 ```toml
 [dependencies]
-cardano-client-lib = { git = "https://github.com/bloxbean/mesmo", package = "cardano-client-lib" }
+mesmo = { git = "https://github.com/bloxbean/mesmo" }
 ```
 
 The import name is `mesmo` regardless: `use mesmo::{Mesmo, Network};`.
@@ -2488,7 +2489,7 @@ The native library is offline by design — it never makes a network call. The o
 
 ```toml
 [dependencies]
-cardano-client-lib = { version = "0.1", features = ["providers"] }
+mesmo = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
@@ -2681,8 +2682,11 @@ Requires Python ≥ 3.8. The only runtime dependency is `pyyaml`.
 ## Installation
 
 ```bash
-pip install mesmo
+pip install --pre mesmo
 ```
+
+> `--pre` is required until 1.0: `0.1.0-preN` normalizes to `0.1.0rcN` under PEP 440, and pip skips
+> pre-releases unless asked.
 
 > If the package is not yet available on PyPI for your platform, install a wheel from the project's [GitHub releases](https://github.com/bloxbean/mesmo/releases), or build one locally: `./gradlew :wrappers:python:wheel` (produces `wrappers/python/dist/*.whl`). Wheels bundle the native library — nothing else to install.
 

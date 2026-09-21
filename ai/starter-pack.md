@@ -8,7 +8,7 @@ Mesmo compiles the Java [Cardano Client Lib (CCL)](https://github.com/bloxbean/c
 
 | Language | Package | Entry object | Naming |
 |---|---|---|---|
-| Python ≥ 3.8 | `pip install mesmo`, `from mesmo import Mesmo` | `Mesmo()` | `snake_case` |
+| Python ≥ 3.8 | `pip install --pre mesmo`, `from mesmo import Mesmo` | `Mesmo()` | `snake_case` |
 | Go ≥ 1.21 | `go get github.com/bloxbean/mesmo/wrappers/go` | `mesmo.New()` → `Mesmo` | `PascalCase` |
 | Rust ≥ 1.70 | crate `mesmo` (import as `mesmo`) | `mesmo::Mesmo::new()` | `snake_case`, methods return `Result` |
 | JavaScript | `bun add @bloxbean/mesmo` — **Bun only, never Node.js** | `new Mesmo()` | `camelCase` |
