@@ -18,16 +18,16 @@ Once published to crates.io:
 
 ```toml
 [dependencies]
-cardano-client-lib = "0.1"
+mesmo = "0.1"
 # with the optional HTTP providers:
-# cardano-client-lib = { version = "0.1", features = ["providers"] }
+# mesmo = { version = "0.1", features = ["providers"] }
 ```
 
 Until then, use a git dependency:
 
 ```toml
 [dependencies]
-cardano-client-lib = { git = "https://github.com/bloxbean/mesmo", package = "cardano-client-lib" }
+mesmo = { git = "https://github.com/bloxbean/mesmo" }
 ```
 
 The import name is `mesmo` regardless: `use mesmo::{Mesmo, Network};`.

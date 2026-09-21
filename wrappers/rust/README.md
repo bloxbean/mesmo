@@ -17,7 +17,7 @@ The native library is **fetched automatically at build time** — no separate do
 ## Installing
 
 ```bash
-cargo add cardano-client-lib          # published as cardano-client-lib, imported as `mesmo`
+cargo add mesmo
 ```
 
 `build.rs` sources `libmesmo.*` for your target — in priority order: `MESMO_LIB_PATH` (a dir), the
@@ -103,8 +103,7 @@ optional HTTP helpers (via `ureq`) that fetch those for you, keeping the native 
 provider-free:
 
 ```toml
-# Published as `cardano-client-lib`; imported as `mesmo` (see below).
-cardano-client-lib = { version = "0.1", features = ["providers"] }
+mesmo = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust

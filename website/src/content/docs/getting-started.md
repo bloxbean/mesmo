@@ -27,7 +27,7 @@ Go 1.21+. Pure Go (no cgo, no C toolchain): the module loads `libmesmo` with pur
 
 ```toml
 [dependencies]
-mesmo = { package = "mesmo", version = "0.1" }
+mesmo = "0.1"
 ```
 
 Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `features = ["providers"]` for the HTTP provider/evaluator helpers.
@@ -35,10 +35,11 @@ Rust 1.70+. `build.rs` fetches the matching native library at first build. Add `
 ### Python
 
 ```bash
-pip install mesmo
+pip install --pre mesmo
 ```
 
-Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`.
+Python 3.8+. Platform wheels bundle the native library; the only dependency is `pyyaml`. `--pre` is
+required until 1.0 — every release is a pre-release, and pip skips those unless asked.
 
 ## First program
 

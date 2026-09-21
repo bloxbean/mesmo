@@ -4,7 +4,7 @@ The native library is offline by design — it never makes a network call. The o
 
 ```toml
 [dependencies]
-cardano-client-lib = { version = "0.1", features = ["providers"] }
+mesmo = { version = "0.1", features = ["providers"] }
 ```
 
 ```rust
