@@ -102,7 +102,11 @@ fn download_lib(lib_file: &str, out_dir: &Path) -> PathBuf {
         )
     });
     let platform = platform_tag();
-    let tarball = format!("cardano-client-lib-{version}-{platform}.tar.gz");
+    // Must match the asset name uploaded by .github/workflows/release.yml, which
+    // tests/version_sync_test.rs cross-checks — nothing else does. The publish workflow verify-builds
+    // against an in-tree libmesmo, so a stale name here publishes cleanly and only fails later, at
+    // every consumer's first build, for a version that can then only be yanked.
+    let tarball = format!("mesmo-{version}-{platform}.tar.gz");
     let url = format!("https://github.com/{REPO}/releases/download/{version}/{tarball}");
     let dl = out_dir.join(&tarball);
 
