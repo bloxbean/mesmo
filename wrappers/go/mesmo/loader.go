@@ -23,7 +23,7 @@ import (
 // straight from git source. The repository's `syncVersions` Gradle task writes this committed
 // constant from gradle.properties, and TestVersionConstantsMatchGradle guards it against drift so a
 // stale pin fails CI instead of 404ing on a user.
-const defaultLibVersion = "v0.1.0-pre6"
+const defaultLibVersion = "v0.1.0-pre7"
 
 const releaseBaseURL = "https://github.com/bloxbean/mesmo/releases/download"
 

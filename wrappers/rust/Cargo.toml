@@ -1,6 +1,6 @@
 [package]
 name = "mesmo"
-version = "0.1.0-pre6"
+version = "0.1.0-pre7"
 edition = "2021"
 description = "Rust bindings for Cardano Client Lib (CCL) via GraalVM native library"
 license = "MIT"
