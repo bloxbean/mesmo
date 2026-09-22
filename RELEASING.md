@@ -129,9 +129,13 @@ Nobody pushes `v*` tags by hand — direct tag pushes are blocked by a repositor
 2. A **release code owner** (`@satran004`, `@matiwinnetou`, `@fabianbormann`) reviews and merges it
    to `main`. This is enforced by [`.github/CODEOWNERS`](.github/CODEOWNERS) + the `main` branch
    ruleset.
-3. On merge, [`tag-release.yml`](.github/workflows/tag-release.yml) creates and pushes
-   `v<version>` (using a GitHub App token so the tag fires the downstream workflows), which triggers
-   `release.yml`, `publish-js.yml`, `publish-rust.yml`, and `publish-py.yml`.
+3. On merge, [`tag-release.yml`](.github/workflows/tag-release.yml) resolves the version, then
+   **pauses** on the `release` environment (`authorize` job) until a release code owner approves.
+   Only then does it push `v<version>`, using a GitHub App token so the tag fires the downstream
+   workflows: `release.yml`, `publish-js.yml`, `publish-rust.yml` and `publish-py.yml`. The tag is
+   the point of no cheap return — `release.yml` publishes the GitHub Release with no further gate —
+   so it is gated too. A bump can be merged now and tagged later; a rejected approval can be retried
+   with a manual run, which is gated identically.
 4. `publish-js.yml`, `publish-rust.yml`, and `publish-py.yml` each build, then **pause** on the
    shared `release` environment until a release code owner approves the final publish. All three
    registries are irreversible — a published version can never be overwritten, only unpublished
@@ -148,18 +152,23 @@ normal actor, so the tag fans out.
 These enforce the flow and are configured in GitHub settings, not code:
 
 - **GitHub App** with Contents: read & write, installed on the repo; secrets `RELEASE_APP_ID` +
-  `RELEASE_APP_PRIVATE_KEY` (used by `tag-release.yml` to push the tag).
+  `RELEASE_APP_PRIVATE_KEY` held by the **`release-staging` environment**, which `tag-release.yml`'s
+  `tag` job declares — so they are not readable from a workflow on any other branch.
 - **`main` ruleset**: require a PR, ≥1 approval, and **Require review from Code Owners**. Keep the
   bypass list empty (do not add `Maintain`/`Write` roles — anyone on it skips code-owner review).
 - **`v*` tag ruleset**: restrict tag creation; bypass list = the release App only, so a `v*` tag can
   only come from the approved-PR auto-tag.
 - **`release` environment**: required reviewers = the release code owners; enable "Prevent
-  self-review". One environment shared by all three publish workflows — it is the human gate on
-  every irreversible publish.
+  self-review". Holds no secrets. Four jobs gate on it — `tag-release.yml`'s `authorize` plus the
+  three publish workflows — so it is the human gate on tagging and on every irreversible publish.
+  Its deployment policy must allow **`tag: v*`** as well as `branch: main`, because the publish jobs
+  run on the tag; a branch-only policy rejects them outright.
+- **`release-staging` environment**: no reviewers, holds the release App secrets, deployment policy
+  `branch: main`, `branch: release/**`, `tag: v*`.
 - **Trusted publishing** (no API-token secrets — every registry mints a short-lived token from the
   GitHub OIDC identity): configure the publisher on
   [npmjs.com](https://docs.npmjs.com/trusted-publishers) against `publish-js.yml` + `release`, on
-  [crates.io](https://crates.io/crates/cardano-client-lib/settings) against `publish-rust.yml` +
+  [crates.io](https://crates.io/crates/mesmo/settings) against `publish-rust.yml` +
   `release`, and on [PyPI](https://docs.pypi.org/trusted-publishers/) against `publish-py.yml` +
   `release`. Each publisher matches on the **top-level workflow filename** and the environment name,
   so renaming either breaks the OIDC exchange until it is re-registered. crates.io needs the crate
@@ -197,11 +206,12 @@ so it is worth getting the publish tag right instead.
        every resulting wrapper manifest, lockfile, and constant update. Confirm
        `./gradlew checkVersions` passes, get the PR approved by a release code owner, and merge it
        to `main`.
-2. [ ] Merge auto-creates `vX.Y.Z` → `release.yml` builds + uploads the 5 platform tarballs +
+2. [ ] Approve the `authorize` job on `tag-release.yml` (environment `release`) to create
+       `vX.Y.Z` → `release.yml` builds + uploads the 5 platform tarballs +
        `SHA256SUMS`; `publish-js.yml`, `publish-rust.yml`, and `publish-py.yml` build, then wait on
        the `release` approval. `publish-py.yml` also attaches its 5 wheels to the release before the
        approval gate, so they are downloadable regardless of the PyPI outcome.
-3. [ ] Verify the release assets are named `cardano-client-lib-vX.Y.Z-<platform>.tar.gz`. **The Rust
+3. [ ] Verify the release assets are named `mesmo-vX.Y.Z-<platform>.tar.gz`. **The Rust
        crate is source-only** — its `build.rs` downloads these at the consumer's build time, so they
        must be uploaded *before* approving the crates.io publish, or a `cargo add` will fail.
 4. [ ] Approve the `release` environment on `publish-js.yml` (npm), `publish-rust.yml`
