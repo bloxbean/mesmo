@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOCS_ROOT = path.resolve(__dirname, '..');
 const CONTENT_ROOT = path.join(DOCS_ROOT, 'src/content/docs');
 
-const SITE = 'https://pages.bloxbean.com/mesmo';
+const SITE = 'https://getmesmo.dev';
 
 // Curated section order — mirrors the Astro sidebar in astro.config.mjs.
 // Missing files are skipped gracefully so a rename does not fail the build.

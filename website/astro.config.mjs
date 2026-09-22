@@ -4,14 +4,13 @@ import starlight from '@astrojs/starlight';
 import tailwindcss from '@tailwindcss/vite';
 import llmsIntegration from './scripts/llms-integration.mjs';
 
-// Current host: the org-wide GitHub Pages domain (bloxbean.github.io redirects here).
-// TODO: switch to the final Mesmo docs domain when it exists.
-const SITE = 'https://pages.bloxbean.com';
-const BASE = process.env.DOCS_BASE ?? '/mesmo';
+// The docs site has its own apex domain. It is served at the domain root, so there is no `base`
+// path any more (it used to be the /mesmo project-pages path). `public/CNAME` pins the domain into
+// every build, which is what keeps it through a deploy — see website/README.md.
+const SITE = 'https://getmesmo.dev';
 
 export default defineConfig({
   site: SITE,
-  base: BASE,
   integrations: [
     starlight({
       title: 'Mesmo',

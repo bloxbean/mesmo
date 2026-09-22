@@ -27,4 +27,6 @@ The `scripts/llms-integration.mjs` Astro integration publishes, at build time an
 
 ## Deployment
 
-`.github/workflows/website-deploy.yml` builds and publishes `website/dist` to GitHub Pages on a `dv*` tag (or manual dispatch), matching JuLC's flow. The site currently assumes the GitHub Pages project path (`https://pages.bloxbean.com/mesmo`); when a custom domain is chosen, set it in `astro.config.mjs` (`SITE`, drop `BASE`), add a `public/CNAME`, and update the hard-coded URLs in the AI pages.
+`.github/workflows/website-deploy.yml` builds and publishes `website/dist` to the `gh-pages` branch on a push to `main` that touches `website/` or `docs/` (or manual dispatch). The site is served from **https://getmesmo.dev**, so it lives at the domain root and `astro.config.mjs` sets no `base`.
+
+`public/CNAME` is what holds the custom domain: the deploy replaces the whole `gh-pages` tree, so a CNAME written once by the Pages settings UI would be wiped on the next deploy. Keeping it in `public/` means every build ships it. Changing the domain means editing that file, `SITE` in `astro.config.mjs`, and the absolute URLs in `scripts/generate-llms-txt.mjs`, `src/content/docs/ai/index.md` and `src/pages/index.astro`.

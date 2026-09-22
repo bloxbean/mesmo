@@ -35,11 +35,10 @@ jobs:
           npm ci
 
       - name: Build website
-        # Base path derived from the repository name, so GitHub Pages links survive a repo
-        # rename without touching the Astro config.
+        # No base path: the site is served at the root of getmesmo.dev (see astro.config.mjs).
         run: |
           cd website
-          DOCS_BASE="/${GITHUB_REPOSITORY#*/}" npm run build
+          npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
