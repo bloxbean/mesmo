@@ -7,54 +7,54 @@
 
 Key entry points for AI agents:
 
-- [AI Starter Pack](https://pages.bloxbean.com/mesmo/ai/starter-pack.md): everything an agent needs to use the bindings correctly
-- [llms-full.txt](https://pages.bloxbean.com/mesmo/llms-full.txt): the full docsite as one markdown file
+- [AI Starter Pack](https://getmesmo.dev/ai/starter-pack.md): everything an agent needs to use the bindings correctly
+- [llms-full.txt](https://getmesmo.dev/llms-full.txt): the full docsite as one markdown file
 
 ## AI
 
-- [Using Mesmo with AI Agents](https://pages.bloxbean.com/mesmo/ai/): How to use Claude Code, Cursor, Continue, ChatGPT, and other AI tools to build with Mesmo.
-- [Mesmo — AI Starter Pack](https://pages.bloxbean.com/mesmo/ai/starter-pack/): Everything an AI agent needs to write correct code against the Mesmo bindings on first try. Ingest this before generating code.
+- [Using Mesmo with AI Agents](https://getmesmo.dev/ai/): How to use Claude Code, Cursor, Continue, ChatGPT, and other AI tools to build with Mesmo.
+- [Mesmo — AI Starter Pack](https://getmesmo.dev/ai/starter-pack/): Everything an AI agent needs to write correct code against the Mesmo bindings on first try. Ingest this before generating code.
 
 ## Overview
 
-- [Overview](https://pages.bloxbean.com/mesmo/overview/): Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
-- [Getting Started](https://pages.bloxbean.com/mesmo/getting-started/): Install a wrapper package and build your first offline Cardano transaction in Python, Go, Rust, or JavaScript.
+- [Overview](https://getmesmo.dev/overview/): Cardano Client Lib as a native shared library, callable from Python, Go, Rust, and JavaScript — no JVM required.
+- [Getting Started](https://getmesmo.dev/getting-started/): Install a wrapper package and build your first offline Cardano transaction in Python, Go, Rust, or JavaScript.
 
 ## JavaScript (Bun)
 
-- [Cardano Client Lib for JavaScript (Bun)](https://pages.bloxbean.com/mesmo/js/)
-- [JavaScript API Reference](https://pages.bloxbean.com/mesmo/js/api/)
-- [Building Transactions (JavaScript)](https://pages.bloxbean.com/mesmo/js/transactions/)
-- [Providers & Evaluators (JavaScript)](https://pages.bloxbean.com/mesmo/js/providers/)
-- [Troubleshooting (JavaScript)](https://pages.bloxbean.com/mesmo/js/troubleshooting/)
+- [Cardano Client Lib for JavaScript (Bun)](https://getmesmo.dev/js/)
+- [JavaScript API Reference](https://getmesmo.dev/js/api/)
+- [Building Transactions (JavaScript)](https://getmesmo.dev/js/transactions/)
+- [Providers & Evaluators (JavaScript)](https://getmesmo.dev/js/providers/)
+- [Troubleshooting (JavaScript)](https://getmesmo.dev/js/troubleshooting/)
 
 ## Go
 
-- [Cardano Client Lib for Go](https://pages.bloxbean.com/mesmo/go/)
-- [Go API Reference](https://pages.bloxbean.com/mesmo/go/api/)
-- [Building Transactions (Go)](https://pages.bloxbean.com/mesmo/go/transactions/)
-- [Providers & Evaluators (Go)](https://pages.bloxbean.com/mesmo/go/providers/)
-- [Troubleshooting (Go)](https://pages.bloxbean.com/mesmo/go/troubleshooting/)
+- [Cardano Client Lib for Go](https://getmesmo.dev/go/)
+- [Go API Reference](https://getmesmo.dev/go/api/)
+- [Building Transactions (Go)](https://getmesmo.dev/go/transactions/)
+- [Providers & Evaluators (Go)](https://getmesmo.dev/go/providers/)
+- [Troubleshooting (Go)](https://getmesmo.dev/go/troubleshooting/)
 
 ## Rust
 
-- [Cardano Client Lib for Rust](https://pages.bloxbean.com/mesmo/rust/)
-- [Rust API Reference](https://pages.bloxbean.com/mesmo/rust/api/)
-- [Building Transactions (Rust)](https://pages.bloxbean.com/mesmo/rust/transactions/)
-- [Providers & Evaluators (Rust)](https://pages.bloxbean.com/mesmo/rust/providers/)
-- [Troubleshooting (Rust)](https://pages.bloxbean.com/mesmo/rust/troubleshooting/)
+- [Cardano Client Lib for Rust](https://getmesmo.dev/rust/)
+- [Rust API Reference](https://getmesmo.dev/rust/api/)
+- [Building Transactions (Rust)](https://getmesmo.dev/rust/transactions/)
+- [Providers & Evaluators (Rust)](https://getmesmo.dev/rust/providers/)
+- [Troubleshooting (Rust)](https://getmesmo.dev/rust/troubleshooting/)
 
 ## Python
 
-- [Cardano Client Lib for Python](https://pages.bloxbean.com/mesmo/python/)
-- [Python API Reference](https://pages.bloxbean.com/mesmo/python/api/)
-- [Building Transactions (Python)](https://pages.bloxbean.com/mesmo/python/transactions/)
-- [Providers & Evaluators (Python)](https://pages.bloxbean.com/mesmo/python/providers/)
-- [Troubleshooting (Python)](https://pages.bloxbean.com/mesmo/python/troubleshooting/)
+- [Cardano Client Lib for Python](https://getmesmo.dev/python/)
+- [Python API Reference](https://getmesmo.dev/python/api/)
+- [Building Transactions (Python)](https://getmesmo.dev/python/transactions/)
+- [Providers & Evaluators (Python)](https://getmesmo.dev/python/providers/)
+- [Troubleshooting (Python)](https://getmesmo.dev/python/troubleshooting/)
 
 ## Reference
 
-- [QuickTx — TxPlan (YAML) Transaction Builder](https://pages.bloxbean.com/mesmo/reference/txplan/)
-- [Platforms & Packages](https://pages.bloxbean.com/mesmo/reference/platforms/): Supported operating systems and architectures, package sizes, and how the native library reaches each language.
-- [Caveats & Limitations](https://pages.bloxbean.com/mesmo/reference/limitations/): What the bindings deliberately do not do, what does not work yet, and the sharp edges to know about before building on them.
-- [Architecture (ADRs)](https://pages.bloxbean.com/mesmo/reference/architecture/): The architecture decision records behind the bindings — why things are the way they are.
+- [QuickTx — TxPlan (YAML) Transaction Builder](https://getmesmo.dev/reference/txplan/)
+- [Platforms & Packages](https://getmesmo.dev/reference/platforms/): Supported operating systems and architectures, package sizes, and how the native library reaches each language.
+- [Caveats & Limitations](https://getmesmo.dev/reference/limitations/): What the bindings deliberately do not do, what does not work yet, and the sharp edges to know about before building on them.
+- [Architecture (ADRs)](https://getmesmo.dev/reference/architecture/): The architecture decision records behind the bindings — why things are the way they are.
