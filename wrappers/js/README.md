@@ -1,11 +1,11 @@
-# Mesmo — JavaScript (Bun)
+# Mesmo
 
 JavaScript bindings for [Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib)
 via the Mesmo native library, using Bun's built-in FFI.
 
-> Part of the [Mesmo](../../README.md) project. See the
-> [top-level README](../../README.md) for the full API reference and
-> [`docs/quicktx.md`](../../docs/quicktx.md) for transaction building.
+> Part of the [Mesmo](https://github.com/bloxbean/mesmo) project. See the
+> [top-level README](https://github.com/bloxbean/mesmo#readme) for the full API reference and
+> [`docs/quicktx.md`](https://github.com/bloxbean/mesmo/blob/main/docs/quicktx.md) for transaction building.
 
 ## Requirements
 
@@ -16,58 +16,32 @@ The native library is **bundled inside the platform package** — no separate do
 
 > **Node.js is not supported.** Node's FFI libraries (ffi-napi, koffi) crash against the
 > GraalVM native library due to stack-boundary detection. Use Bun, whose built-in FFI
-> works correctly. See the project [`TODO.md`](../../TODO.md) Non-Goals.
+> works correctly. See the project [`TODO.md`](https://github.com/bloxbean/mesmo/blob/main/TODO.md) Non-Goals.
 
 ## Installing
 
 **Recommended — a package that bundles the native library:**
 
 ```bash
-bun add @bloxbean/mesmo                 # once published
-# or, a locally built tarball:
-bun add ./bloxbean-mesmo-0.1.0.tgz
+bun add @bloxbean/mesmo
 ```
 
 The package ships the matching `libmesmo.*` under `libs/`, so `new Mesmo()` just works — nothing
-else to set. Build the tarball locally with:
+else to set. At load time the bindings look for the library in this order: an explicit
+`new Mesmo(libPath)`, the `MESMO_LIB_PATH` env var, then the bundled `libs/` copy.
 
-```bash
-./gradlew :wrappers:js:pack           # -> wrappers/js/bloxbean-mesmo-*.tgz
-```
+Building the tarball yourself, or developing against a locally built `libmesmo`:
+see [BUILD_FROM_SOURCE.md](https://github.com/bloxbean/mesmo/blob/main/wrappers/js/BUILD_FROM_SOURCE.md).
 
-At load time the bindings look for the library in this order: an explicit `new Mesmo(libPath)`,
-the `MESMO_LIB_PATH` env var, then the bundled `libs/` copy.
+## Examples
 
-**Development — against a locally built library** (no package): point `MESMO_LIB_PATH` at a directory
-containing `libmesmo.{dylib,so,dll}`:
-
-```bash
-./gradlew :core:nativeCompile         # build from source (needs Oracle GraalVM 25.0.3), or
-make download-lib                     # download a pre-built binary
-export MESMO_LIB_PATH=core/build/native/nativeCompile
-```
-
-At **runtime** the OS loader also needs it via `DYLD_LIBRARY_PATH` (macOS) /
-`LD_LIBRARY_PATH` (Linux).
-
-## Running the examples
-
-From `wrappers/js`:
-
-```bash
-LIB_DIR=../../core/build/native/nativeCompile
-
-MESMO_LIB_PATH=$LIB_DIR DYLD_LIBRARY_PATH=$LIB_DIR LD_LIBRARY_PATH=$LIB_DIR \
-  bun examples/account.js
-```
-
-The [`examples/`](examples/) directory contains:
+The [`examples/`](https://github.com/bloxbean/mesmo/tree/main/wrappers/js/examples) directory contains:
 
 | File | What it shows |
 |------|---------------|
-| [`account.js`](examples/account.js) | Create an account, restore from mnemonic, derive keys and a DRep ID |
-| [`primitives.js`](examples/primitives.js) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
-| [`transaction.js`](examples/transaction.js) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
+| [`account.js`](https://github.com/bloxbean/mesmo/blob/main/wrappers/js/examples/account.js) | Create an account, restore from mnemonic, derive keys and a DRep ID |
+| [`primitives.js`](https://github.com/bloxbean/mesmo/blob/main/wrappers/js/examples/primitives.js) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
+| [`transaction.js`](https://github.com/bloxbean/mesmo/blob/main/wrappers/js/examples/transaction.js) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
 
 ## Quick start
 
@@ -138,7 +112,7 @@ Transactions are defined as a [TxPlan](https://github.com/bloxbean/cardano-clien
 const result = lib.quicktx.build(yaml, utxos, protocolParams); // { tx_cbor, tx_hash, fee }
 ```
 
-See [`examples/transaction.js`](examples/transaction.js).
+See [`examples/transaction.js`](https://github.com/bloxbean/mesmo/blob/main/wrappers/js/examples/transaction.js).
 
 ## Chain-data providers (optional)
 
@@ -169,7 +143,7 @@ const result = await lib.quicktx.buildWith(yaml, provider, [senderAddress]); // 
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
 `TransactionEvaluator`; `buildWith` runs a two-pass (draft → evaluate → rebuild). libmesmo never makes
-HTTP calls ([ADR-0013](../../docs/adr/0013-transaction-evaluators.md)), so remote evaluation lives
+HTTP calls ([ADR-0013](https://github.com/bloxbean/mesmo/blob/main/docs/adr/0013-transaction-evaluators.md)), so remote evaluation lives
 here in the wrapper:
 
 ```javascript
