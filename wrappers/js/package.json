@@ -1,6 +1,6 @@
 {
   "name": "@bloxbean/mesmo",
-  "version": "0.1.0-pre7",
+  "version": "0.1.0-pre8",
   "description": "JavaScript bindings for Cardano Client Lib (CCL) via GraalVM native library",
   "license": "MIT",
   "homepage": "https://github.com/bloxbean/mesmo",
@@ -35,11 +35,11 @@
     "yaml": "^2.3.0"
   },
   "optionalDependencies": {
-    "@bloxbean/mesmo-linux-x86_64": "0.1.0-pre7",
-    "@bloxbean/mesmo-linux-aarch64": "0.1.0-pre7",
-    "@bloxbean/mesmo-linux-musl-x86_64": "0.1.0-pre7",
-    "@bloxbean/mesmo-macos-aarch64": "0.1.0-pre7",
-    "@bloxbean/mesmo-windows-x86_64": "0.1.0-pre7"
+    "@bloxbean/mesmo-linux-x86_64": "0.1.0-pre8",
+    "@bloxbean/mesmo-linux-aarch64": "0.1.0-pre8",
+    "@bloxbean/mesmo-linux-musl-x86_64": "0.1.0-pre8",
+    "@bloxbean/mesmo-macos-aarch64": "0.1.0-pre8",
+    "@bloxbean/mesmo-windows-x86_64": "0.1.0-pre8"
   },
   "engines": {
     "bun": ">=1.0.0"
