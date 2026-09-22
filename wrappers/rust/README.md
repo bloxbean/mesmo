@@ -1,11 +1,11 @@
-# Mesmo — Rust
+# Mesmo
 
 Rust bindings for [Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib)
 via the Mesmo native library.
 
-> Part of the [Mesmo](../../README.md) project. See the
-> [top-level README](../../README.md) for the full API reference and
-> [`docs/quicktx.md`](../../docs/quicktx.md) for transaction building.
+> Part of the [Mesmo](https://github.com/bloxbean/mesmo) project. See the
+> [top-level README](https://github.com/bloxbean/mesmo#readme) for the full API reference and
+> [`docs/quicktx.md`](https://github.com/bloxbean/mesmo/blob/main/docs/quicktx.md) for transaction building.
 
 ## Requirements
 
@@ -27,32 +27,22 @@ in-tree monorepo build, or **downloaded from the GitHub release** — then stage
 - Override the release tag it fetches from with `MESMO_LIB_VERSION`.
 - crates.io can't host the ~50 MB binary, so the crate carries only source + `build.rs`; the lib is
   pulled at build time (needs network on the first build). See
-  [ADR-0012](../../docs/adr/0012-native-lib-bundled-in-wrapper-packages.md).
+  [ADR-0012](https://github.com/bloxbean/mesmo/blob/main/docs/adr/0012-native-lib-bundled-in-wrapper-packages.md).
 
-## Running the examples
+## Examples
 
-From `wrappers/rust`, **no env vars required**:
+From a checkout, `cargo run --example account` — **no env vars required**.
 
-```bash
-cargo run --example account
-```
+Building against a locally built `libmesmo` from a checkout:
+see [BUILD_FROM_SOURCE.md](https://github.com/bloxbean/mesmo/blob/main/wrappers/rust/BUILD_FROM_SOURCE.md).
 
-For development against a locally built library, point `MESMO_LIB_PATH` at it (optional — the in-tree
-build is found automatically):
-
-```bash
-./gradlew :core:nativeCompile            # build from source (needs Oracle GraalVM 25.0.3), or
-make download-lib                        # download a pre-built binary
-MESMO_LIB_PATH=../../core/build/native/nativeCompile cargo run --example account
-```
-
-The [`examples/`](examples/) directory contains:
+The [`examples/`](https://github.com/bloxbean/mesmo/tree/main/wrappers/rust/examples) directory contains:
 
 | `--example` | What it shows |
 |-------------|---------------|
-| [`account`](examples/account.rs) | Create an account, restore from mnemonic, derive keys and a DRep ID |
-| [`primitives`](examples/primitives.rs) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
-| [`transaction`](examples/transaction.rs) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
+| [`account`](https://github.com/bloxbean/mesmo/blob/main/wrappers/rust/examples/account.rs) | Create an account, restore from mnemonic, derive keys and a DRep ID |
+| [`primitives`](https://github.com/bloxbean/mesmo/blob/main/wrappers/rust/examples/primitives.rs) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
+| [`transaction`](https://github.com/bloxbean/mesmo/blob/main/wrappers/rust/examples/transaction.rs) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
 
 ## Quick start
 
@@ -128,7 +118,7 @@ let result = lib.quicktx().build_with(&yaml, &provider, &[sender], 0, None)?; //
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
 `TransactionEvaluator`; `build_with` runs a two-pass (draft → evaluate → rebuild). libmesmo never
-makes HTTP calls ([ADR-0013](../../docs/adr/0013-transaction-evaluators.md)), so remote evaluation
+makes HTTP calls ([ADR-0013](https://github.com/bloxbean/mesmo/blob/main/docs/adr/0013-transaction-evaluators.md)), so remote evaluation
 lives here in the wrapper (also behind the `providers` feature):
 
 ```rust

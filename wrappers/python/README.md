@@ -1,11 +1,11 @@
-# Mesmo — Python
+# Mesmo
 
 Python bindings for [Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib)
-via the Mesmo native library. Pure `ctypes` — no JVM, no compiler, no C extension.
+via the Mesmo native library. Pure `ctypes` — no compiler, no C extension.
 
-> Part of the [Mesmo](../../README.md) project. See the
-> [top-level README](../../README.md) for the full API reference and
-> [`docs/quicktx.md`](../../docs/quicktx.md) for transaction building.
+> Part of the [Mesmo](https://github.com/bloxbean/mesmo) project. See the
+> [top-level README](https://github.com/bloxbean/mesmo#readme) for the full API reference and
+> [`docs/quicktx.md`](https://github.com/bloxbean/mesmo/blob/main/docs/quicktx.md) for transaction building.
 
 ## Requirements
 
@@ -32,49 +32,21 @@ Wheels are published for `linux-x86_64`, `linux-aarch64`, `linux-musl-x86_64` (A
 build `libmesmo` from source and point `MESMO_LIB_PATH` at it (see below).
 
 The wheel ships the matching `libmesmo.*` inside the package (`mesmo/_libs/`), so `import mesmo`
-just works — nothing else to set. Build one locally (needs `pip install build`):
+just works — nothing else to set. At load time the bindings look for the library in this order: an
+explicit `Mesmo(lib_path=...)`, the `MESMO_LIB_PATH` env var, then the bundled `mesmo/_libs/` copy.
 
-```bash
-./gradlew :wrappers:python:wheel     # -> wrappers/python/dist/mesmo-*.whl
-```
+Building the wheel yourself, or developing against a locally built `libmesmo`:
+see [BUILD_FROM_SOURCE.md](https://github.com/bloxbean/mesmo/blob/main/wrappers/python/BUILD_FROM_SOURCE.md).
 
-At load time the bindings look for the library in this order: an explicit `Mesmo(lib_path=...)`,
-the `MESMO_LIB_PATH` env var, then the bundled `mesmo/_libs/` copy.
+## Examples
 
-**Development — against a locally built library** (no wheel): point `MESMO_LIB_PATH` at a directory
-containing `libmesmo.{dylib,so,dll}`:
-
-```bash
-./gradlew :core:nativeCompile        # produces core/build/native/nativeCompile/libmesmo.*
-export MESMO_LIB_PATH=core/build/native/nativeCompile
-# (or: make download-lib to fetch a pre-built binary)
-```
-
-## Running the examples
-
-The package finds the library via the `MESMO_LIB_PATH` environment variable, and the OS
-loader needs it on its search path too. From the repo root:
-
-```bash
-LIB_DIR=core/build/native/nativeCompile
-
-PYTHONPATH=wrappers/python \
-MESMO_LIB_PATH=$LIB_DIR \
-DYLD_LIBRARY_PATH=$LIB_DIR \
-LD_LIBRARY_PATH=$LIB_DIR \
-  python3 wrappers/python/examples/01_account_and_keys.py
-```
-
-(`DYLD_LIBRARY_PATH` is for macOS, `LD_LIBRARY_PATH` for Linux — set both, the unused one
-is harmless.)
-
-The [`examples/`](examples/) directory contains:
+The [`examples/`](https://github.com/bloxbean/mesmo/tree/main/wrappers/python/examples) directory contains:
 
 | File | What it shows |
 |------|---------------|
-| [`01_account_and_keys.py`](examples/01_account_and_keys.py) | Create an account, restore from mnemonic, derive keys and a DRep ID |
-| [`02_primitives.py`](examples/02_primitives.py) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
-| [`03_build_and_sign_tx.py`](examples/03_build_and_sign_tx.py) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
+| [`01_account_and_keys.py`](https://github.com/bloxbean/mesmo/blob/main/wrappers/python/examples/01_account_and_keys.py) | Create an account, restore from mnemonic, derive keys and a DRep ID |
+| [`02_primitives.py`](https://github.com/bloxbean/mesmo/blob/main/wrappers/python/examples/02_primitives.py) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
+| [`03_build_and_sign_tx.py`](https://github.com/bloxbean/mesmo/blob/main/wrappers/python/examples/03_build_and_sign_tx.py) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
 
 ## Quick start
 
@@ -134,7 +106,7 @@ Transactions are defined as a [TxPlan](https://github.com/bloxbean/cardano-clien
 result = lib.quicktx.build(txplan_yaml, utxos, protocol_params)  # -> {"tx_cbor","tx_hash","fee"}
 ```
 
-See [`examples/03_build_and_sign_tx.py`](examples/03_build_and_sign_tx.py).
+See [`examples/03_build_and_sign_tx.py`](https://github.com/bloxbean/mesmo/blob/main/wrappers/python/examples/03_build_and_sign_tx.py).
 
 ## Chain-data providers (optional)
 
@@ -164,7 +136,7 @@ result = lib.quicktx.build_with(txplan_yaml, provider, [sender_address])  # Scal
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
 `TransactionEvaluator`; `build_with` runs a two-pass (draft → evaluate → rebuild). libmesmo never
-makes HTTP calls ([ADR-0013](../../docs/adr/0013-transaction-evaluators.md)), so remote evaluation
+makes HTTP calls ([ADR-0013](https://github.com/bloxbean/mesmo/blob/main/docs/adr/0013-transaction-evaluators.md)), so remote evaluation
 lives here in the wrapper:
 
 ```python

@@ -1,14 +1,29 @@
-# Code owners for release-critical paths. Combined with the `main` branch ruleset's
-# "Require review from Code Owners", any PR touching these paths needs an approving review from one
-# of the listed owners. See docs/release-flow.md.
+# Release owners. Combined with the `main` branch ruleset's "Require review from Code Owners", a PR
+# that touches any of these paths needs an approving review from one of them. Changing `version` in
+# gradle.properties drives the tag and the release, and the other paths decide what runs, with the
+# release credentials, when it does.
 #
-# There is intentionally no catch-all `*` rule: all other source (wrappers/*, core/*, docs, ...)
-# stays unowned and does NOT require these reviewers. CODEOWNERS is last-match-wins, so keep the
-# patterns below non-overlapping.
+# There is intentionally no catch-all `*` rule: everything else (wrappers/*, core/*, docs, ...) stays
+# unowned and does NOT require these reviewers. CODEOWNERS is last-match-wins, so keep the patterns
+# below non-overlapping. Release owners are managed as the org team bloxbean/release-owners, which is
+# also the reviewer of the `release` and `github-pages` environments — so an owner change is a team
+# membership change, made in one place. The team must stay visible and keep write access to this
+# repository, or GitHub silently ignores these entries.
+#
+# CODEOWNERS is read from a PR's base branch.
 
-# Bumping the version drives the auto-tag + release.
-/gradle.properties        @satran004 @matiwinnetou @fabianbormann
+# This file, so the protection can't be removed without a release owner.
+/.github/CODEOWNERS        @bloxbean/release-owners
 
-# Protect the release pipeline and this gate itself from unreviewed changes.
-/.github/workflows/       @satran004 @matiwinnetou @fabianbormann
-/.github/CODEOWNERS       @satran004 @matiwinnetou @fabianbormann
+# Every workflow runs with the repository's secrets once it is on a protected branch.
+/.github/workflows/        @bloxbean/release-owners
+
+# Version bump -> tag -> release.
+/gradle.properties         @bloxbean/release-owners
+
+# Build logic evaluated by the credentialed release jobs, and the Gradle distribution that runs it.
+/build.gradle              @bloxbean/release-owners
+/settings.gradle           @bloxbean/release-owners
+/gradle/wrapper/           @bloxbean/release-owners
+/gradlew                   @bloxbean/release-owners
+/gradlew.bat               @bloxbean/release-owners

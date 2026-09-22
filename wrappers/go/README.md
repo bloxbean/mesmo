@@ -1,12 +1,12 @@
-# Mesmo — Go
+# Mesmo
 
 Go bindings for [Cardano Client Lib](https://github.com/bloxbean/cardano-client-lib)
 via the Mesmo native library. Pure Go — the library is loaded with
 [purego](https://github.com/ebitengine/purego), so there is **no cgo and no C toolchain**.
 
-> Part of the [Mesmo](../../README.md) project. See the
-> [top-level README](../../README.md) for the full API reference and
-> [`docs/quicktx.md`](../../docs/quicktx.md) for transaction building.
+> Part of the [Mesmo](https://github.com/bloxbean/mesmo) project. See the
+> [top-level README](https://github.com/bloxbean/mesmo#readme) for the full API reference and
+> [`docs/quicktx.md`](https://github.com/bloxbean/mesmo/blob/main/docs/quicktx.md) for transaction building.
 
 ## Install
 
@@ -30,22 +30,19 @@ download errors rather than silently using a stale library.
 > Linux x86_64). Calls are serialized; create multiple `Mesmo` instances if you need
 > concurrent isolate work.
 
-## Running the examples
+## Examples
 
-From `wrappers/go` (the library is auto-resolved; set `MESMO_LIB_PATH` to a local build to
-skip the download):
+From a checkout, `go run ./examples/account` in `wrappers/go` — the library is auto-resolved.
+Building against a locally built `libmesmo`:
+see [BUILD_FROM_SOURCE.md](https://github.com/bloxbean/mesmo/blob/main/wrappers/go/BUILD_FROM_SOURCE.md).
 
-```bash
-go run ./examples/account
-```
-
-The [`examples/`](examples/) directory contains:
+The [`examples/`](https://github.com/bloxbean/mesmo/tree/main/wrappers/go/examples) directory contains:
 
 | Program | What it shows |
 |---------|---------------|
-| [`account`](examples/account/main.go) | Create an account, restore from mnemonic, derive keys and a DRep ID |
-| [`primitives`](examples/primitives/main.go) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
-| [`transaction`](examples/transaction/main.go) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
+| [`account`](https://github.com/bloxbean/mesmo/blob/main/wrappers/go/examples/account/main.go) | Create an account, restore from mnemonic, derive keys and a DRep ID |
+| [`primitives`](https://github.com/bloxbean/mesmo/blob/main/wrappers/go/examples/primitives/main.go) | Mnemonics, Blake2b hashing, Ed25519 signing, address parsing/validation |
+| [`transaction`](https://github.com/bloxbean/mesmo/blob/main/wrappers/go/examples/transaction/main.go) | Build an unsigned payment **offline** (QuickTx) and sign it — no node/DevKit needed |
 
 ## Quick start
 
@@ -97,7 +94,7 @@ Errors are returned as a `*mesmo.MesmoError`.
 Transactions are built from a [TxPlan](https://github.com/bloxbean/cardano-client-lib)
 **YAML** document via `lib.QuickTx.Build(yaml, utxos, protocolParams)`, fully offline —
 you supply the UTXOs and protocol parameters. See
-[`examples/transaction`](examples/transaction/main.go).
+[`examples/transaction`](https://github.com/bloxbean/mesmo/blob/main/wrappers/go/examples/transaction/main.go).
 
 ## Chain-data providers (optional)
 
@@ -124,7 +121,7 @@ result, err := lib.QuickTx.BuildWith(yaml, provider, []string{senderAddress}, 0)
 
 To use a **remote** evaluator instead (e.g. an authoritative fallback), pass a
 `TransactionEvaluator`; `BuildWith` runs a two-pass (draft → evaluate → rebuild). libmesmo never makes
-HTTP calls ([ADR-0013](../../docs/adr/0013-transaction-evaluators.md)), so remote evaluation lives
+HTTP calls ([ADR-0013](https://github.com/bloxbean/mesmo/blob/main/docs/adr/0013-transaction-evaluators.md)), so remote evaluation lives
 here in the wrapper:
 
 ```go
