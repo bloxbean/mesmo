@@ -1,0 +1,45 @@
+# Dependabot is used here for SECURITY updates only.
+# Version updates are turned off (open-pull-requests-limit: 0) because routine
+# upgrades are handled by a separate weekly maintenance process; security-update
+# PRs ignore this limit and still open whenever a vulnerable dependency has a fix.
+# Note: security-update PRs also need "Dependabot security updates" enabled in
+# Settings > Code security.
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directories:
+      - "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "gomod"
+    directories:
+      - "/wrappers/go"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "npm"
+    directories:
+      - "/wrappers/js"
+      - "/website"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "pip"
+    directories:
+      - "/wrappers/python"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+  - package-ecosystem: "cargo"
+    directories:
+      - "/wrappers/rust"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
