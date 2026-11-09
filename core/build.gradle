@@ -38,10 +38,10 @@ dependencies {
     compileOnly "org.graalvm.sdk:nativeimage:25.3.4.1"
 
     // SLF4J NOP - avoids log framework init issues in native image
-    implementation 'org.slf4j:slf4j-nop:2.0.11'
+    implementation 'org.slf4j:slf4j-nop:2.0.20'
 
     // Test
-    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation platform('org.junit:junit-bom:6.1.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
